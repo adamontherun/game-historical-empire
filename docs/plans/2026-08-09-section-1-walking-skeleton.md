@@ -147,6 +147,16 @@ Run all gates in one shell sequence before marking complete.
 - **Risk:** `uv` not on CI — keep `uv` as primary per grill; fallback is `pip install -e backend` but not implemented in Section 1.
 - **Rollback:** Revert with `rm -rf backend/app/domain backend/app/engine backend/tests backend/pyproject.toml backend/uv.lock backend/.venv Makefile backend/.python-version && git restore BUILD_SPEC.md DECISIONS.md` (DECISIONS.md wording reverts). Plan file itself is safe to keep.
 
+## Implementation outcome (audit superseded draft assumptions)
+
+During implementation the draft plan was superseded by audit findings. The following were removed or narrowed to keep Section 1 minimal:
+
+- `pytest-asyncio` / `asyncio_mode = auto` — removed; add `pytest-asyncio` only when genuine async tests are introduced
+- duplicate `backend/.python-version` — removed, keep root `.python-version` only
+- placeholder `add(a, b)` in `backend/app/engine/__init__.py` — removed; `__init__.py` files are empty, `test_sanity.py` now proves only that `app.engine`/`app.domain` import
+- grep/`sys.modules`-based purity test — replaced with recursive AST `rglob("*.py")` import-boundary test covering future `engine/*.py` and `domain/*.py` files
+- repo-wide Ruff targets (`ruff check .` / `ruff format .`) — narrowed to `ruff check backend` / `ruff format backend` so `AGENTS.md` and plans are not formatted
+
 ## Open Questions
 
 - None — grill-settled. One verified assumption: `DECISIONS.md:001` will be edited to include verbatim 3 bullets; `Makefile` is a thin wrapper only and does not constitute future-system scaffolding.

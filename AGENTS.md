@@ -19,11 +19,18 @@ Long-term promise: spot the next economic bottleneck before rivals — know when
 
 ## 3. Authority & Execution
 
-Precedence:
+Authority:
+
+- `BUILD_SPEC.md` active Section — implementation authority (what to build now)
+- `AGENTS.md` — standing engineering and agent rules (how to build)
+- `DECISIONS.md` — durable decisions that refine the spec
+- `STATE.md` — current handoff state (what is complete, what is next)
+
+Precedence when rules conflict:
 
 1. Currently active numbered Section in `BUILD_SPEC.md`
-2. Accepted decisions in `DECISIONS.md`
-3. Global rules in `BUILD_SPEC.md` (Parts I–III)
+2. `DECISIONS.md`
+3. `AGENTS.md` and global rules in `BUILD_SPEC.md` (Parts I–III)
 4. Future Sections (context, not scope)
 5. Older drafts
 
@@ -31,12 +38,16 @@ Protocol for every Section:
 
 1. Read `BUILD_SPEC.md` fully, then the active Section again
 2. Inspect repo + tests before changing anything
-3. **Always enter plan mode first** — use `/plan` to produce the smallest coherent implementation plan and get it approved before any code changes
-4. `/grill` for scope creep, missing tests, premature abstraction — revise plan downward if possible
-5. `/goal` — implement only the approved Section
-6. Run every acceptance check in that Section
-7. Commit the Section: create a feature branch `section/<n>-<slug>` (e.g. `section/1-walking-skeleton`), `git add` the Section's files + updated `STATE.md`, commit, and push to GitHub `adamontherun` (`git push -u origin section/<n>-<slug>`)
-8. Stop — do not auto-advance. Report files changed, commands, tests, risks, and the pushed branch URL.
+3. Create feature branch `section/<n>-<slug>` (e.g. `section/2-core-types`) from `main` before any code changes
+4. Use `/plan` to create a draft plan
+5. Exit/cancel the initial plan approval (do not approve the draft)
+6. Use `/grill` to pressure-test the saved draft plan for scope creep, missing tests, premature abstraction
+7. Revise the plan
+8. Approve the final plan
+9. Use `/goal` to implement only the approved Section
+10. Run every acceptance check in that Section
+11. Push the feature branch to GitHub `adamontherun` (`git push -u origin section/<n>-<slug>`)
+12. Stop — do not auto-advance. Report files changed, commands, tests, risks, and the pushed branch URL.
 
 Only the `Status` line of a Section may be updated after all gates pass.
 
@@ -44,40 +55,44 @@ Only the `Status` line of a Section may be updated after all gates pass.
 
 - **Highly autonomous by default.** Do not check in frequently or ask for permission to proceed within an active Section. Make the smallest correct decision that satisfies the active Section's acceptance criteria and the conventions in this file.
 - **Check in only when necessary:** ambiguous requirements where two reasonable interpretations would produce different accepted behavior, a blocked dependency (missing credential, external service down), or a decision that would meaningfully expand scope beyond the active Section.
-- **After each Section:** commit + push a feature branch to GitHub (`adamontherun`) as in §3 step 7, then stop, do not auto-advance. Report files changed, commands run, tests/checks run + results, pushed branch URL, and known risks/follow-ups — then wait for human go-ahead to start the next Section.
+- **After each Section:** push the feature branch created in §3 step 3 to GitHub (`adamontherun`), then stop, do not auto-advance. Report files changed, commands run, tests/checks run + results, pushed branch URL, and known risks/follow-ups — then wait for human go-ahead to start the next Section.
 
-## 5. Repository Structure
+## 5. Git workspace safety
 
-```
-backend/
-  app/
-    domain/          # pure business rules — sync, no I/O
-    engine/          # simulation kernel — pure, deterministic
-    routers/         # thin FastAPI routers — validate + delegate
-    services/        # business logic — coordinates clients
-    clients/
-      database/      # DB operations (repository layer)
-      networking/    # external API clients
-    models/          # SQLAlchemy ORM models
-    schemas/         # Pydantic request/response schemas
-    errors/          # custom exceptions + handlers
-    dependencies.py  # ONLY file that knows about `Depends`
-    utils/           # stateless helpers
-  tests/
-    unit_tests/      # mocked — never touches DB/network
-    integration_tests/ # real Postgres (rollback), real network
-  main.py            # app factory, lifespan, router registration
-  database.py        # async engine, session factory, get_db_session
-frontend/            # Vite+React — minimal until Section 11
-docs/
-BUILD_SPEC.md
-DECISIONS.md
-AGENTS.md            # this file
-```
+Before starting any Section:
 
-Create abstractions after 2 concrete use cases. Do not scaffold future ages/systems early.
+1. Verify this is the real repository checkout:
+   - `git rev-parse --show-toplevel`
+   - `git remote get-url origin`
+   - `git status --short`
+   - `git branch --show-current`
 
-## 6. FastAPI Conventions (Beta Acid Reference App)
+2. Fetch the remote and start the Section branch from the current remote main:
+   - `git fetch origin`
+   - ensure local `main` matches or can fast-forward to `origin/main`
+   - create `section/<n>-<slug>` from `origin/main`
+
+3. Never create a temporary clone, temporary Git repository, or `/tmp` copy as a workaround for Git sandbox restrictions.
+
+4. Never push commits from a temporary copy of the workspace.
+
+5. If the sandbox prevents writing `.git`, creating/switching a branch, committing, or pushing:
+   - stop Git operations
+   - preserve all working-tree files
+   - tell the user the exact Git command that must be run outside Muse
+   - after the user runs it, re-read Git state in the original workspace before continuing
+
+6. Do not run `git init` inside an existing project merely because Git commands fail. First determine whether `.git` is missing, inaccessible, sandboxed, or the checkout is incorrect.
+
+7. Before declaring a Section complete, verify:
+   - current branch is `section/<n>-<slug>`
+   - working tree contains only intended changes
+   - the Section commit exists locally
+   - the remote Section branch points to the pushed Section commit
+
+The original project directory is authoritative. Build/cache workarounds may use `/tmp` when appropriate; Git repository state must not.
+
+## 6. FastAPI Conventions
 
 Follow https://github.com/betaacid/FastAPI-Reference-App exactly:
 
@@ -153,21 +168,19 @@ MODERATE   API integration tests
 LIMITED    critical Playwright browser flows
 ```
 
-- **Unit:** `tests/unit_tests/` — every layer isolated. Injected deps via `dependency_overrides`, plain functions via `@patch`. `httpx.MockTransport` for networking clients. No real DB/network. `pytest-asyncio` `asyncio_mode = auto` so `async def test_*` needs no decorator.
+- **Unit:** `tests/unit_tests/` — every layer isolated. Injected deps via `dependency_overrides`, plain functions via `@patch`. `httpx.MockTransport` for networking clients. No real DB/network. Add `pytest-asyncio` only when genuine async tests are introduced.
 - **Integration:** `tests/integration_tests/` — real Postgres + real external calls. `integration_client` overrides `get_db_session` to **rollback** instead of commit. Requires `.env` with `DATABASE_URL`. Lazy engine creation so imports don't need DB.
 - **Playwright:** only critical path (start → 5-turn completion, mobile `390×844` + desktop smoke). Screenshots for first decision / drought warning / drought reveal / summary. No coverage gate on UI.
 - **Coverage:** tracked (`pytest --cov`) but **not blocking** until Section 3–4 kernel stabilizes. Target when gating is added: `90%+ engine/domain/services`, `80%+ overall`.
 
-Commands (via `uv`):
+Commands:
 
 ```bash
-uv sync
-uv run pytest tests/unit_tests/ -v          # no DB needed
-uv run pytest tests/integration_tests/ -v   # needs DATABASE_URL
-uv run pytest -v
-uv run ruff check .
-uv run ruff format --check .
-uv run pyright
+uv sync --project backend
+make test          # = pytest
+make lint          # = ruff check backend
+make type          # = pyright
+make format-check  # = ruff format --check backend
 ```
 
 ## 10. API Contract (from Section 10, for reference)
