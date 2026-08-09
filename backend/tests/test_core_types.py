@@ -45,7 +45,6 @@ def test_game_state_valid_construction() -> None:
             inventory=InventoryState(grain=50),
             farm_capacity=10,
             storage_capacity=100,
-            operations=[OperationState(id="farm_1", kind="farm", capacity=10)],
         ),
         market=MarketState(supply=100, demand=120, base_price=5000, current_price=5200),
     )

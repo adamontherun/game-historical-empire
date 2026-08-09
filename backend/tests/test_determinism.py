@@ -15,10 +15,11 @@ def test_derive_seed_stable_same_material() -> None:
 
 
 def test_derive_seed_golden_values() -> None:
-    # Golden values generated via blake2b(digest_size=8) canonical serialization.
-    assert derive_seed("seed-001", "1.0", 1, "market", "home_valley", 0) == 8430719109992129109
-    assert derive_seed("seed-001", "1.0", 1, "market", "home_valley", 1) == 7423421374912178531
-    assert derive_seed("seed-001", "1.0", 1, "rival", "mira", 0) == 5631495137868431154
+    # Golden values generated via blake2b(digest_size=8) over JSON canonical
+    # [run_seed, ruleset_version, turn, namespace, entity_id, ordinal].
+    assert derive_seed("seed-001", "1.0", 1, "market", "home_valley", 0) == 9000414367206956173
+    assert derive_seed("seed-001", "1.0", 1, "market", "home_valley", 1) == 8070410502144384724
+    assert derive_seed("seed-001", "1.0", 1, "rival", "mira", 0) == 6965261172636434297
 
 
 def test_different_namespaces_produce_different_streams() -> None:
@@ -45,6 +46,26 @@ def test_different_entity_ids_produce_different_seeds() -> None:
     assert a != b
 
 
+def test_delimiter_collision_regression() -> None:
+    """RNG serialization must not collide on delimiter-containing strings.
+
+    Old naive '|'-join would give same canonical string for
+    ('a|b','c') vs ('a','b|c'); JSON array encoding must distinguish them.
+    """
+    a = derive_seed("a|b", "c", 1, "ns", "e", 0)
+    b = derive_seed("a", "b|c", 1, "ns", "e", 0)
+    assert a != b
+
+    c = derive_seed("ab", "1.0", 1, "c|d", "e", 0)
+    d = derive_seed("ab|c", "1.0", 1, "d", "e", 0)
+    assert c != d
+
+    # Also ensure '|' inside a single field changes the seed
+    e = derive_seed("seed|001", "1.0", 1, "market", "home_valley", 0)
+    f = derive_seed("seed001", "1.0", 1, "market", "home_valley", 0)
+    assert e != f
+
+
 def test_make_rng_deterministic_sequence() -> None:
     seed = derive_seed("seed-001", "1.0", 1, "market", "home_valley", 0)
     r1 = make_rng(seed)
@@ -60,33 +81,38 @@ def test_rng_for_convenience_same_as_derive() -> None:
 
 
 def test_no_global_random_usage_in_engine() -> None:
-    """AC #5: engine/rng.py must not use global random functions."""
-    rng_path = Path(__file__).parent.parent / "app" / "engine" / "rng.py"
-    source = rng_path.read_text(encoding="utf-8")
-    tree = ast.parse(source, filename=str(rng_path))
-    # Allowed: import random, random.Random
-    # Forbidden: random.random(), random.randint(), etc. as globals
-    # Also forbidden: from random import ...
-    for node in ast.walk(tree):
-        if isinstance(node, ast.ImportFrom):
-            assert node.module != "random", (
-                "rng.py must not use 'from random import ...' (global state risk)"
-            )
-        if isinstance(node, ast.Attribute):
-            # e.g. random.randint -> flag if Attribute is under Name 'random' and not 'Random'
-            if (
-                isinstance(node.value, ast.Name)
-                and node.value.id == "random"
-                and node.attr != "Random"
-            ):
-                # Catch random.* not Random; make_rng uses Random ok
-                # Excluded Random above; other attrs forbidden
-                # hashlib etc are fine
-                raise AssertionError(
-                    f"rng.py must not use global random.{node.attr} — use Random instance instead"
+    """AC #5: engine must not use global random functions (all files)."""
+    engine_dir = Path(__file__).parent.parent / "app" / "engine"
+    for path in engine_dir.rglob("*.py"):
+        source = path.read_text(encoding="utf-8")
+        if not source.strip():
+            continue
+        tree = ast.parse(source, filename=str(path))
+        # Allowed: import random, random.Random
+        # Forbidden: random.random(), random.randint(), etc. as globals
+        # Also forbidden: from random import ...
+        for node in ast.walk(tree):
+            if isinstance(node, ast.ImportFrom):
+                assert node.module != "random", (
+                    f"{path.name} must not use 'from random import ...' (global state risk)"
                 )
-    # Also ensure no built-in hash() usage
-    assert "hash(" not in source or "hashlib" in source, "rng.py must not use built-in hash()"
+            if isinstance(node, ast.Attribute):
+                # e.g. random.randint -> flag if Attribute under Name 'random' and not 'Random'
+                if (
+                    isinstance(node.value, ast.Name)
+                    and node.value.id == "random"
+                    and node.attr != "Random"
+                ):
+                    # Catch random.* not Random; make_rng uses Random ok
+                    # Excluded Random above; other attrs forbidden
+                    # hashlib etc are fine
+                    raise AssertionError(
+                        f"{path.name} must not use global random.{node.attr}"
+                        " — use Random instance instead"
+                    )
+        # Also ensure no built-in hash() usage in engine files
+        if "hash(" in source and "hashlib" not in source:
+            raise AssertionError(f"{path.name} appears to use built-in hash() — forbidden")
 
 
 def test_no_hash_builtin_in_domain_or_engine() -> None:

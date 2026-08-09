@@ -51,7 +51,13 @@ class OperationState(BaseModel):
 
 
 class PlayerState(BaseModel):
-    """Player economic exposure."""
+    """Player economic exposure — single source of truth for capacities.
+
+    For Sections 2-4 farm/storage capacities are explicit aggregates.
+    OperationState exists as a standalone type for future Section 5 use
+    but is not embedded here to avoid coherent-state duplication
+    (frozen + mutable list + duplicate capacity sources).
+    """
 
     model_config = ConfigDict(frozen=True)
 
@@ -59,9 +65,6 @@ class PlayerState(BaseModel):
     inventory: InventoryState = Field(description="Player inventory")
     farm_capacity: Quantity = Field(description="Total farm capacity")
     storage_capacity: Quantity = Field(description="Total storage capacity")
-    operations: list[OperationState] = Field(
-        default_factory=list, description="Operations owned (stub for Sec 5)"
-    )
 
 
 class MarketState(BaseModel):
