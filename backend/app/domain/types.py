@@ -8,8 +8,9 @@ Covers 10 required concepts:
 - cash, grain inventory, farm capacity, storage capacity,
   regional supply/demand, grain price, turn, run_seed, ruleset_version
 
-Six models: GameState, PlayerState, MarketState, OperationState,
+Models: GameState, PlayerState, MarketState, OperationState,
 InventoryState, TurnContext plus Money/Quantity/BasisPoints/PriceMilliunits.
+WorldCondition and PlayerCommand added in Section 3.
 """
 
 from __future__ import annotations
@@ -68,10 +69,7 @@ class PlayerState(BaseModel):
 
 
 class MarketState(BaseModel):
-    """Regional grain market — minimal for Sections 2-4.
-
-    Responsiveness / max movement deferred to Section 3.
-    """
+    """Regional grain market — one market, one good (grain) for Section 3."""
 
     model_config = ConfigDict(frozen=True)
 
@@ -79,6 +77,12 @@ class MarketState(BaseModel):
     demand: Quantity = Field(description="Regional grain demand")
     base_price: PriceMilliunits = Field(description="Base price milliunits")
     current_price: PriceMilliunits = Field(description="Current price milliunits")
+    responsiveness: BasisPoints = Field(
+        default=5000, description="Price responsiveness bps (10_000=100% pass-through)"
+    )
+    max_movement_bps: BasisPoints = Field(
+        default=2000, description="Max per-turn price movement bps (10_000=100%)"
+    )
 
 
 class TurnContext(BaseModel):
@@ -89,6 +93,22 @@ class TurnContext(BaseModel):
     turn: int = Field(ge=0, description="Current turn number")
     run_seed: str = Field(description="Opaque run seed")
     ruleset_version: str = Field(description="Ruleset version")
+
+
+WorldCondition = Literal["normal", "drought"]
+
+
+class PlayerCommand(BaseModel):
+    """Player turn command — one major action per turn (Section 3)."""
+
+    model_config = ConfigDict(frozen=True)
+
+    type: Literal["expand_farm", "build_granary", "buy_grain", "hold"] = Field(
+        description="Command type"
+    )
+    quantity: Quantity | None = Field(
+        default=None, description="Grain quantity for buy_grain (ignored otherwise)"
+    )
 
 
 class GameState(BaseModel):

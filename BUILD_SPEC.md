@@ -743,7 +743,7 @@ Stop when the core types and deterministic RNG are stable enough to implement a 
 
 # SECTION 3 — One-Turn Grain Market Kernel
 
-**Status:** NOT STARTED
+**Status:** COMPLETE
 
 ## Goal
 
