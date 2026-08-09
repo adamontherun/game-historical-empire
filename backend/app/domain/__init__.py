@@ -1,9 +1,11 @@
 """Domain package — re-exports canonical types."""
 
 from app.domain.trace import (
+    CausalEdge,
     CausalNode,
     CausalTrace,
     DomainEffect,
+    OutcomeDriver,
     PlayerOutcome,
     TurnResolution,
 )
@@ -24,6 +26,7 @@ from app.domain.types import (
 
 __all__ = [
     "BasisPoints",
+    "CausalEdge",
     "CausalNode",
     "CausalTrace",
     "DomainEffect",
@@ -32,6 +35,7 @@ __all__ = [
     "MarketState",
     "Money",
     "OperationState",
+    "OutcomeDriver",
     "PlayerCommand",
     "PlayerState",
     "PlayerOutcome",

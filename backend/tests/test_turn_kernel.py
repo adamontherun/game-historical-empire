@@ -168,7 +168,7 @@ def test_farm_output_parents_are_world_and_farm_capacity_not_command() -> None:
         if cmd_type == "expand_farm":
             assert "command" in farm_cap.parent_ids
         else:
-            assert farm_cap.parent_ids == [], (
+            assert farm_cap.parent_ids == (), (
                 f"{cmd_type} should not make farm_capacity child of command"
             )
         # No direct world→price edge already covered, but also ensure supply→price chain intact
@@ -282,7 +282,7 @@ def test_price_bounded_movement() -> None:
 
 
 def test_turn_order_constant() -> None:
-    assert TURN_ORDER == "command -> production -> supply -> price -> settlement"
+    assert TURN_ORDER == "command -> production -> supply -> price -> settlement -> valuation"
 
 
 def test_player_outcome_drivers_deterministic_and_bounded() -> None:
