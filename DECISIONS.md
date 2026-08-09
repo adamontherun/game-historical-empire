@@ -49,9 +49,9 @@ Record of accepted decisions that constrain implementation. `BUILD_SPEC.md` acti
 
 - **Decision:** Agent is highly autonomous within an active Section — do not check in frequently. Check in only for genuine ambiguity (two interpretations would change accepted behavior), blocked dependencies, or scope-expanding decisions. After each Section, stop, report (files changed, commands, tests/results, risks), and wait for go-ahead before the next Section.
 
-## 008 — Plan Mode (2026-08-09)
+## 008 — Plan Mode (2026-08-09) — revised 2026-08-09
 
-- **Decision:** Section workflow is `/plan` (creates draft) → exit/cancel initial approval → `/grill` the saved draft → revise → approve final plan → `/goal` implements.
+- **Decision:** Section workflow is `/plan` (creates draft in `docs/plans/`) → Approve / Request changes (single gate) → implement. The former `/grill` and `/goal` skills are not part of the required path — grill-type pressure testing, when needed, is surfaced as open questions inside the plan itself. The Muse approval gate is the only gate.
 
 ## 009 — Feature Branch per Section (2026-08-09)
 

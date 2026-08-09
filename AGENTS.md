@@ -39,15 +39,12 @@ Protocol for every Section:
 1. Read `BUILD_SPEC.md` fully, then the active Section again
 2. Inspect repo + tests before changing anything
 3. Create feature branch `section/<n>-<slug>` (e.g. `section/2-core-types`) from `main` before any code changes
-4. Use `/plan` to create a draft plan
-5. Exit/cancel the initial plan approval (do not approve the draft)
-6. Use `/grill` to pressure-test the saved draft plan for scope creep, missing tests, premature abstraction
-7. Revise the plan
-8. Approve the final plan
-9. Use `/goal` to implement only the approved Section
-10. Run every acceptance check in that Section
-11. Push the feature branch to GitHub `adamontherun` (`git push -u origin section/<n>-<slug>`)
-12. Stop — do not auto-advance. Report files changed, commands, tests, risks, and the pushed branch URL.
+4. Use `/plan` to create a draft plan (saved to `docs/plans/`)
+5. Approve / Request changes — single gate (revise until approved). If the draft has scope creep, missing tests, or premature abstraction, surface it as open questions in the plan itself — no separate `/grill` skill required.
+6. Implement only the approved Section
+7. Run every acceptance check in that Section
+8. Push the feature branch to GitHub `adamontherun` (`git push -u origin section/<n>-<slug>`)
+9. Stop — do not auto-advance. Report files changed, commands, tests, risks, and the pushed branch URL.
 
 Only the `Status` line of a Section may be updated after all gates pass.
 
