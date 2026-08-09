@@ -62,7 +62,7 @@ def test_turn_must_be_non_negative() -> None:
             player=PlayerState(
                 cash=0, inventory=InventoryState(grain=0), farm_capacity=0, storage_capacity=0
             ),
-            market=MarketState(supply=0, demand=0, base_price=0, current_price=0),
+            market=MarketState(supply=0, demand=0, base_price=1, current_price=1),
         )
 
 
@@ -96,9 +96,43 @@ def test_to_turn_context() -> None:
         player=PlayerState(
             cash=0, inventory=InventoryState(grain=0), farm_capacity=0, storage_capacity=0
         ),
-        market=MarketState(supply=0, demand=0, base_price=0, current_price=0),
+        market=MarketState(supply=0, demand=0, base_price=1, current_price=1),
     )
     ctx = state.to_turn_context()
     assert ctx.turn == 3
     assert ctx.run_seed == "seed-xyz"
     assert ctx.ruleset_version == "2.0"
+
+
+def test_market_state_rejects_invalid_prices_and_params() -> None:
+    # base_price and current_price must be >0
+    with pytest.raises(ValidationError):
+        MarketState(supply=10, demand=10, base_price=0, current_price=1000)
+    with pytest.raises(ValidationError):
+        MarketState(supply=10, demand=10, base_price=1000, current_price=0)
+    with pytest.raises(ValidationError):
+        MarketState(supply=10, demand=10, base_price=1000, current_price=-1)
+    # responsiveness >=0
+    with pytest.raises(ValidationError):
+        MarketState(supply=10, demand=10, base_price=1000, current_price=1000, responsiveness=-5000)
+    # max_movement_bps 0..10_000
+    with pytest.raises(ValidationError):
+        MarketState(
+            supply=10, demand=10, base_price=1000, current_price=1000, max_movement_bps=-2000
+        )
+    with pytest.raises(ValidationError):
+        MarketState(
+            supply=10, demand=10, base_price=1000, current_price=1000, max_movement_bps=20000
+        )
+    # valid edge cases should pass
+    MarketState(
+        supply=0, demand=0, base_price=1, current_price=1, responsiveness=0, max_movement_bps=0
+    )
+    MarketState(
+        supply=0,
+        demand=0,
+        base_price=1,
+        current_price=1,
+        responsiveness=10000,
+        max_movement_bps=10000,
+    )
