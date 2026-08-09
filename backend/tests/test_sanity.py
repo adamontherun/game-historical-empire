@@ -1,4 +1,4 @@
-"""Trivial engine harness test — proves imports and determinism without placeholder API."""
+"""Trivial engine harness test — proves engine/domain imports work."""
 
 from __future__ import annotations
 

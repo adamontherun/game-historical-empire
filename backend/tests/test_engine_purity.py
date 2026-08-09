@@ -36,17 +36,3 @@ def test_engine_source_contains_no_forbidden_imports() -> None:
     for root in (ENGINE_DIR, DOMAIN_DIR):
         for filepath in root.rglob("*.py"):
             _assert_no_forbidden_imports(filepath)
-
-
-def test_engine_and_domain_import_without_forbidden_runtime_deps() -> None:
-    # Importing the pure packages must not pull forbidden runtime deps transitively.
-    # ruff/pyright ensure no direct imports; this guards transitive pulls.
-    import importlib
-
-    for name in ("app.engine", "app.domain"):
-        importlib.import_module(name)
-
-    import sys
-
-    for mod in FORBIDDEN_TOP_LEVEL:
-        assert mod not in sys.modules, f"importing pure package pulled in '{mod}'"

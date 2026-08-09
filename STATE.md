@@ -34,7 +34,7 @@ docs/
 ### Boundaries
 
 - `backend/app/engine` and `backend/app/domain` are pure: no `fastapi`, `sqlalchemy`, `httpx`, `asyncpg`, `openai`, `clerk` imports. Enforced by AST rglob test that will catch future `engine/randomness.py` etc.
-- `backend/pyproject.toml` is the single Python project. No `fastapi`/`pydantic` until Section 10.
+- `backend/pyproject.toml` is the single Python project. No `fastapi` until Section 10; do not add `pydantic` early unless an approved Section plan demonstrates a concrete need.
 - Ruff/pyright scoped to `backend` only — `AGENTS.md` / plans not formatted.
 
 ### Normal verification

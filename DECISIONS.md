@@ -27,7 +27,7 @@ Record of accepted decisions that constrain implementation. `BUILD_SPEC.md` acti
 
 ## 003 — Tooling (2026-08-09)
 
-- **Decision:** `uv` + Python 3.12, `ruff` (lint+format) + `pyright` strict, `pytest` with `pytest-asyncio` (`asyncio_mode = auto`). Conventional Commits. OpenAPI at `/docs`.
+- **Decision:** `uv` + Python 3.12, `ruff` (lint+format) + `pyright` strict, `pytest`. Add `pytest-asyncio` only when genuine async tests are introduced. Conventional Commits. OpenAPI at `/docs`.
 - **Consequence:** Section 1 gates require `ruff check`, `ruff format --check`, and `pyright` to pass.
 
 ## 004 — Testing Strategy (2026-08-09)
@@ -51,8 +51,8 @@ Record of accepted decisions that constrain implementation. `BUILD_SPEC.md` acti
 
 ## 008 — Plan Mode (2026-08-09)
 
-- **Decision:** Always use plan mode (`/plan`) before each Section — produce and get approval for the smallest coherent implementation plan before any code changes, then proceed to `/grill` and `/goal`.
+- **Decision:** Section workflow is `/plan` (creates draft) → exit/cancel initial approval → `/grill` the saved draft → revise → approve final plan → `/goal` implements.
 
 ## 009 — Feature Branch per Section (2026-08-09)
 
-- **Decision:** At the end of each Section, push a feature branch `section/<n>-<slug>` to GitHub `adamontherun` (`git push -u origin section/<n>-<slug>`), including the Section's files + updated `STATE.md`.
+- **Decision:** Create feature branch `section/<n>-<slug>` at the **start** of each Section (before `/plan`), and push it to GitHub `adamontherun` after implementation (`git push -u origin section/<n>-<slug>`), including the Section's files + updated `STATE.md`.
