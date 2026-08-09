@@ -24,6 +24,8 @@ Kind = Literal[
     "price",
     "inventory",
     "quantity_value_effect",
+    "purchase_quantity_value",
+    "harvest_quantity_value",
     "price_value_effect",
     "wealth",
 ]
@@ -117,6 +119,8 @@ class CausalTrace(BaseModel):
                     "price",
                     "inventory",
                     "quantity_value_effect",
+                    "purchase_quantity_value",
+                    "harvest_quantity_value",
                     "price_value_effect",
                     "wealth",
                 ):

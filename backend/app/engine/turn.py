@@ -460,6 +460,21 @@ def resolve_turn(
                 parent_ids=(),
             )
         )
+    # Emit stable storage_capacity state node every turn so
+    # inventory depends on farm_output + storage_capacity
+    if not any(n.id == "storage_capacity" for n in nodes):
+        nodes.append(
+            CausalNode(
+                id="storage_capacity",
+                label="Storage capacity",
+                kind="capacity",
+                before=before_storage,
+                after=storage_capacity,
+                delta=0,
+                reason_code="storage_capacity_unchanged",
+                parent_ids=(),
+            )
+        )
 
     # 2. Production — farm output depends on post-command farm_capacity + world
     base_output = farm_capacity * YIELD_PER_CAPACITY
@@ -588,6 +603,14 @@ def resolve_turn(
         inventory_final = storage_capacity
         settle_reason = "capped_by_storage"
         settle_delta = inventory_final - inventory_before_settlement
+        if command.type == "buy_grain":
+            inv_parents: tuple[str, ...] = (
+                "farm_output",
+                "storage_capacity",
+                "inventory_after_buy",
+            )
+        else:
+            inv_parents = ("farm_output", "storage_capacity")
         nodes.append(
             CausalNode(
                 id="inventory",
@@ -597,16 +620,17 @@ def resolve_turn(
                 after=inventory_final,
                 delta=settle_delta,
                 reason_code=settle_reason,
-                parent_ids=(
-                    "farm_output",
-                    "inventory_after_buy" if command.type == "buy_grain" else "command",
-                ),
+                parent_ids=inv_parents,
             )
         )
     else:
         inventory_final = inventory_after_harvest
         settle_delta = farm_output
         settle_reason = "harvest_to_inventory"
+        if command.type == "buy_grain":
+            inv_parents = ("farm_output", "storage_capacity", "inventory_after_buy")
+        else:
+            inv_parents = ("farm_output", "storage_capacity")
         nodes.append(
             CausalNode(
                 id="inventory",
@@ -616,7 +640,7 @@ def resolve_turn(
                 after=inventory_final,
                 delta=settle_delta,
                 reason_code=settle_reason,
-                parent_ids=("farm_output",),
+                parent_ids=inv_parents,
             )
         )
     # Domain effects for settlement
@@ -644,33 +668,86 @@ def resolve_turn(
 
     # 6. Valuation — exact decomposition of wealth
     # wealth_before = cash_before + value(inv_before, price_before)
-    # quantity_value_effect = value(inv_after, price_before) - value(inv_before, price_before)
-    # price_value_effect    = value(inv_after, price_after)  - value(inv_after, price_before)
-    # cash_effect           = cash - cash_before
-    # wealth_delta          = cash_effect + quantity + price
+    # purchase_quantity_value = value(inv_after_buy, price_before) - value(inv_before, price_before)
+    # harvest_quantity_value  = value(inv_final, price_before) - value(inv_after_buy, price_before)
+    # price_value_effect      = value(inv_final, price_after)  - value(inv_final, price_before)
+    # cash_effect             = cash - cash_before
+    # wealth_delta            = cash_effect + purchase + harvest + price
     value_before = _value(before_inventory, before_price)
+    value_after_buy = _value(inventory_before_settlement, before_price)
     value_after_quantity = _value(inventory_final, before_price)
     value_after = _value(inventory_final, new_price)
     wealth_before = before_cash + value_before
     wealth_after = cash + value_after
-    quantity_value_effect = value_after_quantity - value_before
+    purchase_quantity_value = value_after_buy - value_before
+    harvest_quantity_value = value_after_quantity - value_after_buy
+    quantity_value_effect = (
+        purchase_quantity_value + harvest_quantity_value
+    )  # for backward compat if needed
     price_value_effect = value_after - value_after_quantity
     cash_effect = cash - before_cash
-    wealth_delta = cash_effect + quantity_value_effect + price_value_effect
+    wealth_delta = (
+        cash_effect + purchase_quantity_value + harvest_quantity_value + price_value_effect
+    )
     # Sanity: wealth_after - wealth_before must equal wealth_delta
     assert wealth_after - wealth_before == wealth_delta
+    assert quantity_value_effect == purchase_quantity_value + harvest_quantity_value
 
+    # Purchase quantity — value of bought grain at old price
+    if command.type == "buy_grain":
+        purchase_parents: tuple[str, ...] = ("command", "inventory_after_buy")
+        purchase_reason = "purchase_quantity_value"
+        purchase_label = f"Purchase quantity value {value_before} → {value_after_buy} (delta {purchase_quantity_value:+})"
+    else:
+        purchase_parents = ("command",)
+        purchase_reason = "no_purchase"
+        purchase_label = f"Purchase quantity value {value_before} → {value_after_buy} (delta {purchase_quantity_value:+})"
+    nodes.append(
+        CausalNode(
+            id="purchase_quantity_value",
+            label=purchase_label,
+            kind="purchase_quantity_value",
+            before=value_before,
+            after=value_after_buy,
+            delta=purchase_quantity_value,
+            reason_code=purchase_reason,
+            parent_ids=purchase_parents,
+        )
+    )
+    # Harvest quantity — value of harvested grain at old price (storage-constrained)
+    if settle_reason == "capped_by_storage":
+        harvest_reason = "harvest_quantity_capped_by_storage"
+        harvest_label = f"Harvest quantity value {value_after_buy} → {value_after_quantity} (delta {harvest_quantity_value:+}, capped)"
+    else:
+        if world == "drought":
+            harvest_reason = "drought_harvest_quantity_value"
+            harvest_label = f"Harvest quantity value {value_after_buy} → {value_after_quantity} (delta {harvest_quantity_value:+})"
+        else:
+            harvest_reason = "harvest_quantity_value"
+            harvest_label = f"Harvest quantity value {value_after_buy} → {value_after_quantity} (delta {harvest_quantity_value:+})"
+    nodes.append(
+        CausalNode(
+            id="harvest_quantity_value",
+            label=harvest_label,
+            kind="harvest_quantity_value",
+            before=value_after_buy,
+            after=value_after_quantity,
+            delta=harvest_quantity_value,
+            reason_code=harvest_reason,
+            parent_ids=("farm_output", "storage_capacity", "inventory"),
+        )
+    )
+    # Combined quantity value — sum of purchase and harvest, for wealth decomposition and backward compat
     nodes.append(
         CausalNode(
             id="quantity_value_effect",
-            label=f"Quantity value {value_before} → {value_after_quantity} "
-            f"(delta {quantity_value_effect:+})",
+            label=f"Quantity value {value_before} → {value_after_quantity} (delta {quantity_value_effect:+})",
             kind="quantity_value_effect",
             before=value_before,
             after=value_after_quantity,
             delta=quantity_value_effect,
-            reason_code="inventory_quantity_change_at_old_price",
-            parent_ids=("inventory", "price"),
+            reason_code="quantity_value_effect",
+            parent_ids=("purchase_quantity_value", "harvest_quantity_value"),
         )
     )
     nodes.append(
@@ -708,6 +785,24 @@ def resolve_turn(
             delta=wealth_delta,
             reason_code="wealth_from_cash_and_valuation",
             parent_ids=("cash_effect", "quantity_value_effect", "price_value_effect"),
+        )
+    )
+    effects.append(
+        DomainEffect(
+            metric="purchase_quantity_value",
+            before=value_before,
+            after=value_after_buy,
+            delta=purchase_quantity_value,
+            reason_code="purchase_quantity_value",
+        )
+    )
+    effects.append(
+        DomainEffect(
+            metric="harvest_quantity_value",
+            before=value_after_buy,
+            after=value_after_quantity,
+            delta=harvest_quantity_value,
+            reason_code="harvest_quantity_value",
         )
     )
     effects.append(
@@ -811,29 +906,58 @@ def resolve_turn(
             )
         )
 
-    # Candidate 2: quantity value effect (farm output / inventory quantity)
-    if quantity_value_effect != 0:
-        if settle_reason == "capped_by_storage":
-            label = (
-                f"Storage cap prevented inventory growth (quantity value {quantity_value_effect:+})"
-            )
-            reason = "storage_capped_quantity"
-            causal_ids = ("farm_output", "inventory", "quantity_value_effect")
-        else:
-            if world == "drought":
-                label = f"Drought reduced harvest, quantity value {quantity_value_effect:+}"
-                reason = "drought_quantity_value"
+    # Candidate 2: purchase quantity value — only if purchase actually added value
+    if purchase_quantity_value != 0:
+        # This is the value of bought grain at old price; harvest is separate
+        if command.type == "buy_grain":
+            # Use actual purchase amount for label if available
+            # inventory_after_buy - before_inventory is purchase qty
+            purchase_qty = inventory_before_settlement - before_inventory
+            if cmd_reason in ("insufficient_cash", "insufficient_storage"):
+                label = f"Bought {purchase_qty} grain (value {purchase_quantity_value:+}, limited by {cmd_reason})"
+                reason = "purchase_quantity_limited"
             else:
-                label = f"Harvest added grain, quantity value {quantity_value_effect:+}"
-                reason = "harvest_quantity_value"
-            causal_ids = ("world", "farm_output", "inventory", "quantity_value_effect")
+                label = f"Bought {purchase_qty} grain (value {purchase_quantity_value:+})"
+                reason = "purchase_quantity_value"
+            causal_ids = ("command", "inventory_after_buy", "purchase_quantity_value")
+        else:
+            label = f"Purchase quantity value {purchase_quantity_value:+}"
+            reason = "purchase_quantity_value"
+            causal_ids = ("command", "purchase_quantity_value")
         candidates.append(
             OutcomeDriver(
-                id="quantity_value",
+                id="purchase_quantity",
                 label=label,
                 kind="valuation",
-                impact_money=quantity_value_effect,
-                impact_bps=_bps(quantity_value_effect),
+                impact_money=purchase_quantity_value,
+                impact_bps=_bps(purchase_quantity_value),
+                reason_code=reason,
+                causal_node_ids=causal_ids,
+            )
+        )
+
+    # Candidate 3: harvest quantity value — only if harvest added (or was capped) value
+    if harvest_quantity_value != 0:
+        if settle_reason == "capped_by_storage":
+            label = f"Storage cap limited harvest (quantity value {harvest_quantity_value:+})"
+            reason = "harvest_quantity_capped"
+            causal_ids = ("farm_output", "storage_capacity", "inventory", "harvest_quantity_value")
+        else:
+            if world == "drought":
+                label = f"Drought reduced harvest, quantity value {harvest_quantity_value:+}"
+                reason = "drought_harvest_quantity_value"
+                causal_ids = ("world", "farm_output", "harvest_quantity_value")
+            else:
+                label = f"Harvest added grain, quantity value {harvest_quantity_value:+}"
+                reason = "harvest_quantity_value"
+                causal_ids = ("farm_output", "harvest_quantity_value")
+        candidates.append(
+            OutcomeDriver(
+                id="harvest_quantity",
+                label=label,
+                kind="valuation",
+                impact_money=harvest_quantity_value,
+                impact_bps=_bps(harvest_quantity_value),
                 reason_code=reason,
                 causal_node_ids=causal_ids,
             )

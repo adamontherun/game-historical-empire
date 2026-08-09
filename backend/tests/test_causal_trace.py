@@ -64,10 +64,13 @@ def test_every_important_node_has_parent_including_valuation() -> None:
                 "target_price",
                 "price",
                 "inventory",
+                "purchase_quantity_value",
+                "harvest_quantity_value",
                 "quantity_value_effect",
                 "price_value_effect",
                 "wealth",
                 "cash_after_command",
+                "storage_capacity",
             ):
                 assert required in ids, f"missing {required} for {cmd_type}/{world}"
             # Parents exist and are before child, and are tuples
@@ -81,12 +84,29 @@ def test_every_important_node_has_parent_including_valuation() -> None:
                 if node.id == "farm_capacity" and node.delta == 0:
                     assert node.parent_ids == ()
                     continue
+                if node.id == "storage_capacity" and node.delta == 0:
+                    assert node.parent_ids == ()
+                    continue
                 # All valuation nodes must have parents
-                if node.id in ("quantity_value_effect", "price_value_effect", "wealth"):
+                if node.id in (
+                    "quantity_value_effect",
+                    "purchase_quantity_value",
+                    "harvest_quantity_value",
+                    "price_value_effect",
+                    "wealth",
+                ):
                     assert len(node.parent_ids) > 0
                 if node.id == "quantity_value_effect":
-                    assert "inventory" in node.parent_ids
-                    assert "price" in node.parent_ids
+                    assert "purchase_quantity_value" in node.parent_ids
+                    assert "harvest_quantity_value" in node.parent_ids
+                if node.id == "purchase_quantity_value":
+                    # purchase should be from command / inventory_after_buy, not price
+                    assert "price" not in node.parent_ids
+                    assert len(node.parent_ids) > 0
+                if node.id == "harvest_quantity_value":
+                    assert "price" not in node.parent_ids
+                    assert "farm_output" in node.parent_ids
+                    assert "storage_capacity" in node.parent_ids
                 if node.id == "price_value_effect":
                     assert "inventory" in node.parent_ids
                     assert "price" in node.parent_ids
@@ -94,6 +114,9 @@ def test_every_important_node_has_parent_including_valuation() -> None:
                     assert "quantity_value_effect" in node.parent_ids
                     assert "price_value_effect" in node.parent_ids
                     assert "cash_effect" in node.parent_ids
+                if node.id == "inventory":
+                    assert "farm_output" in node.parent_ids
+                    assert "storage_capacity" in node.parent_ids
             # Parents before children
             pos = {n.id: i for i, n in enumerate(res.causal_trace.nodes)}
             for node in res.causal_trace.nodes:
@@ -131,7 +154,7 @@ def test_trace_immutable_tuples() -> None:
 
 
 def test_wealth_decomposition_exact() -> None:
-    """Wealth delta must equal cash + quantity + price effects exactly."""
+    """Wealth delta must equal cash + purchase + harvest + price effects exactly."""
     for world in ("normal", "drought"):
         for cmd_type in ("hold", "expand_farm", "build_granary", "buy_grain"):
             state = _base_state(cash=1000, grain=20, farm=10, storage=100)
@@ -140,35 +163,40 @@ def test_wealth_decomposition_exact() -> None:
             res = resolve_turn(state, cmd, world, state.to_turn_context())  # type: ignore[arg-type]
             # Extract valuation effects
             eff = {e.metric: e for e in res.domain_effects}
+            assert "purchase_quantity_value" in eff
+            assert "harvest_quantity_value" in eff
             assert "quantity_value_effect" in eff
             assert "price_value_effect" in eff
             assert "cash_effect" in eff
             assert "wealth" in eff
-            # Check exact sum
+            # Check exact sum with split: cash + purchase + harvest + price
             wealth_delta = eff["wealth"].delta
             assert (
                 wealth_delta
                 == eff["cash_effect"].delta
-                + eff["quantity_value_effect"].delta
+                + eff["purchase_quantity_value"].delta
+                + eff["harvest_quantity_value"].delta
                 + eff["price_value_effect"].delta
             ), f"wealth decomposition failed for {cmd_type}/{world}"
+            # Combined quantity must equal purchase+harvest
+            assert (
+                eff["quantity_value_effect"].delta
+                == eff["purchase_quantity_value"].delta + eff["harvest_quantity_value"].delta
+            )
             # Also check wealth node matches
             wealth_node = next(n for n in res.causal_trace.nodes if n.id == "wealth")
             assert wealth_node.delta == wealth_delta
             assert wealth_node.before is not None and wealth_node.after is not None
-            # Drivers sum should be ≤ wealth_delta magnitude but with exact partition, sum of all drivers (≤3) may be subset
-            # Instead check that drivers' impact sum plus discarded zeros still allows exact check via effects
-            # Verify that every driver's impact corresponds to one of the three effects
+            # Drivers are exact partitions; each driver should be one of purchase/harvest/price/cash
             for d in res.player_outcome.drivers:
-                assert (
-                    d.impact_money
-                    in (
-                        eff["cash_effect"].delta,
-                        eff["quantity_value_effect"].delta,
-                        eff["price_value_effect"].delta,
-                    )
-                    or d.impact_money == eff["wealth"].delta
-                )  # allow wealth direct if needed
+                assert d.impact_money in (
+                    eff["cash_effect"].delta,
+                    eff["purchase_quantity_value"].delta,
+                    eff["harvest_quantity_value"].delta,
+                    eff["price_value_effect"].delta,
+                    eff["quantity_value_effect"].delta,
+                    eff["wealth"].delta,
+                )
 
 
 def test_wealth_graph_parents() -> None:
@@ -177,13 +205,20 @@ def test_wealth_graph_parents() -> None:
     q = next(n for n in res.causal_trace.nodes if n.id == "quantity_value_effect")
     p = next(n for n in res.causal_trace.nodes if n.id == "price_value_effect")
     w = next(n for n in res.causal_trace.nodes if n.id == "wealth")
-    assert set(q.parent_ids) == {"inventory", "price"}
+    pur = next(n for n in res.causal_trace.nodes if n.id == "purchase_quantity_value")
+    har = next(n for n in res.causal_trace.nodes if n.id == "harvest_quantity_value")
+    assert set(q.parent_ids) == {"purchase_quantity_value", "harvest_quantity_value"}
     assert set(p.parent_ids) == {"inventory", "price"}
     assert set(w.parent_ids) == {"cash_effect", "quantity_value_effect", "price_value_effect"}
+    assert "price" not in pur.parent_ids
+    assert "price" not in har.parent_ids
+    assert "farm_output" in har.parent_ids
+    assert "storage_capacity" in har.parent_ids
     # Edges derived
-    assert ("inventory", "quantity_value_effect") in res.causal_trace.edges
-    assert ("price", "price_value_effect") in res.causal_trace.edges
+    assert ("purchase_quantity_value", "quantity_value_effect") in res.causal_trace.edges
+    assert ("harvest_quantity_value", "quantity_value_effect") in res.causal_trace.edges
     assert ("quantity_value_effect", "wealth") in res.causal_trace.edges
+    assert ("price", "price_value_effect") in res.causal_trace.edges
 
 
 def test_drivers_derived_from_trace_not_snapshot() -> None:
@@ -466,17 +501,56 @@ def test_storage_capped_zero_quantity_effect() -> None:
     assert inv_node.delta == 0
     q = next(n for n in res.causal_trace.nodes if n.id == "quantity_value_effect")
     assert q.delta == 0
-    # Quantity driver should be absent (filtered)
+    pur = next(n for n in res.causal_trace.nodes if n.id == "purchase_quantity_value")
+    har = next(n for n in res.causal_trace.nodes if n.id == "harvest_quantity_value")
+    assert pur.delta == 0
+    assert har.delta == 0
+    # Quantity drivers should be absent (filtered) — both purchase and harvest
+    assert not any(d.id == "purchase_quantity" for d in res.player_outcome.drivers)
+    assert not any(d.id == "harvest_quantity" for d in res.player_outcome.drivers)
     assert not any(d.id == "quantity_value" for d in res.player_outcome.drivers)
     # Price effect may still be present if price moved
-    # wealth decomposition still exact
+    # wealth decomposition still exact with split
     eff = {e.metric: e for e in res.domain_effects}
     assert (
         eff["wealth"].delta
         == eff["cash_effect"].delta
-        + eff["quantity_value_effect"].delta
+        + eff["purchase_quantity_value"].delta
+        + eff["harvest_quantity_value"].delta
         + eff["price_value_effect"].delta
     )
+    assert (
+        eff["quantity_value_effect"].delta
+        == eff["purchase_quantity_value"].delta + eff["harvest_quantity_value"].delta
+    )
+
+
+def test_buy_quantity_split_no_false_harvest_story() -> None:
+    """Farm 0 buy must not produce a harvest story — quantity is entirely purchase."""
+    state = _base_state(cash=1000, grain=0, farm=0, storage=100, supply=100, demand=120)
+    res = resolve_turn(
+        state, PlayerCommand(type="buy_grain", quantity=5), "normal", state.to_turn_context()
+    )
+    pur = next(n for n in res.causal_trace.nodes if n.id == "purchase_quantity_value")
+    har = next(n for n in res.causal_trace.nodes if n.id == "harvest_quantity_value")
+    assert pur.delta == 25  # 5 * 5000 //1000
+    assert har.delta == 0
+    # Drivers must include purchase, not harvest
+    assert any(d.id == "purchase_quantity" for d in res.player_outcome.drivers)
+    assert not any(d.id == "harvest_quantity" for d in res.player_outcome.drivers)
+    # Purchase driver must reference inventory_after_buy, not farm_output
+    pur_driver = next(d for d in res.player_outcome.drivers if d.id == "purchase_quantity")
+    assert "inventory_after_buy" in pur_driver.causal_node_ids
+    assert "farm_output" not in pur_driver.causal_node_ids
+    # No harvest driver, so no false "Harvest added grain" story
+    assert not any(
+        "Harvest" in d.label for d in res.player_outcome.drivers if d.id == "harvest_quantity"
+    )
+    # Ensure purchase driver label mentions purchase, not harvest/drought
+    assert "Bought" in pur_driver.label or "Purchase" in pur_driver.label
+    # Verify parents: purchase should not include price, harvest should not include price
+    assert "price" not in pur.parent_ids
+    assert "price" not in har.parent_ids
 
 
 def test_turn_order_includes_valuation() -> None:
