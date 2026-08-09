@@ -57,38 +57,42 @@ Only the `Status` line of a Section may be updated after all gates pass.
 - **Check in only when necessary:** ambiguous requirements where two reasonable interpretations would produce different accepted behavior, a blocked dependency (missing credential, external service down), or a decision that would meaningfully expand scope beyond the active Section.
 - **After each Section:** push the feature branch created in §3 step 3 to GitHub (`adamontherun`), then stop, do not auto-advance. Report files changed, commands run, tests/checks run + results, pushed branch URL, and known risks/follow-ups — then wait for human go-ahead to start the next Section.
 
-## 5. Repository Structure
+## 5. Git workspace safety
 
-```
-backend/
-  app/
-    domain/          # pure business rules — sync, no I/O
-    engine/          # simulation kernel — pure, deterministic
-    routers/         # thin FastAPI routers — validate + delegate
-    services/        # business logic — coordinates clients
-    clients/
-      database/      # DB operations (repository layer)
-      networking/    # external API clients
-    models/          # SQLAlchemy ORM models
-    schemas/         # Pydantic request/response schemas
-    errors/          # custom exceptions + handlers
-    dependencies.py  # ONLY file that knows about `Depends`
-    utils/           # stateless helpers
-  tests/
-    unit_tests/      # mocked — never touches DB/network
-    integration_tests/ # real Postgres (rollback), real network
-  main.py            # app factory, lifespan, router registration
-  database.py        # async engine, session factory, get_db_session
-frontend/            # Vite+React — minimal until Section 11
-docs/
-BUILD_SPEC.md
-DECISIONS.md
-AGENTS.md            # this file
-```
+Before starting any Section:
 
-Create abstractions after 2 concrete use cases. Do not scaffold future ages/systems early.
+1. Verify this is the real repository checkout:
+   - `git rev-parse --show-toplevel`
+   - `git remote get-url origin`
+   - `git status --short`
+   - `git branch --show-current`
 
-## 6. FastAPI Conventions (Beta Acid Reference App)
+2. Fetch the remote and start the Section branch from the current remote main:
+   - `git fetch origin`
+   - ensure local `main` matches or can fast-forward to `origin/main`
+   - create `section/<n>-<slug>` from `origin/main`
+
+3. Never create a temporary clone, temporary Git repository, or `/tmp` copy as a workaround for Git sandbox restrictions.
+
+4. Never push commits from a temporary copy of the workspace.
+
+5. If the sandbox prevents writing `.git`, creating/switching a branch, committing, or pushing:
+   - stop Git operations
+   - preserve all working-tree files
+   - tell the user the exact Git command that must be run outside Muse
+   - after the user runs it, re-read Git state in the original workspace before continuing
+
+6. Do not run `git init` inside an existing project merely because Git commands fail. First determine whether `.git` is missing, inaccessible, sandboxed, or the checkout is incorrect.
+
+7. Before declaring a Section complete, verify:
+   - current branch is `section/<n>-<slug>`
+   - working tree contains only intended changes
+   - the Section commit exists locally
+   - the remote Section branch points to the pushed Section commit
+
+The original project directory is authoritative. Build/cache workarounds may use `/tmp` when appropriate; Git repository state must not.
+
+## 6. FastAPI Conventions
 
 Follow https://github.com/betaacid/FastAPI-Reference-App exactly:
 
