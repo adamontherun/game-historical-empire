@@ -3,7 +3,9 @@ name = "historical-empire-backend"
 version = "0.1.0"
 description = "Historical Empire backend — walking skeleton (Section 1)"
 requires-python = ">=3.12"
-dependencies = []
+dependencies = [
+    "pydantic>=2.7",
+]
 
 [dependency-groups]
 dev = [
