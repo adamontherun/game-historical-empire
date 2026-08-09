@@ -445,8 +445,8 @@ def resolve_turn(
             )
         )
 
-    # Emit stable farm_capacity state node every turn so  # noqa: E501
-    # farm_output depends on world + farm_capacity  # noqa: E501
+    # Emit stable farm_capacity state node every turn so
+    # farm_output depends on world + farm_capacity
     if not any(n.id == "farm_capacity" for n in nodes):
         nodes.append(
             CausalNode(
@@ -591,7 +591,7 @@ def resolve_turn(
         nodes.append(
             CausalNode(
                 id="inventory",
-                label=f"Inventory capped {inventory_before_settlement}+{farm_output} → {inventory_final} (excess {excess})",  # noqa: E501
+                label=f"Inventory capped {inventory_before_settlement}+{farm_output} → {inventory_final} (excess {excess})",
                 kind="inventory",
                 before=inventory_before_settlement,
                 after=inventory_final,
@@ -663,8 +663,8 @@ def resolve_turn(
     nodes.append(
         CausalNode(
             id="quantity_value_effect",
-            label=f"Quantity value {value_before} → {value_after_quantity} "  # noqa: E501
-            f"(delta {quantity_value_effect:+})",  # noqa: E501
+            label=f"Quantity value {value_before} → {value_after_quantity} "
+            f"(delta {quantity_value_effect:+})",
             kind="quantity_value_effect",
             before=value_before,
             after=value_after_quantity,
@@ -676,8 +676,8 @@ def resolve_turn(
     nodes.append(
         CausalNode(
             id="price_value_effect",
-            label=f"Price revaluation {value_after_quantity} → {value_after} "  # noqa: E501
-            f"(delta {price_value_effect:+})",  # noqa: E501
+            label=f"Price revaluation {value_after_quantity} → {value_after} "
+            f"(delta {price_value_effect:+})",
             kind="price_value_effect",
             before=value_after_quantity,
             after=value_after,
@@ -854,8 +854,8 @@ def resolve_turn(
             "price",
             "price_value_effect",
         )
-        # For holds where price moves without farm_output  # noqa: E501
-        # change, still include farm_output for chain  # noqa: E501
+        # For holds where price moves without farm_output
+        # change, still include farm_output for chain
         candidates.append(
             OutcomeDriver(
                 id="price_revaluation",
@@ -868,21 +868,21 @@ def resolve_turn(
             )
         )
 
-    # Candidate 4: storage constraint — handled via quantity driver label  # noqa: E501
-    # Already covered; no separate driver to avoid double-count  # noqa: E501
+    # Candidate 4: storage constraint — handled via quantity driver label
+    # Already covered; no separate driver to avoid double-count
     if settle_reason == "capped_by_storage":
         excess = inventory_before_settlement + farm_output - storage_capacity
         if excess > 0:
-            # Only add if not already represented and meaningful  # noqa: E501
-            # Check if quantity driver already covers capped case —  # noqa: E501
-            # if it does, skip to avoid double-count  # noqa: E501
-            # Instead, add only if quantity_value_effect ==0 (fully capped)  # noqa: E501
+            # Only add if not already represented and meaningful
+            # Check if quantity driver already covers capped case —
+            # if it does, skip to avoid double-count
+            # Instead, add only if quantity_value_effect ==0 (fully capped)
             if quantity_value_effect == 0:
-                # This driver would double-count if we add both,  # noqa: E501
-                # so skip — quantity driver already explains  # noqa: E501
+                # This driver would double-count if we add both,
+                # so skip — quantity driver already explains
                 pass
-            # If quantity driver non-zero but capped, we already  # noqa: E501
-            # have storage info in its label  # noqa: E501
+            # If quantity driver non-zero but capped, we already
+            # have storage info in its label
 
     # Candidate 5: farm output story as distinct from quantity value (for richer narrative)
     # Only add if farm_output driver would be distinct and non-zero wealth impact already covered

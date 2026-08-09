@@ -53,13 +53,13 @@ class CausalNode(BaseModel):
                 # For nodes where before/after are present, delta must match
                 pass  # keep permissive for now; DomainEffect enforces strictly
         if self.delta is not None and self.before is not None and self.after is not None:
-            # Strict check only when all three present and not  # noqa: E501
-            # deliberately capped  # noqa: E501
-            # Inventory capped nodes have correct delta; keep check  # noqa: E501
+            # Strict check only when all three present and not
+            # deliberately capped
+            # Inventory capped nodes have correct delta; keep check
             if self.delta != self.after - self.before:
                 raise ValueError(
-                    f"CausalNode {self.id} delta {self.delta} "  # noqa: E501
-                    f"!= after {self.after} - before {self.before}"  # noqa: E501
+                    f"CausalNode {self.id} delta {self.delta} "
+                    f"!= after {self.after} - before {self.before}"
                 )
         return self
 
@@ -94,8 +94,8 @@ class CausalTrace(BaseModel):
         allowed_empty_roots = {"world", "command"}
         for idx, node in enumerate(self.nodes):
             if not node.parent_ids:
-                # Empty parents allowed for world/command always;  # noqa: E501
-                # for others only if delta is 0 or None (unchanged)  # noqa: E501
+                # Empty parents allowed for world/command always;
+                # for others only if delta is 0 or None (unchanged)
                 if node.id in allowed_empty_roots or node.kind in allowed_empty_roots:
                     continue
                 # farm_capacity / storage_capacity unchanged nodes are allowed as roots
@@ -104,13 +104,13 @@ class CausalTrace(BaseModel):
                 # Generic unchanged capacity nodes allowed
                 if node.kind == "capacity" and node.delta == 0:
                     continue
-                # If delta is None (diagnostic like world) already  # noqa: E501
-                # handled; otherwise require parents  # noqa: E501
-                # But diagnostic nodes like world have been allowed;  # noqa: E501
-                # other nodes with no delta and no parents are allowed  # noqa: E501
-                # only if world/command  # noqa: E501
-                # For production/supply/price/inventory/wealth etc  # noqa: E501
-                # with no parents, it's invalid  # noqa: E501
+                # If delta is None (diagnostic like world) already
+                # handled; otherwise require parents
+                # But diagnostic nodes like world have been allowed;
+                # other nodes with no delta and no parents are allowed
+                # only if world/command
+                # For production/supply/price/inventory/wealth etc
+                # with no parents, it's invalid
                 if node.kind in (
                     "production",
                     "supply",
@@ -121,10 +121,10 @@ class CausalTrace(BaseModel):
                     "wealth",
                 ):
                     raise ValueError(f"node {node.id!r} kind {node.kind!r} must have parent_ids")
-                # cash_after_command etc should have parents; but  # noqa: E501
-                # cash_after_command is child of command, so not empty  # noqa: E501
-                # If node has delta==0 and is capacity, allow;  # noqa: E501
-                # otherwise require parents  # noqa: E501
+                # cash_after_command etc should have parents; but
+                # cash_after_command is child of command, so not empty
+                # If node has delta==0 and is capacity, allow;
+                # otherwise require parents
                 if node.delta is not None and node.delta != 0:
                     raise ValueError(f"node {node.id!r} must have parent_ids")
                 # Allow zero-delta diagnostic nodes to be roots
@@ -154,8 +154,8 @@ class DomainEffect(BaseModel):
     def _validate_delta(self) -> DomainEffect:
         if self.delta != self.after - self.before:
             raise ValueError(
-                f"DomainEffect {self.metric!r} delta {self.delta} "  # noqa: E501
-                f"!= after {self.after} - before {self.before}"  # noqa: E501
+                f"DomainEffect {self.metric!r} delta {self.delta} "
+                f"!= after {self.after} - before {self.before}"
             )
         return self
 

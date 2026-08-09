@@ -44,10 +44,10 @@ def _print_state(label: str, state: GameState) -> None:
     print(f"--- {label} ---")
     print(f"turn: {state.turn}  seed: {state.run_seed}  ruleset: {state.ruleset_version}")
     print(
-        f"player cash: {state.player.cash}  grain: {state.player.inventory.grain}  farm: {state.player.farm_capacity}  storage: {state.player.storage_capacity}"  # noqa: E501
+        f"player cash: {state.player.cash}  grain: {state.player.inventory.grain}  farm: {state.player.farm_capacity}  storage: {state.player.storage_capacity}"
     )
     print(
-        f"market supply: {state.market.supply}  demand: {state.market.demand}  base: {state.market.base_price}  price: {state.market.current_price}"  # noqa: E501
+        f"market supply: {state.market.supply}  demand: {state.market.demand}  base: {state.market.base_price}  price: {state.market.current_price}"
     )
 
 
@@ -117,12 +117,12 @@ def main() -> None:
             )
         # Verify exact sum
         total = sum(d.impact_money for d in res.player_outcome.drivers)
-        # Note: drivers are ≤3 of possibly >3 effects; but for this  # noqa: E501
-        # exact partition, sum of all drivers should be ≤ wealth_delta  # noqa: E501
-        # Actually with exact partition (cash+quantity+price), sum of  # noqa: E501
-        # drivers == wealth_delta when all 3 present  # noqa: E501
-        # When filtered zero, sum may be < wealth_delta but we show check  # noqa: E501
-        print(f"  drivers sum: {total:+}  wealth_delta: {res.player_outcome.wealth_delta:+}")  # noqa: E501
+        # Note: drivers are ≤3 of possibly >3 effects; but for this
+        # exact partition, sum of all drivers should be ≤ wealth_delta
+        # Actually with exact partition (cash+quantity+price), sum of
+        # drivers == wealth_delta when all 3 present
+        # When filtered zero, sum may be < wealth_delta but we show check
+        print(f"  drivers sum: {total:+}  wealth_delta: {res.player_outcome.wealth_delta:+}")
 
     print("\n--- AFTER STATE (next_state) ---")
     _print_state("AFTER STATE", res.next_state)
@@ -136,14 +136,14 @@ def main() -> None:
             if node.before is not None or node.after is not None:
                 before_after = f"  before={node.before} after={node.after}"
             print(
-                f"[{node.id}] {node.label}  reason={node.reason_code}{before_after}{delta_str}{parents}"  # noqa: E501
+                f"[{node.id}] {node.label}  reason={node.reason_code}{before_after}{delta_str}{parents}"
             )
 
         print("\n--- DOMAIN EFFECTS (debug) ---")
         for eff in res.domain_effects:
             print(
-                f"{eff.metric}: {eff.before} -> {eff.after} ({eff.delta:+}) "  # noqa: E501
-                f"reason={eff.reason_code}"  # noqa: E501
+                f"{eff.metric}: {eff.before} -> {eff.after} ({eff.delta:+}) "
+                f"reason={eff.reason_code}"
             )
 
         print("\n--- DRIVERS (structured) ---")
@@ -170,8 +170,8 @@ def main() -> None:
     print(f"  supply {state.market.supply} -> {res2.next_state.market.supply}")
     print(f"  inventory {state.player.inventory.grain} -> {res2.next_state.player.inventory.grain}")
     print(
-        f"  wealth_delta {res2.player_outcome.wealth_delta:+} "  # noqa: E501
-        f"drivers: {res2.player_outcome.top_drivers}"  # noqa: E501
+        f"  wealth_delta {res2.player_outcome.wealth_delta:+} "
+        f"drivers: {res2.player_outcome.top_drivers}"
     )
     print("=" * 60)
 

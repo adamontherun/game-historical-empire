@@ -156,8 +156,8 @@ def test_wealth_decomposition_exact() -> None:
             wealth_node = next(n for n in res.causal_trace.nodes if n.id == "wealth")
             assert wealth_node.delta == wealth_delta
             assert wealth_node.before is not None and wealth_node.after is not None
-            # Drivers sum should be ≤ wealth_delta magnitude but with exact partition, sum of all drivers (≤3) may be subset  # noqa: E501
-            # Instead check that drivers' impact sum plus discarded zeros still allows exact check via effects  # noqa: E501
+            # Drivers sum should be ≤ wealth_delta magnitude but with exact partition, sum of all drivers (≤3) may be subset
+            # Instead check that drivers' impact sum plus discarded zeros still allows exact check via effects
             # Verify that every driver's impact corresponds to one of the three effects
             for d in res.player_outcome.drivers:
                 assert (
@@ -208,7 +208,7 @@ def test_drivers_derived_from_trace_not_snapshot() -> None:
     # Snapshot diff would just see inventory +5 and cash -25, but trace knows why (storage)
     # Ensure quantity_value_effect reflects capped inventory
     q = next(n for n in res.causal_trace.nodes if n.id == "quantity_value_effect")
-    # With farm 0, inventory change is only buy 5, so quantity effect should be 5 * price_before //1000  # noqa: E501
+    # With farm 0, inventory change is only buy 5, so quantity effect should be 5 * price_before //1000
     # price_before 5000 => 5*5000//1000=25
     assert q.delta == 25
 
@@ -457,7 +457,7 @@ def test_rng_context_mismatch_raises() -> None:
 
 def test_storage_capped_zero_quantity_effect() -> None:
     """If storage is full, quantity value effect should be zero and driver discarded."""
-    # Storage exactly full before harvest: grain 100, storage 100, farm 10 => 100 output would exceed  # noqa: E501
+    # Storage exactly full before harvest: grain 100, storage 100, farm 10 => 100 output would exceed
     state = _base_state(cash=1000, grain=100, farm=10, storage=100, supply=100, demand=120)
     res = resolve_turn(state, PlayerCommand(type="hold"), "normal", state.to_turn_context())
     # Inventory should be capped at 100, so delta 0, quantity effect 0

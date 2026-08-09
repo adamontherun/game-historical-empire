@@ -83,7 +83,7 @@ def test_demand_unchanged_cannot_reduce_target_when_supply_falls() -> None:
 def test_resolve_turn_monotonic_via_engine() -> None:
     # Use full resolve_turn: lower initial supply should lead to >= price
     cmd = PlayerCommand(type="hold")
-    # Use farm 0 to isolate price effect; but farm_output still adds, need same farm  # noqa: E501
+    # Use farm 0 to isolate price effect; but farm_output still adds, need same farm
     s_high = _state(supply=150, demand=120, current_price=5000)
     s_low = _state(supply=100, demand=120, current_price=5000)
     # Both have same farm 5 => same output, but starting supply differs

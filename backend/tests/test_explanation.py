@@ -55,7 +55,7 @@ def test_drought_to_wealth_structural_chain_exact() -> None:
     # Price higher under drought (scarcity)
     assert drought.next_state.market.current_price >= normal.next_state.market.current_price
 
-    # Structural chain exists: world -> farm_output -> supply -> price -> price_value_effect -> wealth  # noqa: E501
+    # Structural chain exists: world -> farm_output -> supply -> price -> price_value_effect -> wealth
     ids = {n.id for n in drought.causal_trace.nodes}
     for required in (
         "world",
@@ -105,11 +105,11 @@ def test_drought_to_wealth_structural_chain_exact() -> None:
     )
     assert wealth_node.delta == eff["wealth"].delta
 
-    # Drivers must be derived from trace and sum to wealth_delta (when all present, sum equals wealth_delta)  # noqa: E501
+    # Drivers must be derived from trace and sum to wealth_delta (when all present, sum equals wealth_delta)
     # For hold, cash_effect is 0, so drivers may be quantity and price only
     _total_driver_impact = sum(d.impact_money for d in drought.player_outcome.drivers)  # noqa: F841
-    # With hold, cash 0, so drivers should be quantity+price; sum should equal wealth_delta if both present  # noqa: E501
-    # But if one is zero, it's filtered, so sum may be <= wealth_delta; check that no driver double counts  # noqa: E501
+    # With hold, cash 0, so drivers should be quantity+price; sum should equal wealth_delta if both present
+    # But if one is zero, it's filtered, so sum may be <= wealth_delta; check that no driver double counts
     # Ensure every driver's causal_node_ids are subset of trace ids
     trace_ids = {n.id for n in drought.causal_trace.nodes}
     for d in drought.player_outcome.drivers:
@@ -133,7 +133,7 @@ def test_story_drivers_cover_wealth_chain() -> None:
     all_causal = set()
     for d in res.player_outcome.drivers:
         all_causal.update(d.causal_node_ids)
-    # At least one driver should mention farm_output or quantity, and at least one should mention price  # noqa: E501
+    # At least one driver should mention farm_output or quantity, and at least one should mention price
     assert any(
         "farm_output" in d.causal_node_ids for d in res.player_outcome.drivers
     ) or "quantity_value" in {d.id for d in res.player_outcome.drivers}
@@ -173,7 +173,7 @@ def test_concise_le_three_full_trace_preserved() -> None:
 
 
 def test_normal_vs_drought_different_drivers() -> None:
-    """Same command, different world should produce different driver impacts (drought has larger farm/price effects)."""  # noqa: E501
+    """Same command, different world should produce different driver impacts (drought has larger farm/price effects)."""
     state = _state(farm=10, supply=100, demand=120)
     cmd = PlayerCommand(type="hold")
     normal = resolve_turn(state, cmd, "normal", state.to_turn_context())

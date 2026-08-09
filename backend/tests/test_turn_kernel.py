@@ -52,18 +52,18 @@ def test_determinism_same_inputs_same_result() -> None:
 
 def test_determinism_seed_matters_only_via_context() -> None:
     # Same state fields except seed leads to same structure except RNG
-    # Core price is deterministic; ensure same seed yields identical  # noqa: E501
+    # Core price is deterministic; ensure same seed yields identical
     s1 = _base_state(seed="seed-A")
     s2 = _base_state(seed="seed-B")
     cmd = PlayerCommand(type="hold")
     r1 = resolve_turn(s1, cmd, "normal", s1.to_turn_context())
     r2 = resolve_turn(s2, cmd, "normal", s2.to_turn_context())
-    # With same supply/demand/price, results may be equal;  # noqa: E501
-    # In our impl core price is not RNG-driven, so seeds same next_state.  # noqa: E501
+    # With same supply/demand/price, results may be equal;
+    # In our impl core price is not RNG-driven, so seeds same next_state.
     # But we still prove determinism per seed: repeating same seed gives same.
     r1b = resolve_turn(s1, cmd, "normal", s1.to_turn_context())
     assert r1 == r1b
-    # r1 and r2 may be equal because RNG not affecting price; that's okay.  # noqa: E501
+    # r1 and r2 may be equal because RNG not affecting price; that's okay.
     assert r2 == resolve_turn(s2, cmd, "normal", s2.to_turn_context())
 
 
@@ -177,12 +177,12 @@ def test_farm_output_parents_are_world_and_farm_capacity_not_command() -> None:
 
 
 def test_buy_beyond_cash_is_clamped() -> None:
-    # Price 5000 => 5 per unit, cash 100 can afford at most 20 units  # noqa: E501
+    # Price 5000 => 5 per unit, cash 100 can afford at most 20 units
     # Farm 10 gives output 100, storage 100 caps total to 100.
     state = _base_state(cash=100, grain=0, storage=100, current_price=5000)
     cmd = PlayerCommand(type="buy_grain", quantity=50)  # request 50, can only afford 20
     res = resolve_turn(state, cmd, "normal", state.to_turn_context())
-    # Buy itself is clamped to 20 — verify via inventory_after_buy node  # noqa: E501
+    # Buy itself is clamped to 20 — verify via inventory_after_buy node
     buy_node = next(n for n in res.causal_trace.nodes if n.id == "inventory_after_buy")
     assert buy_node.delta == 20
     assert buy_node.after == 20
