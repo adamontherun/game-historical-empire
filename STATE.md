@@ -101,6 +101,18 @@ After that, no environmental caveat remains.
 
 Causal explanation (Section 4 — formalize DomainEffect/CausalNode/OutcomeDriver), two markets + river route (Section 5), headless prototype (Section 6), rivals (Section 7), etc. No FastAPI routes, DB/SQLAlchemy, React UI, content framework, LLMs.
 
+### Follow-up obligations (from Section 3 review)
+
+Must resolve before **Section 4**:
+- Replace raw absolute-delta driver ranking with unit-aware, meaningful ranking (Section 4 owns `OutcomeDriver`).
+- Formalize / harden causal trace (deeper validation of graph shape).
+- Resolve RNG context ownership — derive `TurnContext` internally from `GameState` or validate `rng_context` equals `state`'s turn/seed/version; do not rely on caller to keep them in sync. Do not add jitter just because a stream exists; deterministic economics preferred.
+
+Must resolve before **Section 6** (multi-turn prototype):
+- Define `market.supply` semantics: stock on hand vs per-turn flow vs aggregate supply signal. Current `next_supply = supply + farm_output` is a persistent stock while `farm_output` also enters player `inventory` and `buy_grain` does not reduce regional supply — coherent for one turn but will monotonically accumulate over repeated turns. Design stock/flow accounting before the headless balance harness (tuning 5000/2000 is fine to defer to that harness).
+
+Supply / RNG notes do not block a deliberately one-turn Section 3, but are hard gates before Section 6.
+
 ### Next milestone
 
 **Section 4 — Causal Explanation and Outcome Model** — formalize `DomainEffect/CausalNode/CausalTrace/PlayerOutcome/OutcomeDriver` with ≤3 drivers derived from trace, full debug trace, CLI showing concise + debug.

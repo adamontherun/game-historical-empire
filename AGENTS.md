@@ -39,14 +39,16 @@ Protocol for every Section:
 1. Read `BUILD_SPEC.md` fully, then the active Section again
 2. Inspect repo + tests before changing anything
 3. Create feature branch `section/<n>-<slug>` (e.g. `section/2-core-types`) from `main` before any code changes
-4. Use `/plan` to create a draft plan (saved to `docs/plans/`)
-5. Approve / Request changes — single gate (revise until approved). If the draft has scope creep, missing tests, or premature abstraction, surface it as open questions in the plan itself — no separate `/grill` skill required.
+4. **Enter plan mode before any code changes** — use the `/plan` skill (Muse Code: `muse.read_skill("plan")` / `/plan`) to create a draft plan saved to `docs/plans/`. Do not write, edit, or scaffold any Section code until the draft plan exists. The trigger "let's work on the next section" (or any identification of the next Section) means: create the branch, then immediately enter plan mode — not implementation.
+5. Approve / Request changes — single gate (revise until approved). If the draft has scope creep, missing tests, or premature abstraction, surface it as open questions in the plan itself — no separate `/grill` skill required. **Do not start implementation until the plan is approved.**
 6. Implement only the approved Section
 7. Run every acceptance check in that Section
 8. Push the feature branch to GitHub `adamontherun` (`git push -u origin section/<n>-<slug>`)
 9. Stop — do not auto-advance. Report files changed, commands, tests, risks, and the pushed branch URL.
 
 Only the `Status` line of a Section may be updated after all gates pass.
+
+> **Hard gate:** No source edits (`backend/`, `frontend/`, `STATE.md`, `DECISIONS.md` beyond the branch itself) before steps 4–5 are complete. If you catch yourself about to code after step 3, stop and produce the plan first.
 
 ## 4. Autonomy
 

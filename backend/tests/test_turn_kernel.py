@@ -145,6 +145,37 @@ def test_drought_price_not_direct_mutation_grep() -> None:
     assert "drought_price" not in src.lower()
 
 
+def test_farm_output_parents_are_world_and_farm_capacity_not_command() -> None:
+    # Blocker 2: hold/buy/build must not claim command caused farm output.
+    # Correct graph: world ─┐ → farm_output , farm_capacity ─┘
+    # expand_farm → farm_capacity, but farm_output parents are still world+farm_capacity.
+    for cmd_type in ("hold", "buy_grain", "build_granary", "expand_farm"):
+        state = _base_state(farm=10, supply=100, demand=120)
+        qty = 5 if cmd_type == "buy_grain" else None
+        cmd = PlayerCommand(type=cmd_type, quantity=qty)  # type: ignore[arg-type]
+        res = resolve_turn(state, cmd, "normal", state.to_turn_context())  # type: ignore[arg-type]
+        # Every turn must have a stable farm_capacity node
+        assert any(n.id == "farm_capacity" for n in res.causal_trace.nodes), (
+            f"missing farm_capacity for {cmd_type}"
+        )
+        farm_out = next(n for n in res.causal_trace.nodes if n.id == "farm_output")
+        # Must depend on world + farm_capacity, never directly on command
+        assert "world" in farm_out.parent_ids
+        assert "farm_capacity" in farm_out.parent_ids
+        assert "command" not in farm_out.parent_ids, f"false command→farm_output for {cmd_type}"
+        # Farm capacity node itself should not falsely link command except for expand_farm
+        farm_cap = next(n for n in res.causal_trace.nodes if n.id == "farm_capacity")
+        if cmd_type == "expand_farm":
+            assert "command" in farm_cap.parent_ids
+        else:
+            assert farm_cap.parent_ids == [], (
+                f"{cmd_type} should not make farm_capacity child of command"
+            )
+        # No direct world→price edge already covered, but also ensure supply→price chain intact
+        assert any(n.id == "supply" for n in res.causal_trace.nodes)
+        assert any(n.id == "price" for n in res.causal_trace.nodes)
+
+
 def test_buy_beyond_cash_is_clamped() -> None:
     # Price 5000 => 5 per unit, cash 100 can afford at most 20 units  # noqa: E501
     # Farm 10 gives output 100, storage 100 caps total to 100.

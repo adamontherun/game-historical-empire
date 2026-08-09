@@ -441,8 +441,22 @@ def resolve_turn(
             )
         )
 
-    # For commands that didn't emit inventory/storage effects, ensure at least cash effect.  # noqa: E501
-    # Add hold's lack of other deltas as zero effects? Not needed.
+    # Emit stable farm_capacity state node every turn so farm_output
+    # depends on world + farm_capacity, not directly on command.
+    # This fixes false command → production edges for hold/buy/build.
+    if not any(n.id == "farm_capacity" for n in nodes):
+        nodes.append(
+            CausalNode(
+                id="farm_capacity",
+                label="Farm capacity",
+                kind="capacity",
+                before=before_farm,
+                after=farm_capacity,
+                delta=0,
+                reason_code="farm_capacity_unchanged",
+                parent_ids=[],
+            )
+        )
 
     # 2. Production — farm output depends on post-command farm_capacity + world
     base_output = farm_capacity * YIELD_PER_CAPACITY
@@ -462,9 +476,7 @@ def resolve_turn(
             after=farm_output,
             delta=farm_output - base_output if world == "drought" else farm_output,
             reason_code=prod_reason,
-            parent_ids=["world", "farm_capacity"]
-            if any(n.id == "farm_capacity" for n in nodes)
-            else ["world", "command"],
+            parent_ids=["world", "farm_capacity"],
         )
     )
     effects.append(

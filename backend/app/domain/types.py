@@ -75,13 +75,28 @@ class MarketState(BaseModel):
 
     supply: Quantity = Field(description="Regional grain supply")
     demand: Quantity = Field(description="Regional grain demand")
-    base_price: PriceMilliunits = Field(description="Base price milliunits")
-    current_price: PriceMilliunits = Field(description="Current price milliunits")
+    base_price: PriceMilliunits = Field(  # type: ignore[call-overload]
+        description="Base price milliunits (>0)",
+        strict=True,
+        gt=0,
+    )
+    current_price: PriceMilliunits = Field(  # type: ignore[call-overload]
+        description="Current price milliunits (>0)",
+        strict=True,
+        gt=0,
+    )
     responsiveness: BasisPoints = Field(
-        default=5000, description="Price responsiveness bps (10_000=100% pass-through)"
+        default=5000,
+        description="Price responsiveness bps (10_000=100% pass-through, >=0)",
+        strict=True,
+        ge=0,
     )
     max_movement_bps: BasisPoints = Field(
-        default=2000, description="Max per-turn price movement bps (10_000=100%)"
+        default=2000,
+        description="Max per-turn price movement bps (0..10_000)",
+        strict=True,
+        ge=0,
+        le=10_000,
     )
 
 

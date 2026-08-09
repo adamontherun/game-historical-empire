@@ -93,9 +93,9 @@ def test_resolve_turn_monotonic_via_engine() -> None:
 
 
 def test_no_negatives_across_random_spread() -> None:
-    # Fuzz a few states
+    # Fuzz a few states — prices must be >0 per MarketState validation
     cases = [
-        (0, 0, 0, 0),
+        (0, 0, 1, 1),
         (10, 1000, 5000, 5000),
         (100, 10, 100, 1000),
         (50, 50, 1, 1),
