@@ -70,7 +70,7 @@ make format            # actually formats backend/
 
 ```
 uv sync --project backend  → Resolved 15 packages, 0 errors
-pytest -v                  → 48 passed (7 core + 7 rounding + 11 determinism + 2 purity/sanity + 14 kernel + 7 invariants)
+pytest -v                  → 50 passed (8 core + 7 rounding + 11 determinism + 2 purity/sanity + 15 kernel + 7 invariants)
 ruff check backend         → All checks passed
 ruff format --check backend→ 18 files already formatted
 pyright                    → 0 errors, 0 warnings
@@ -103,7 +103,7 @@ Causal explanation (Section 4 — formalize DomainEffect/CausalNode/OutcomeDrive
 
 ### Follow-up obligations (from Section 3 review)
 
-Must resolve before **Section 4**:
+Must resolve during **Section 4** before it is marked COMPLETE:
 - Replace raw absolute-delta driver ranking with unit-aware, meaningful ranking (Section 4 owns `OutcomeDriver`).
 - Formalize / harden causal trace (deeper validation of graph shape).
 - Resolve RNG context ownership — derive `TurnContext` internally from `GameState` or validate `rng_context` equals `state`'s turn/seed/version; do not rely on caller to keep them in sync. Do not add jitter just because a stream exists; deterministic economics preferred.
