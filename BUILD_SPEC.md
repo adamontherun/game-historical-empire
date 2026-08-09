@@ -670,7 +670,7 @@ Stop when the repository can run a trivial pure-engine test and all baseline che
 
 # SECTION 2 — Core Economic Types and Deterministic Randomness
 
-**Status:** NOT STARTED
+**Status:** COMPLETE
 
 ## Goal
 
