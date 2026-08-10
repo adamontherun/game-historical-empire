@@ -1,10 +1,10 @@
 {
-  "0": "resolve_turn",
-  "1": "GameState",
+  "0": "PlayerCommand",
+  "1": "test_causal_trace.py",
   "2": "test_determinism.py",
   "3": "FiveTurnGame",
   "4": "What You Must Do When Invoked",
-  "5": "test_invariants.py",
+  "5": "InventoryState",
   "6": "Plan — Section 1: Repository Contract and Walking Skeleton",
   "7": "What You Must Do When Invoked",
   "8": "Section 5 — Two Markets and One Trade Route — Plan",
@@ -12,10 +12,10 @@
   "10": "app/__init__.py",
   "11": "tests/__init__.py",
   "12": "historical-empire-backend",
-  "13": ".edges",
+  "13": "test_invariants.py",
   "14": "Historical Empire — Agent Guide",
   "15": "graphify reference: extra exports and benchmark",
-  "16": "Section 6 — COMPLETE (2026-08-09)",
+  "16": "Section 7 — COMPLETE (2026-08-09)",
   "17": "graphify reference: extra exports and benchmark",
   "18": "graphify reference: query, path, explain",
   "19": "graphify reference: query, path, explain",
@@ -66,6 +66,7 @@
   "64": "SECTION 4 — Causal Explanation and Outcome Model",
   "65": "Part VIII — Agent Guardrails",
   "66": "SECTION 8 — Pressure-Driven Event Arc",
-  "67": "SECTION 9 — Headless Strategy and Balance Harness",
-  "68": "SECTION 20 — Visual Asset System and Polish"
+  "67": "turn.py",
+  "68": "SECTION 20 — Visual Asset System and Polish",
+  "70": "Section 7 — Deterministic Rivals — Plan (Rev 2)"
 }
