@@ -1,16 +1,16 @@
 # Graph Report - game-historical-empire  (2026-08-09)
 
 ## Corpus Check
-- 72 files · ~108,964 words
+- 72 files · ~108,227 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
-- 1044 nodes · 1864 edges · 80 communities (70 shown, 10 thin omitted)
+- 1043 nodes · 1863 edges · 81 communities (71 shown, 10 thin omitted)
 - Extraction: 96% EXTRACTED · 4% INFERRED · 0% AMBIGUOUS · INFERRED: 74 edges (avg confidence: 0.51)
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `8448ff28`
+- Built from commit: `b9dee94a`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
@@ -29,7 +29,7 @@
 - Section 8 plan — consolidated review (round 2, against Rev 3)
 - Historical Empire — Agent Guide
 - graphify reference: extra exports and benchmark
-- Section 9 — COMPLETE (2026-08-10)
+- Section 9 — IN PROGRESS (2026-08-10)
 - graphify reference: extra exports and benchmark
 - graphify reference: query, path, explain
 - graphify reference: query, path, explain
@@ -93,6 +93,7 @@
 - Section 8 implementation — consolidated review (round 3, against commit 28a0963)
 - test_balance_harness.py
 - harness.py
+- .edges
 
 ## God Nodes (most connected - your core abstractions)
 1. `PlayerCommand` - 104 edges
@@ -115,13 +116,13 @@
   backend/app/engine/prototype.py → backend/app/domain/pressure.py
 - `TurnSpec` --uses--> `PressureState`  [INFERRED]
   backend/app/engine/prototype.py → backend/app/domain/pressure.py
-- `CausalNode` --uses--> `GameState`  [INFERRED]
-  backend/app/domain/trace.py → backend/app/domain/types.py
+- `FiveTurnGame` --uses--> `TurnResolution`  [INFERRED]
+  backend/app/engine/prototype.py → backend/app/domain/trace.py
 
 ## Import Cycles
 - None detected.
 
-## Communities (80 total, 10 thin omitted)
+## Communities (81 total, 10 thin omitted)
 
 ### Community 0 - "SECTION 9 — Headless Strategy and Balance Harness"
 Cohesion: 0.40
@@ -129,11 +130,11 @@ Nodes (5): Acceptance criteria, Goal, In scope, SECTION 9 — Headless Strategy 
 
 ### Community 1 - "test_pressure_arc.py"
 Cohesion: 0.07
-Nodes (32): PressureState, BaseModel, model_validator, Pressure domain — Section 8 world-pressure arc types. Small, frozen, validated…, One step of the authored pressure arc — frozen, validated. Exactly 7 fields per…, next_world_known_for_turn(), pressure_for_turn(), WorldCondition (+24 more)
+Nodes (31): PressureState, BaseModel, model_validator, One step of the authored pressure arc — frozen, validated. Exactly 7 fields per…, next_world_known_for_turn(), pressure_for_turn(), WorldCondition, Pressure arc — Section 8 authored 5-turn arc. Hard-coded, deterministic, no… (+23 more)
 
 ### Community 2 - "engine/__init__.py"
-Cohesion: 0.06
-Nodes (55): Engine package — deterministic RNG and rounding., derive_seed(), make_rng(), Deterministic RNG substreams via stable hash. Spec: never use global random…, Derive deterministic int seed from key material via BLAKE2b. Canonical…, Create isolated random.Random from int seed — no global state. Args: seed: Int…, Convenience: derive seed from key material and return Random. Args: run_seed:…, rng_for() (+47 more)
+Cohesion: 0.07
+Nodes (45): Engine package — deterministic RNG and rounding., derive_seed(), make_rng(), Deterministic RNG substreams via stable hash. Spec: never use global random…, Derive deterministic int seed from key material via BLAKE2b. Canonical…, Create isolated random.Random from int seed — no global state. Args: seed: Int…, Convenience: derive seed from key material and return Random. Args: run_seed:…, rng_for() (+37 more)
 
 ### Community 3 - "test_five_turn_prototype.py"
 Cohesion: 0.13
@@ -171,9 +172,9 @@ Nodes (16): 10. API Contract (from Section 10, for reference), 11. Frontend Rule
 Cohesion: 0.22
 Nodes (8): graphify reference: extra exports and benchmark, Step 6b - Wiki (only if --wiki flag), Step 7 - Neo4j export (only if --neo4j or --neo4j-push flag), Step 7a - FalkorDB export (only if --falkordb or --falkordb-push flag), Step 7b - SVG export (only if --svg flag), Step 7c - GraphML export (only if --graphml flag), Step 7d - MCP server (only if --mcp flag), Step 8 - Token reduction benchmark (only if total_words > 5000)
 
-### Community 16 - "Section 9 — COMPLETE (2026-08-10)"
-Cohesion: 0.18
-Nodes (10): Boundaries, Decisions relevant to future work, Follow-up obligations, Intentionally missing (do not build early), Last known green, Next milestone, Normal verification, Section 9 — COMPLETE (2026-08-10) (+2 more)
+### Community 16 - "Section 9 — IN PROGRESS (2026-08-10)"
+Cohesion: 0.20
+Nodes (9): Boundaries, Decisions relevant, Intentionally missing, Last known green, Next milestone, Normal verification, Section 9 — IN PROGRESS (2026-08-10), STATE — Historical Empire (+1 more)
 
 ### Community 17 - "graphify reference: extra exports and benchmark"
 Cohesion: 0.22
@@ -349,7 +350,7 @@ Nodes (79): affordable_quantity(), compute_farm_output(), cost_for_quantity(), S
 
 ### Community 68 - "GameState"
 Cohesion: 0.06
-Nodes (63): Domain package — re-exports canonical types., CausalTrace, DomainEffect, OutcomeDriver, PlayerOutcome, BaseModel, model_validator, Causal trace, domain effects, and player outcome for Sections 4–5. Structural… (+55 more)
+Nodes (71): Domain package — re-exports canonical types., Pressure domain — Section 8 world-pressure arc types. Small, frozen, validated…, CausalNode, CausalTrace, DomainEffect, OutcomeDriver, PlayerOutcome, BaseModel (+63 more)
 
 ### Community 69 - "Section 8 — Pressure-Driven Event Arc — Plan (Rev 4 — incorporates R1–R8 + grill Q1–Q7 + review round 2 F1–F5)"
 Cohesion: 0.09
@@ -365,7 +366,7 @@ Nodes (5): Acceptance criteria, Goal, In scope, SECTION 8 — Pressure-Driven Ev
 
 ### Community 73 - "PlayerCommand"
 Cohesion: 0.06
-Nodes (83): CausalNode, One step in the causal chain with explicit parent links., PlayerCommand, Player turn command — one major action per turn (Sections 3–5, sell_grain added…, pressure_for_world(), Return canonical test pressure for a WorldCondition (G1 helper)., Resolve one deterministic turn. Order is explicit: pressure_stage -> world ->…, resolve_turn() (+75 more)
+Nodes (82): PlayerCommand, Player turn command — one major action per turn (Sections 3–5, sell_grain added…, pressure_for_world(), Return canonical test pressure for a WorldCondition (G1 helper)., Resolve one deterministic turn. Order is explicit: pressure_stage -> world ->…, Non-player regional output after world effect — reuses same drought primitive., _regional_output_after_world(), resolve_turn() (+74 more)
 
 ### Community 75 - "Section 9 — Headless Strategy and Balance Harness — Plan (Rev 2 — regional_output fix, per review round 1)"
 Cohesion: 0.12
@@ -377,7 +378,7 @@ Nodes (5): Acceptance criteria, Goal, In scope, SECTION 20 — Visual Asset Syst
 
 ### Community 80 - "FiveTurnGame"
 Cohesion: 0.10
-Nodes (10): FiveTurnGame, In-memory 5-turn game — owns GameState, history, and session rivals. Rivals are…, Derived headlines per turn for UI convenience., test_harness_uses_pressure_not_bare_string(), Canonical hold-5 run must have ≥3 turns where Mira/Daran choose different types., test_canonical_run_has_three_diffs(), test_headlines_derived_and_visible_after_first_turn(), test_rival_determinism_same_seed() (+2 more)
+Nodes (10): FiveTurnGame, In-memory 5-turn game — owns GameState, history, and session rivals. Rivals are…, Derived headlines per turn for UI convenience., test_harness_uses_pressure_not_bare_string(), Canonical hold-5 run must have ≥1 turn where Mira/Daran choose different types…, test_canonical_run_has_three_diffs(), test_headlines_derived_and_visible_after_first_turn(), test_rival_determinism_same_seed() (+2 more)
 
 ### Community 81 - "cli.py"
 Cohesion: 0.23
@@ -395,20 +396,24 @@ Nodes (14): BatchConfig, PolicyAggregate, BaseModel, Run batch — deterministic
 Cohesion: 0.21
 Nodes (12): _can_afford(), policy_cash_preserving(), policy_production_heavy(), policy_random_legal(), policy_storage_heavy(), policy_trade_heavy(), Balance harness — Section 9 headless strategy sweep. Pure, sync, no FastAPI/DB.…, Uniform among affordable legal commands, deterministic via rng_for. (+4 more)
 
+### Community 88 - ".edges"
+Cohesion: 0.33
+Nodes (4): Deprecated string view — derived from drivers for backward compat., Derived edges as (parent, child) tuples from parent_ids., CausalEdge, computed_field
+
 ## Knowledge Gaps
-- **467 isolated node(s):** `historical-empire-backend`, `Usage`, `What graphify is for`, `Step 0 - GitHub repos and multi-path merge (only if a URL or several paths)`, `Step 1 - Ensure graphify is installed` (+462 more)
+- **466 isolated node(s):** `historical-empire-backend`, `Usage`, `What graphify is for`, `Step 0 - GitHub repos and multi-path merge (only if a URL or several paths)`, `Step 1 - Ensure graphify is installed` (+461 more)
   These have ≤1 connection - possible missing edges or undocumented components.
 - **10 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
 
 ## Suggested Questions
 _Questions this graph is uniquely positioned to answer:_
 
-- **Why does `PlayerCommand` connect `PlayerCommand` to `test_pressure_arc.py`, `engine/__init__.py`, `test_deterministic_rivals.py`, `GameState`, `test_five_turn_prototype.py`, `FiveTurnGame`, `cli.py`, `test_balance_harness.py`, `harness.py`?**
+- **Why does `PlayerCommand` connect `PlayerCommand` to `test_pressure_arc.py`, `test_deterministic_rivals.py`, `GameState`, `test_five_turn_prototype.py`, `FiveTurnGame`, `cli.py`, `test_balance_harness.py`, `harness.py`?**
   _High betweenness centrality (0.046) - this node is a cross-community bridge._
 - **Why does `resolve_turn()` connect `PlayerCommand` to `test_pressure_arc.py`, `engine/__init__.py`, `test_deterministic_rivals.py`, `GameState`, `test_five_turn_prototype.py`, `test_balance_harness.py`?**
   _High betweenness centrality (0.044) - this node is a cross-community bridge._
 - **Why does `FiveTurnGame` connect `FiveTurnGame` to `test_pressure_arc.py`, `test_deterministic_rivals.py`, `GameState`, `test_five_turn_prototype.py`, `PlayerCommand`, `cli.py`, `test_balance_harness.py`, `harness.py`?**
-  _High betweenness centrality (0.033) - this node is a cross-community bridge._
+  _High betweenness centrality (0.035) - this node is a cross-community bridge._
 - **Are the 13 inferred relationships involving `PlayerCommand` (e.g. with `BatchConfig` and `BatchResult`) actually correct?**
   _`PlayerCommand` has 13 INFERRED edges - model-reasoned connections that need verification._
 - **Are the 16 inferred relationships involving `FiveTurnGame` (e.g. with `BatchConfig` and `BatchResult`) actually correct?**

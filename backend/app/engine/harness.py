@@ -43,14 +43,32 @@ def _can_afford(cash: int, cost: int) -> bool:
 def policy_production_heavy(
     state: GameState, turn_idx: int, seed: str, version: str
 ) -> PlayerCommand:
-    """Expand farm early while affordable, else hold."""
-    if turn_idx < 2 and _can_afford(state.player.cash, EXPAND_FARM_COST + 200):
+    """Production: expand farm aggressively early, sell only at peak.
+
+    Strategy: invest cash into capacity when affordable; once expanded, hold
+    the extra grain through drought and sell at the price peak (turn 4) rather
+    than early at depressed prices (own output suppresses price).
+    """
+    if turn_idx < 2 and _can_afford(state.player.cash, EXPAND_FARM_COST + 50):
         return PlayerCommand(type="expand_farm")  # type: ignore[arg-type]
+    if turn_idx == 2 and _can_afford(state.player.cash, EXPAND_FARM_COST + 50):
+        return PlayerCommand(type="expand_farm")  # type: ignore[arg-type]
+    if turn_idx == 4 and state.player.inventory.grain > 10:
+        qty = min(state.player.inventory.grain // 2 + 20, state.player.inventory.grain)
+        qty = min(qty, 150)
+        if qty > 0:
+            return PlayerCommand(type="sell_grain", quantity=qty)  # type: ignore[arg-type]
     return PlayerCommand(type="hold")  # type: ignore[arg-type]
 
 
 def policy_storage_heavy(state: GameState, turn_idx: int, seed: str, version: str) -> PlayerCommand:
-    """Build granary T0, buy T1-2, hold drought T3, sell T4-5 at high price."""
+    """Storage: build granary, buy scaled to cash+headroom pre-drought, sell at peak.
+
+    Strategy: expand storage early, then deploy cash into grain while price is low
+    (buying as much as headroom and cash allow), hold through drought, then sell
+    large into the price peak (turn 4) to capture arbitrage. Selling at turn 3
+    would be too early (price not yet peaked), so hold then.
+    """
     if turn_idx == 0 and _can_afford(state.player.cash, BUILD_GRANARY_COST):
         return PlayerCommand(type="build_granary")  # type: ignore[arg-type]
     if turn_idx in (1, 2):
@@ -58,40 +76,50 @@ def policy_storage_heavy(state: GameState, turn_idx: int, seed: str, version: st
         space = state.player.storage_capacity - state.player.inventory.grain
         if space <= 0 or price <= 0:
             return PlayerCommand(type="hold")  # type: ignore[arg-type]
-        max_affordable = ((state.player.cash + 1) * 1000 - 1) // price if price > 0 else 20
-        actual = min(20, space, max_affordable)
+        max_affordable = ((state.player.cash + 1) * 1000 - 1) // price if price > 0 else 0
+        target = min(space, max_affordable)
+        actual = min(target, 80) if target > 10 else target
         if actual <= 0:
             return PlayerCommand(type="hold")  # type: ignore[arg-type]
         return PlayerCommand(type="buy_grain", quantity=actual)  # type: ignore[arg-type]
-    if turn_idx in (3, 4) and state.player.inventory.grain > 0:
-        # Sell after drought price spike — realize gains
-        qty = min(30, state.player.inventory.grain)
+    if turn_idx == 4 and state.player.inventory.grain > 0:
+        qty = min(state.player.inventory.grain, 150)
         if qty > 0:
             return PlayerCommand(type="sell_grain", quantity=qty)  # type: ignore[arg-type]
     return PlayerCommand(type="hold")  # type: ignore[arg-type]
 
 
 def policy_trade_heavy(state: GameState, turn_idx: int, seed: str, version: str) -> PlayerCommand:
-    """Secure route T1, buy T2, ship T4-5 when established."""
+    """Trade: secure route early, buy scaled pre-drought, ship/sell at peak.
+
+    Strategy: pay route cost early, then buy as much as cash/headroom allow,
+    hold through drought, then ship at peak (river arbitrage) and sell remainder
+    at Home peak. Only monetize at turn 4 peak.
+    """
     if (
         turn_idx == 0
         and not state.route.established
         and _can_afford(state.player.cash, ROUTE_ESTABLISH_COST)
     ):
         return PlayerCommand(type="secure_route")  # type: ignore[arg-type]
-    if turn_idx == 1:
+    if turn_idx in (1, 2):
         price = state.market.current_price
         space = state.player.storage_capacity - state.player.inventory.grain
         if space > 0 and price > 0:
-            max_affordable = ((state.player.cash + 1) * 1000 - 1) // price if price > 0 else 10
-            actual = min(10, space, max_affordable)
+            max_affordable = ((state.player.cash + 1) * 1000 - 1) // price if price > 0 else 0
+            target = min(space, max_affordable)
+            actual = min(target, 80) if target > 10 else target
             if actual > 0:
                 return PlayerCommand(type="buy_grain", quantity=actual)  # type: ignore[arg-type]
         return PlayerCommand(type="hold")  # type: ignore[arg-type]
-    if turn_idx in (3, 4) and state.route.established and state.player.inventory.grain > 0:
-        qty = min(10, state.player.inventory.grain, state.route.capacity)
+    if turn_idx == 4 and state.player.inventory.grain > 0:
+        if state.route.established:
+            ship_qty = min(state.player.inventory.grain, state.route.capacity, 30)
+            if ship_qty > 0:
+                return PlayerCommand(type="ship_grain", quantity=ship_qty)  # type: ignore[arg-type]
+        qty = min(state.player.inventory.grain, 80)
         if qty > 0:
-            return PlayerCommand(type="ship_grain", quantity=qty)  # type: ignore[arg-type]
+            return PlayerCommand(type="sell_grain", quantity=qty)  # type: ignore[arg-type]
     return PlayerCommand(type="hold")  # type: ignore[arg-type]
 
 
@@ -392,12 +420,16 @@ def run_batch(config: BatchConfig) -> BatchResult:
     # also check envelope: per-turn move <= 20% +1 (allow rounding)
     # we check in gate but also report overall price range
 
-    # hold_not_top gate: cash_preserving must NOT have highest median
+    # hold rank ≤3 gate: cash_preserving must rank no higher than 3rd of 5
     hold_median = next((a.median_wealth for a in aggregates if a.policy_id == "cash_preserving"), 0)
     max_median = max((a.median_wealth for a in aggregates), default=0)
     max_policy = next((a.policy_id for a in aggregates if a.median_wealth == max_median), "")
-    hold_not_top_pass = hold_median != max_median
-    hold_not_top_reason = f"cash {hold_median} vs max {max_median} ({max_policy}) {'PASS' if hold_not_top_pass else 'FAIL'} — cash must not be top"
+    # Count how many policies strictly beat hold
+    beat_hold = sum(1 for a in aggregates if a.median_wealth > hold_median)
+    # rank = beat_hold +1 (1 = top). Require rank >=3 => beat_hold >=2
+    hold_not_top_pass = beat_hold >= 2
+    rank = beat_hold + 1
+    hold_not_top_reason = f"cash {hold_median} rank {rank}/5 vs max {max_median} ({max_policy}) {'PASS' if hold_not_top_pass else 'FAIL'} — cash must rank ≥3 (≥2 policies beat it)"
 
     # negativity gate
     negativity_pass = not any_negative

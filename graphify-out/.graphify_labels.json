@@ -15,7 +15,7 @@
   "13": "Section 8 plan — consolidated review (round 2, against Rev 3)",
   "14": "Historical Empire — Agent Guide",
   "15": "graphify reference: extra exports and benchmark",
-  "16": "Section 9 — COMPLETE (2026-08-10)",
+  "16": "Section 9 — IN PROGRESS (2026-08-10)",
   "17": "graphify reference: extra exports and benchmark",
   "18": "graphify reference: query, path, explain",
   "19": "graphify reference: query, path, explain",
@@ -78,5 +78,6 @@
   "81": "cli.py",
   "82": "Section 8 implementation — consolidated review (round 3, against commit 28a0963)",
   "83": "test_balance_harness.py",
-  "84": "harness.py"
+  "84": "harness.py",
+  "88": ".edges"
 }

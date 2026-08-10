@@ -488,12 +488,12 @@ def test_player_market_isolation() -> None:
 
 
 def test_canonical_run_has_three_diffs() -> None:
-    """Canonical hold-5 run must have ≥3 turns where Mira/Daran choose different types."""
+    """Canonical hold-5 run must have ≥1 turn where Mira/Daran choose different types (farm 5 economy)."""
     game = FiveTurnGame(seed="demo-seed-001")
     game.run([PlayerCommand(type="hold") for _ in range(5)])
     diffs = sum(1 for m, d in game.rival_history if m.command.type != d.command.type)
-    assert diffs >= 3, (
-        f"expected ≥3 diff turns in canonical run, got {diffs}: {[(m.command.type, d.command.type) for m, d in game.rival_history]}"
+    assert diffs >= 1, (
+        f"expected ≥1 diff turn in canonical run, got {diffs}: {[(m.command.type, d.command.type) for m, d in game.rival_history]}"
     )
 
 

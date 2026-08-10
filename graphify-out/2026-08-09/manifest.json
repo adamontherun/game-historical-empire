@@ -20,8 +20,8 @@
     "semantic_hash": ""
   },
   "backend/app/domain/types.py": {
-    "mtime": 1786344863.8091137,
-    "ast_hash": "2dcc8515c4db99413cec9f6c16c265db",
+    "mtime": 1786345196.4200106,
+    "ast_hash": "8c03e61bedc9adaa4974e9075fdc3007",
     "semantic_hash": ""
   },
   "backend/app/engine/__init__.py": {
@@ -45,8 +45,8 @@
     "semantic_hash": "79fb1a94c42d32e68ee6a881643adb44"
   },
   "backend/app/engine/turn.py": {
-    "mtime": 1786344863.810841,
-    "ast_hash": "e1cc527e123535d819f5fe4093236367",
+    "mtime": 1786345251.052325,
+    "ast_hash": "f64063e100aa6cb22ed89d2f748167dc",
     "semantic_hash": ""
   },
   "backend/pyproject.toml": {
@@ -210,7 +210,7 @@
     "semantic_hash": ""
   },
   "BUILD_SPEC.md": {
-    "mtime": 1786344939.4309554,
+    "mtime": 1786345504.6861343,
     "ast_hash": "4ce2839625b07fc32d3c7bce817bca8a",
     "semantic_hash": ""
   },
@@ -220,13 +220,13 @@
     "semantic_hash": ""
   },
   "DECISIONS.md": {
-    "mtime": 1786344934.6430357,
-    "ast_hash": "d8788b2d7ee79eaf6411b4468e4b21dc",
+    "mtime": 1786345502.0143173,
+    "ast_hash": "fb7f7de213bfadd7180842933bcccdb9",
     "semantic_hash": ""
   },
   "STATE.md": {
-    "mtime": 1786344917.723677,
-    "ast_hash": "bc5c7561b0619f8738e4f38b75cfe243",
+    "mtime": 1786345521.6371117,
+    "ast_hash": "363be96b517da93b5e2e41aabffcd05e",
     "semantic_hash": ""
   },
   "backend/AGENTS.md": {
@@ -265,18 +265,18 @@
     "semantic_hash": ""
   },
   "backend/app/cli.py": {
-    "mtime": 1786344863.8097885,
-    "ast_hash": "b095a064c04fee5544b470912f4cb248",
+    "mtime": 1786345397.2430344,
+    "ast_hash": "931d75f825f498fd225af6af0603cce2",
     "semantic_hash": ""
   },
   "backend/app/engine/prototype.py": {
-    "mtime": 1786344791.4826496,
-    "ast_hash": "54a28a882b1895550355def72264917d",
+    "mtime": 1786345449.5939596,
+    "ast_hash": "96dd2c53b6c7a674a1dd51d4d3ccadc2",
     "semantic_hash": ""
   },
   "backend/tests/test_five_turn_prototype.py": {
-    "mtime": 1786344807.6608067,
-    "ast_hash": "588617496cf01c199d20be2edb2bd827",
+    "mtime": 1786345466.5946186,
+    "ast_hash": "181ed9f40b80049a0d443c60ffa805b9",
     "semantic_hash": ""
   },
   "docs/plans/2026-08-09-section-6-five-turn-prototype.md": {
@@ -285,18 +285,18 @@
     "semantic_hash": ""
   },
   "backend/app/engine/actor.py": {
-    "mtime": 1786329143.7374678,
-    "ast_hash": "c661c96cf355b3b053a698e9a98361d2",
+    "mtime": 1786345200.4608023,
+    "ast_hash": "f39bfb690bc4dbf843c77bff6f1ad256",
     "semantic_hash": ""
   },
   "backend/app/engine/rivals.py": {
-    "mtime": 1786329143.7380216,
-    "ast_hash": "365a25a450ac5c31ac03ecbe3c0975e0",
+    "mtime": 1786345342.867643,
+    "ast_hash": "8f260f34b57eef376d1aac94e8d63ca0",
     "semantic_hash": ""
   },
   "backend/tests/test_deterministic_rivals.py": {
-    "mtime": 1786341862.9488826,
-    "ast_hash": "a43a46b6914650119a78c631e02042ae",
+    "mtime": 1786345428.7406433,
+    "ast_hash": "1d18ab5b32571798350aad995e7e63cf",
     "semantic_hash": ""
   },
   "docs/plans/2026-08-09-section-7-deterministic-rivals.md": {
@@ -350,13 +350,13 @@
     "semantic_hash": ""
   },
   "backend/app/engine/harness.py": {
-    "mtime": 1786344876.1704557,
-    "ast_hash": "4d557a37ef07f9faef5ebf873a494918",
+    "mtime": 1786345449.5943346,
+    "ast_hash": "444337697e261d2f9c30cd876f7ff9f8",
     "semantic_hash": ""
   },
   "backend/tests/test_balance_harness.py": {
-    "mtime": 1786344878.2253773,
-    "ast_hash": "707c0610f03548fdf5a24edb0b50ccbc",
+    "mtime": 1786345401.6550565,
+    "ast_hash": "e74a6f944c5324d2955f70f5a44ab83a",
     "semantic_hash": ""
   }
 }
