@@ -64,26 +64,43 @@ describe("formatRunRecord", () => {
     expect(s).not.toContain("hold:0");
   });
 
-  it("fails if reconstructed from kind+quantity instead of exact id", () => {
-    // Simulate a bug where ids are reconstructed as `${kind}:${quantity}`
-    const serverIds = ["buy_grain:55", "sell_grain:7", "hold"];
-    // A buggy formatter would do:
-    const buggy = serverIds
-      .map((id) => {
-        const parts = id.split(":");
-        const kind = parts[0];
-        const qty = parts[1] ?? null;
-        // bug: reconstructs, loses exactness for hold
-        return qty ? `${kind}:${qty}` : `${kind}:null`;
-      })
-      .join(",");
-    const correct = formatRunRecord("s", "r", serverIds);
-    // correct must not contain the buggy artefact
-    expect(correct).not.toContain("hold:null");
-    expect(buggy).toContain("hold:null");
-    // correct must contain exact ids
-    expect(correct).toContain("buy_grain:55");
-    expect(correct).toContain("hold");
+  it("App records the exact server choice id, not kind+quantity — mutation-proven", async () => {
+    // The server id format today happens to BE `kind:quantity`, so a reconstructing
+    // implementation is indistinguishable from a correct one under real payloads.
+    // Use an opaque id that reconstruction could never produce, so the assertion has teeth.
+    const OPAQUE_ID = "buy_grain@55#v2";
+    const start = makeGame({
+      turn: 0,
+      revision: 0,
+      completion_summary: null,
+      available_choices: [
+        { id: OPAQUE_ID, label: "Buy 55 grain", kind: "buy_grain", quantity: 55, cost: 275 },
+      ],
+    });
+    const finished = makeGame({ turn: 1, revision: 1 });
+
+    const client = await import("../api/client");
+    vi.spyOn(client, "createGame").mockResolvedValue(start as never);
+    const commitSpy = vi.spyOn(client, "commitChoice").mockResolvedValue(finished as never);
+
+    const user = userEvent.setup();
+    const { default: App } = await import("../App");
+    render(<App />);
+
+    await user.click(screen.getByTestId("begin-btn"));
+    await screen.findByTestId("verb-buy_grain");
+    await user.click(screen.getByTestId("verb-buy_grain"));
+    await user.click(screen.getByTestId("commit"));
+
+    // the id sent to the server must be the opaque one, verbatim
+    await vi.waitFor(() => expect(commitSpy).toHaveBeenCalled());
+    expect(commitSpy.mock.calls[0][1]).toBe(OPAQUE_ID);
+
+    // and the recorded run record must carry that same opaque id — a reconstructing
+    // implementation would record "buy_grain:55" here and fail this assertion
+    const record = await screen.findByTestId("run-record-replay");
+    expect(record.textContent).toContain(OPAQUE_ID);
+    expect(record.textContent).not.toContain("buy_grain:55");
   });
 });
 
