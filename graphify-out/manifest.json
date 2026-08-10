@@ -45,9 +45,9 @@
     "semantic_hash": "79fb1a94c42d32e68ee6a881643adb44"
   },
   "backend/app/engine/turn.py": {
-    "mtime": 1786322285.7948382,
-    "ast_hash": "94ab43280753afcd677adc55b0e5bd09",
-    "semantic_hash": "94ab43280753afcd677adc55b0e5bd09"
+    "mtime": 1786322705.7846203,
+    "ast_hash": "a8ab0f4c61579c0c2489b33608d16094",
+    "semantic_hash": ""
   },
   "backend/pyproject.toml": {
     "mtime": 1786320137.7321334,
@@ -105,8 +105,8 @@
     "semantic_hash": "1a5f659bb76e99121304dc9703cbc467"
   },
   "backend/tests/test_two_markets_route.py": {
-    "mtime": 1786322404.5299199,
-    "ast_hash": "a0225ae32b7f2f016a1ee6e87a322f47",
+    "mtime": 1786322710.3753948,
+    "ast_hash": "0d1a6add24a69ba7f8518bbacae953b8",
     "semantic_hash": ""
   },
   ".agents/skills/graphify/SKILL.md": {
@@ -225,8 +225,8 @@
     "semantic_hash": ""
   },
   "STATE.md": {
-    "mtime": 1786321768.8545392,
-    "ast_hash": "ab8fdf6ed671d718cfa95e6cafb4b71d",
+    "mtime": 1786322752.6456196,
+    "ast_hash": "2c53c826d46056b38fa4111d14ac69b9",
     "semantic_hash": ""
   },
   "backend/AGENTS.md": {

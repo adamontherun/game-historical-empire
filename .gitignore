@@ -36,4 +36,3 @@ build/
 
 # graphify — cache is regenerated, graph.json is merge-tracked (see .gitattributes)
 graphify-out/cache/
-graphify-out/.graphify_*
