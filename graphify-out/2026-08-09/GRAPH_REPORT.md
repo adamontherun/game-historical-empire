@@ -1,32 +1,32 @@
 # Graph Report - game-historical-empire  (2026-08-09)
 
 ## Corpus Check
-- 61 files · ~88,759 words
+- 64 files · ~96,549 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
-- 890 nodes · 1467 edges · 71 communities (60 shown, 11 thin omitted)
-- Extraction: 96% EXTRACTED · 4% INFERRED · 0% AMBIGUOUS · INFERRED: 52 edges (avg confidence: 0.58)
+- 941 nodes · 1590 edges · 73 communities (63 shown, 10 thin omitted)
+- Extraction: 97% EXTRACTED · 3% INFERRED · 0% AMBIGUOUS · INFERRED: 53 edges (avg confidence: 0.51)
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `78d73e7b`
+- Built from commit: `8f05ff39`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
 ## Community Hubs (Navigation)
-- resolve_turn
-- turn.py
+- PlayerCommand
+- .edges
 - test_invariants.py
 - FiveTurnGame
 - What You Must Do When Invoked
-- RivalState
+- InventoryState
 - Plan — Section 1: Repository Contract and Walking Skeleton
 - What You Must Do When Invoked
 - Section 5 — Two Markets and One Trade Route — Plan
 - test_sanity.py
 - historical-empire-backend
-- .edges
+- Section 8 plan — consolidated review (round 2, against Rev 3)
 - Historical Empire — Agent Guide
 - graphify reference: extra exports and benchmark
 - Section 7 — COMPLETE (2026-08-09)
@@ -79,64 +79,66 @@
 - SECTION 2 — Core Economic Types and Deterministic Randomness
 - SECTION 4 — Causal Explanation and Outcome Model
 - Part VIII — Agent Guardrails
-- SECTION 8 — Pressure-Driven Event Arc
-- actor.py
+- Section 8 plan — consolidated review (round 1)
+- rivals.py
 - SECTION 20 — Visual Asset System and Polish
-- BaseModel
+- Section 8 — Pressure-Driven Event Arc — Plan (Rev 3 — post-grill, incorporates R1–R8 + grill fixes)
 - Section 7 — Deterministic Rivals — Plan (Rev 2)
+- SECTION 9 — Headless Strategy and Balance Harness
+- SECTION 8 — Pressure-Driven Event Arc
 
 ## God Nodes (most connected - your core abstractions)
-1. `resolve_turn()` - 83 edges
-2. `PlayerCommand` - 66 edges
-3. `FiveTurnGame` - 48 edges
-4. `GameState` - 42 edges
-5. `MarketState` - 32 edges
-6. `InventoryState` - 31 edges
+1. `PlayerCommand` - 88 edges
+2. `resolve_turn()` - 85 edges
+3. `FiveTurnGame` - 55 edges
+4. `InventoryState` - 50 edges
+5. `GameState` - 42 edges
+6. `MarketState` - 32 edges
 7. `PlayerState` - 30 edges
-8. `RivalState` - 28 edges
-9. `StrategicSummary` - 18 edges
-10. `_base_state()` - 18 edges
+8. `RivalState` - 30 edges
+9. `apply_rival_command()` - 25 edges
+10. `ObservableContext` - 19 edges
 
 ## Surprising Connections (you probably didn't know these)
-- `FiveTurnGame` --uses--> `RivalState`  [INFERRED]
-  backend/app/engine/prototype.py → backend/app/engine/rivals.py
-- `FiveTurnGame` --uses--> `RivalTurnResult`  [INFERRED]
-  backend/app/engine/prototype.py → backend/app/engine/rivals.py
-- `FiveTurnGame` --uses--> `ObservableContext`  [INFERRED]
-  backend/app/engine/prototype.py → backend/app/engine/rivals.py
-- `FiveTurnGame` --uses--> `SettlementContext`  [INFERRED]
-  backend/app/engine/prototype.py → backend/app/engine/rivals.py
 - `FiveTurnGame` --uses--> `TurnResolution`  [INFERRED]
   backend/app/engine/prototype.py → backend/app/domain/trace.py
+- `FiveTurnGame` --uses--> `InventoryState`  [INFERRED]
+  backend/app/engine/prototype.py → backend/app/domain/types.py
+- `ObservableContext` --uses--> `InventoryState`  [INFERRED]
+  backend/app/engine/rivals.py → backend/app/domain/types.py
+- `RivalPreferences` --uses--> `InventoryState`  [INFERRED]
+  backend/app/engine/rivals.py → backend/app/domain/types.py
+- `RivalProfile` --uses--> `InventoryState`  [INFERRED]
+  backend/app/engine/rivals.py → backend/app/domain/types.py
 
 ## Import Cycles
 - None detected.
 
-## Communities (71 total, 11 thin omitted)
+## Communities (73 total, 10 thin omitted)
 
-### Community 0 - "resolve_turn"
+### Community 0 - "PlayerCommand"
 Cohesion: 0.06
 Nodes (71): PlayerCommand, Player turn command — one major action per turn (Sections 3–5)., WorldCondition, Resolve one deterministic turn. Order is explicit: command -> production ->…, resolve_turn(), _base_state(), Section 4 — causal trace hardening, exact wealth decomposition, and story…, Wealth delta must equal cash + purchase + harvest + price effects exactly. (+63 more)
 
-### Community 1 - "turn.py"
-Cohesion: 0.08
-Nodes (56): Domain package — re-exports canonical types., CausalNode, CausalTrace, DomainEffect, OutcomeDriver, PlayerOutcome, BaseModel, Causal trace, domain effects, and player outcome for Sections 4–5. Structural… (+48 more)
+### Community 1 - ".edges"
+Cohesion: 0.33
+Nodes (4): Deprecated string view — derived from drivers for backward compat., Derived edges as (parent, child) tuples from parent_ids., CausalEdge, computed_field
 
 ### Community 2 - "test_invariants.py"
 Cohesion: 0.06
 Nodes (55): Engine package — deterministic RNG and rounding., derive_seed(), make_rng(), Deterministic RNG substreams via stable hash. Spec: never use global random…, Derive deterministic int seed from key material via BLAKE2b. Canonical…, Create isolated random.Random from int seed — no global state. Args: seed: Int…, Convenience: derive seed from key material and return Random. Args: run_seed:…, rng_for() (+47 more)
 
 ### Community 3 - "FiveTurnGame"
-Cohesion: 0.07
-Nodes (38): format_market_pulse(), format_player_state(), format_rivals(), format_route_state(), main(), parse_choice(), parse_choices_arg(), Thin CLI for the five-turn headless prototype — Section 6. Pure I/O around… (+30 more)
+Cohesion: 0.06
+Nodes (42): format_market_pulse(), format_player_state(), format_rivals(), format_route_state(), main(), parse_choice(), parse_choices_arg(), Thin CLI for the five-turn headless prototype — Section 6. Pure I/O around… (+34 more)
 
 ### Community 4 - "What You Must Do When Invoked"
 Cohesion: 0.08
 Nodes (24): For /graphify add and --watch, For /graphify query, For the commit hook and native AGENTS.md integration, For --update and --cluster-only, /graphify, Honesty Rules, Interpreter guard for subcommands, Part A - Structural extraction for code files (+16 more)
 
-### Community 5 - "RivalState"
-Cohesion: 0.06
-Nodes (75): _next_world_known_for_turn(), BaseModel, WorldCondition, Five-turn headless prototype — Section 7 with deterministic rivals.…, Wealth = cash + inventory value at Home price (milli)., Structured threat known at turn idx (pre-turn). Section 7: only T3 (idx=2,…, Concise end-of-run summary — both human and structured (now with rivals)., Build pre-turn observable context for rival choice (structured, not prose). (+67 more)
+### Community 5 - "InventoryState"
+Cohesion: 0.07
+Nodes (66): Domain package — re-exports canonical types., CausalNode, CausalTrace, DomainEffect, OutcomeDriver, PlayerOutcome, BaseModel, Causal trace, domain effects, and player outcome for Sections 4–5. Structural… (+58 more)
 
 ### Community 6 - "Plan — Section 1: Repository Contract and Walking Skeleton"
 Cohesion: 0.10
@@ -150,9 +152,9 @@ Nodes (24): For /graphify add and --watch, For /graphify query, For the commit h
 Cohesion: 0.11
 Nodes (18): 1. Confirm workspace & branch → unblocks all edits, 2. Domain — add River Town and River Route types, keep Home alias, 3. Trace — add route/trade/river kinds, keep DAG validators compatible, 4. Engine — resolve two prices + route settlement, keep Home chain exact, 5. CLI — show both market pulses and route status, 6. Tests — prove AC 1–6 and preserve Section 3–4 invariants, 7. Docs & handoff, Constraints And Non-goals (+10 more)
 
-### Community 13 - ".edges"
-Cohesion: 0.33
-Nodes (4): Deprecated string view — derived from drivers for backward compat., Derived edges as (parent, child) tuples from parent_ids., CausalEdge, computed_field
+### Community 13 - "Section 8 plan — consolidated review (round 2, against Rev 3)"
+Cohesion: 0.25
+Nodes (7): Already resolved — no action (convergence check), F1 — The AC1/AC3 instrument still confounds "heeded the warning" with "chose a different production lever" (BLOCKING, highest priority), F2 — `PressureState` still permits the invalid combination R1 was meant to eliminate (BLOCKING), F3 — `causal_source_id` and the trace `reason_code` are two code paths computing one fact (should-fix), F4 — File location for `PressureStage`/`PressureState` is still hedged (should-fix, cheap), F5 — Validation Plan should state the final repo gates explicitly (should-fix, housekeeping), Section 8 plan — consolidated review (round 2, against Rev 3)
 
 ### Community 14 - "Historical Empire — Agent Guide"
 Cohesion: 0.12
@@ -215,8 +217,8 @@ Cohesion: 0.11
 Nodes (17): 1. Confirm workspace & branch → unblocks all edits, 2. Domain — formalize `OutcomeDriver`, tuples, valuation kinds, correct roots → unblocks engine, 3. Engine — exact wealth subgraph + story drivers + exact wealth-bps ranking + RNG validation → unblocks tests/demo, 4. CLI — concise story drivers + full debug trace, 5. Tests — prove AC 1–5 plus exact totals and correct roots, 6. Gates & handoff, Constraints And Non-goals, Context And Current Facts (+9 more)
 
 ### Community 37 - "BUILD_SPEC.md"
-Cohesion: 0.11
-Nodes (18): 1. Product Thesis, 23. Systems Explicitly Deferred Until Proven Necessary, 29. Player Experience Success Criteria, 2. Signature Design Rule, 30. Technical Success Criteria, 35. First Active Section, 3. The Long-Term Hook, Acceptance criteria (+10 more)
+Cohesion: 0.14
+Nodes (13): 1. Product Thesis, 23. Systems Explicitly Deferred Until Proven Necessary, 29. Player Experience Success Criteria, 2. Signature Design Rule, 30. Technical Success Criteria, 35. First Active Section, 3. The Long-Term Hook, Final Architectural Principle (+5 more)
 
 ### Community 38 - "Section 2 — Core Economic Types and Deterministic Randomness — Plan"
 Cohesion: 0.15
@@ -330,41 +332,53 @@ Nodes (6): Acceptance criteria, Explicitly out of scope, Goal, In scope, SECTION
 Cohesion: 0.40
 Nodes (5): 31. Do Not Build Ahead, 32. Do Not Rewrite Working Systems Without Evidence, 33. Dependencies Require Justification, 34. Agent Completion Report Template, Part VIII — Agent Guardrails
 
-### Community 66 - "SECTION 8 — Pressure-Driven Event Arc"
-Cohesion: 0.40
-Nodes (5): Acceptance criteria, Goal, In scope, SECTION 8 — Pressure-Driven Event Arc, Stop condition
+### Community 66 - "Section 8 plan — consolidated review (round 1)"
+Cohesion: 0.18
+Nodes (10): Keep as-is (both reviewers agree), R1 — Pressure must be the single source of truth for the turn (BLOCKING), R2 — Delete `world_modifiers` (BLOCKING), R3 — Trace root: no numeric hash, and no validator change (BLOCKING), R4 — T2/T3 prose must be mechanically truthful (BLOCKING), R5 — AC3 must test preparation, not balance (BLOCKING), R6 — AC1 needs the same instrument, R7 — Fix the validation commands (+2 more)
 
-### Community 67 - "actor.py"
-Cohesion: 0.10
-Nodes (21): affordable_quantity(), compute_farm_output(), cost_for_quantity(), Shared actor-level economic primitives — Section 7 extraction. Single source of…, Settle harvest into inventory with storage cap. Returns…, Resolve ship_grain settlement with shared clamping. Uses pre-turn…, Shared expand_farm affordability/mutation. Returns (cash_after, farm_after,…, Cost in Money for quantity at price_milli (milliunits per unit). Floor division… (+13 more)
+### Community 67 - "rivals.py"
+Cohesion: 0.05
+Nodes (81): affordable_quantity(), compute_farm_output(), cost_for_quantity(), Shared actor-level economic primitives — Section 7 extraction. Single source of…, Settle harvest into inventory with storage cap. Returns…, Resolve ship_grain settlement with shared clamping. Uses pre-turn…, Shared expand_farm affordability/mutation. Returns (cash_after, farm_after,…, Cost in Money for quantity at price_milli (milliunits per unit). Floor division… (+73 more)
 
 ### Community 68 - "SECTION 20 — Visual Asset System and Polish"
 Cohesion: 0.40
 Nodes (5): Acceptance criteria, Goal, In scope, SECTION 20 — Visual Asset System and Polish, Stop condition
 
+### Community 69 - "Section 8 — Pressure-Driven Event Arc — Plan (Rev 3 — post-grill, incorporates R1–R8 + grill fixes)"
+Cohesion: 0.06
+Nodes (33): 1 — Domain pressure types (no behavior change yet), 2 — Pressure arc + pure helpers, 3 — Prototype refactor to drive from pressure (keep TURN_SPECS compat), 4 — Turn kernel signature + trace integration (pressure → world chain), 5 — Rivals & settlement keep structured threat (no scoring rewrite), 6 — CLI + summary polish, 7 — New Section 8 acceptance tests (exact specification per R5/R6 + Q1/Q2/Q5), Constraints And Non-goals (+25 more)
+
 ### Community 70 - "Section 7 — Deterministic Rivals — Plan (Rev 2)"
 Cohesion: 0.10
 Nodes (20): 1 — Extract shared actor primitives (behavior-preserving, no market/trace change), 2 — Rival profile/state/result types, 3 — Integer scoring & deterministic choice, 4 — Rival execution via shared primitives + truthful headlines, 5 — Prototype integration with corrected timing, 6 — Structured threat plumbing, 7 — CLI reveal, 8 — Tests (behavioral, not scripted) (+12 more)
 
+### Community 71 - "SECTION 9 — Headless Strategy and Balance Harness"
+Cohesion: 0.40
+Nodes (5): Acceptance criteria, Goal, In scope, SECTION 9 — Headless Strategy and Balance Harness, Stop condition
+
+### Community 72 - "SECTION 8 — Pressure-Driven Event Arc"
+Cohesion: 0.40
+Nodes (5): Acceptance criteria, Goal, In scope, SECTION 8 — Pressure-Driven Event Arc, Stop condition
+
 ## Knowledge Gaps
-- **402 isolated node(s):** `What exists`, `Boundaries`, `Normal verification`, `Last known green`, `Decisions relevant to future work` (+397 more)
+- **445 isolated node(s):** `Goal`, `Success Criteria (maps to Section 8 AC + global rules)`, `Context And Current Facts (verified against code)`, `Verification of Review Claims`, `Q1 — Does the AC1/AC3 instrument actually isolate the WARNING?` (+440 more)
   These have ≤1 connection - possible missing edges or undocumented components.
-- **11 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
+- **10 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
 
 ## Suggested Questions
 _Questions this graph is uniquely positioned to answer:_
 
-- **Why does `resolve_turn()` connect `resolve_turn` to `turn.py`, `test_invariants.py`, `FiveTurnGame`, `actor.py`, `RivalState`?**
-  _High betweenness centrality (0.052) - this node is a cross-community bridge._
-- **Why does `PlayerCommand` connect `resolve_turn` to `turn.py`, `test_invariants.py`, `FiveTurnGame`, `RivalState`?**
-  _High betweenness centrality (0.027) - this node is a cross-community bridge._
-- **Why does `FiveTurnGame` connect `FiveTurnGame` to `resolve_turn`, `turn.py`, `RivalState`?**
-  _High betweenness centrality (0.025) - this node is a cross-community bridge._
-- **Are the 3 inferred relationships involving `PlayerCommand` (e.g. with `FiveTurnGame` and `StrategicSummary`) actually correct?**
-  _`PlayerCommand` has 3 INFERRED edges - model-reasoned connections that need verification._
+- **Why does `resolve_turn()` connect `PlayerCommand` to `FiveTurnGame`, `test_invariants.py`, `rivals.py`, `InventoryState`?**
+  _High betweenness centrality (0.040) - this node is a cross-community bridge._
+- **Why does `PlayerCommand` connect `PlayerCommand` to `test_invariants.py`, `rivals.py`, `FiveTurnGame`, `InventoryState`?**
+  _High betweenness centrality (0.033) - this node is a cross-community bridge._
+- **Why does `FiveTurnGame` connect `FiveTurnGame` to `PlayerCommand`, `rivals.py`, `InventoryState`?**
+  _High betweenness centrality (0.019) - this node is a cross-community bridge._
+- **Are the 9 inferred relationships involving `PlayerCommand` (e.g. with `FiveTurnGame` and `StrategicSummary`) actually correct?**
+  _`PlayerCommand` has 9 INFERRED edges - model-reasoned connections that need verification._
 - **Are the 11 inferred relationships involving `FiveTurnGame` (e.g. with `TurnResolution` and `GameState`) actually correct?**
   _`FiveTurnGame` has 11 INFERRED edges - model-reasoned connections that need verification._
+- **Are the 9 inferred relationships involving `InventoryState` (e.g. with `FiveTurnGame` and `StrategicSummary`) actually correct?**
+  _`InventoryState` has 9 INFERRED edges - model-reasoned connections that need verification._
 - **Are the 9 inferred relationships involving `GameState` (e.g. with `CausalNode` and `CausalTrace`) actually correct?**
   _`GameState` has 9 INFERRED edges - model-reasoned connections that need verification._
-- **Are the 3 inferred relationships involving `MarketState` (e.g. with `FiveTurnGame` and `StrategicSummary`) actually correct?**
-  _`MarketState` has 3 INFERRED edges - model-reasoned connections that need verification._

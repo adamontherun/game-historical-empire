@@ -1,5 +1,6 @@
 """Domain package — re-exports canonical types."""
 
+from app.domain.pressure import PressureStage, PressureState
 from app.domain.trace import (
     CausalEdge,
     CausalNode,
@@ -40,6 +41,8 @@ __all__ = [
     "PlayerCommand",
     "PlayerState",
     "PlayerOutcome",
+    "PressureStage",
+    "PressureState",
     "PriceMilliunits",
     "Quantity",
     "RouteState",

@@ -77,9 +77,14 @@ def test_every_important_node_has_parent_including_valuation() -> None:
             assert isinstance(res.causal_trace.nodes, tuple)
             for node in res.causal_trace.nodes:
                 assert isinstance(node.parent_ids, tuple)
-                # Allowed roots
-                if node.id in ("world", "command"):
+                # Allowed roots — pressure_stage is now root, world is child of pressure_stage (Section 8)
+                if node.id in ("pressure_stage", "command"):
                     assert node.parent_ids == (), f"{node.id} should be root"
+                    continue
+                if node.id == "world":
+                    assert node.parent_ids == ("pressure_stage",), (
+                        f"world should be child of pressure_stage, got {node.parent_ids}"
+                    )
                     continue
                 if node.id == "farm_capacity" and node.delta == 0:
                     assert node.parent_ids == ()
@@ -556,5 +561,5 @@ def test_buy_quantity_split_no_false_harvest_story() -> None:
 def test_turn_order_includes_valuation() -> None:
     assert (
         TURN_ORDER
-        == "command -> production -> home_supply -> river_supply -> home_price -> river_price -> settlement -> route_settlement -> valuation"
+        == "pressure_stage -> world -> command -> production -> home_supply -> river_supply -> home_price -> river_price -> settlement -> route_settlement -> valuation"
     )

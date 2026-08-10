@@ -45,7 +45,7 @@
     "semantic_hash": "79fb1a94c42d32e68ee6a881643adb44"
   },
   "backend/app/engine/turn.py": {
-    "mtime": 1786328595.5626602,
+    "mtime": 1786329143.7383895,
     "ast_hash": "6a7bfd98b81d260bbe1ca5191c0cd579",
     "semantic_hash": ""
   },
@@ -210,7 +210,7 @@
     "semantic_hash": ""
   },
   "BUILD_SPEC.md": {
-    "mtime": 1786327649.7751853,
+    "mtime": 1786329143.7363226,
     "ast_hash": "cef9945c023b02758ae3306ddcd450bd",
     "semantic_hash": ""
   },
@@ -220,12 +220,12 @@
     "semantic_hash": ""
   },
   "DECISIONS.md": {
-    "mtime": 1786327640.6661582,
+    "mtime": 1786329143.7366512,
     "ast_hash": "20e5ad7e996ca083e380a102fca3140e",
     "semantic_hash": ""
   },
   "STATE.md": {
-    "mtime": 1786328959.9013207,
+    "mtime": 1786329143.7370715,
     "ast_hash": "485c67401c8c0de0288245bcd8b59d9f",
     "semantic_hash": ""
   },
@@ -265,12 +265,12 @@
     "semantic_hash": ""
   },
   "backend/app/cli.py": {
-    "mtime": 1786327266.9702294,
+    "mtime": 1786329143.7372913,
     "ast_hash": "a4d976ce0d6a5d8f62f46af2fb07447f",
     "semantic_hash": ""
   },
   "backend/app/engine/prototype.py": {
-    "mtime": 1786327245.4452834,
+    "mtime": 1786329143.737692,
     "ast_hash": "a1f5192b3a56c5f1db85b876446179c1",
     "semantic_hash": ""
   },
@@ -285,23 +285,38 @@
     "semantic_hash": ""
   },
   "backend/app/engine/actor.py": {
-    "mtime": 1786328581.6533854,
+    "mtime": 1786329143.7374678,
     "ast_hash": "c661c96cf355b3b053a698e9a98361d2",
     "semantic_hash": ""
   },
   "backend/app/engine/rivals.py": {
-    "mtime": 1786328899.1629684,
+    "mtime": 1786329143.7380216,
     "ast_hash": "365a25a450ac5c31ac03ecbe3c0975e0",
     "semantic_hash": ""
   },
   "backend/tests/test_deterministic_rivals.py": {
-    "mtime": 1786328932.4403143,
+    "mtime": 1786329143.7387788,
     "ast_hash": "43bfaee4acfd7c9233b901a8573a10b9",
     "semantic_hash": ""
   },
   "docs/plans/2026-08-09-section-7-deterministic-rivals.md": {
-    "mtime": 1786327030.5124524,
+    "mtime": 1786329143.7390802,
     "ast_hash": "d695edec80cbb59b8e205590c3306f86",
+    "semantic_hash": ""
+  },
+  "docs/plans/2026-08-10-section-8-pressure-driven-event-arc.md": {
+    "mtime": 1786339990.986063,
+    "ast_hash": "09fd7e05aca43b2c4676b8862f1adcdd",
+    "semantic_hash": ""
+  },
+  "docs/plans/2026-08-10-section-8-review-round-1.md": {
+    "mtime": 1786339735.728042,
+    "ast_hash": "6983c9cde4ced2ab1307d94d2c43ec25",
+    "semantic_hash": ""
+  },
+  "docs/plans/2026-08-10-section-8-review-round-2.md": {
+    "mtime": 1786340479.029048,
+    "ast_hash": "1db68ba0284106cfd15b5476c02b4705",
     "semantic_hash": ""
   }
 }

@@ -40,6 +40,7 @@ Spec: drought reduces production/yield, not directly price.
 
 from __future__ import annotations
 
+from app.domain.pressure import PressureState
 from app.domain.trace import (
     CausalNode,
     CausalTrace,
@@ -55,7 +56,6 @@ from app.domain.types import (
     PlayerCommand,
     PlayerState,
     TurnContext,
-    WorldCondition,
 )
 from app.engine.actor import (
     DROUGHT_YIELD_REDUCTION_BPS,  # noqa: F401  re-export for backward compat
@@ -81,7 +81,7 @@ from app.engine.rng import rng_for
 from app.engine.rounding import clamp_non_negative, div_round_half_up
 
 # Public for tests to assert order.
-TURN_ORDER: str = "command -> production -> home_supply -> river_supply -> home_price -> river_price -> settlement -> route_settlement -> valuation"
+TURN_ORDER: str = "pressure_stage -> world -> command -> production -> home_supply -> river_supply -> home_price -> river_price -> settlement -> route_settlement -> valuation"
 
 
 def _target_price(
@@ -122,17 +122,21 @@ def _bounded_price(
 def resolve_turn(
     state: GameState,
     command: PlayerCommand,
-    world: WorldCondition,
+    pressure: PressureState | str,
     rng_context: TurnContext,
 ) -> TurnResolution:
     """Resolve one deterministic turn.
 
-    Order is explicit: command -> production -> home_supply -> river_supply -> home_price -> river_price -> settlement -> route_settlement -> valuation.
+    Order is explicit: pressure_stage -> world -> command -> production -> home_supply -> river_supply -> home_price -> river_price -> settlement -> route_settlement -> valuation.
 
     Args:
         state: Canonical before state (includes home market, river market, route).
         command: Single player major action (now includes secure_route/ship_grain).
-        world: World condition for this turn (normal/drought).
+        pressure: Pressure state for this turn (world derived as pressure.world).
+            For backward compat with pre-Section 8 tests, a bare WorldCondition
+            string ("normal"/"drought") is still accepted and synthesized to a
+            minimal PressureState (stage matching world) so existing call sites
+            do not need mechanical editing before the gate.
         rng_context: Turn identity for deterministic substreams — must equal state context.
 
     Returns:
@@ -209,7 +213,37 @@ def resolve_turn(
     nodes: list[CausalNode] = []
     effects: list[DomainEffect] = []
 
-    # World node — root cause, no parents.
+    # Pressure stage — single source of truth (F3): reason_code is causal_source_id directly
+    # Backward compat: allow bare world string from pre-Section 8 call sites
+    if isinstance(pressure, str):
+        _world_str: str = pressure
+        # Synthesize minimal pressure for trace (activation_turn 0, stage matching world)
+        from app.domain.pressure import PressureState as _PS  # local import to avoid cycle
+
+        _stage = "drought" if _world_str == "drought" else "normal"
+        pressure = _PS(
+            pressure_id="legacy",
+            stage=_stage,  # type: ignore[arg-type]
+            activation_turn=0,
+            world=_world_str,  # type: ignore[arg-type]
+            signal="legacy",
+            title="Drought" if _world_str == "drought" else "Normal",
+        )
+    world = pressure.world  # type: ignore[union-attr]
+    nodes.append(
+        CausalNode(
+            id="pressure_stage",
+            label=pressure.title,  # type: ignore[union-attr]
+            kind="pressure",
+            before=None,
+            after=None,
+            delta=None,
+            reason_code=pressure.causal_source_id,  # type: ignore[union-attr]
+            parent_ids=(),
+        )
+    )
+
+    # World node — child of pressure_stage (systemic chain)
     world_label = "Normal harvest" if world == "normal" else "Drought"
     world_reason = "normal_harvest" if world == "normal" else "drought"
     nodes.append(
@@ -221,7 +255,7 @@ def resolve_turn(
             after=None,
             delta=None,
             reason_code=world_reason,
-            parent_ids=(),
+            parent_ids=("pressure_stage",),
         )
     )
 

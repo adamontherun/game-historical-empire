@@ -1164,7 +1164,7 @@ Stop when a player can identify which rival is which from behavior alone.
 
 # SECTION 8 — Pressure-Driven Event Arc
 
-**Status:** NOT STARTED
+**Status:** COMPLETE
 
 ## Goal
 
