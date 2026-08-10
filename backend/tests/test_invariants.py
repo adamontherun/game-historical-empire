@@ -44,17 +44,13 @@ def test_target_price_monotonic_in_supply() -> None:
 
 def test_bounded_price_monotonic_with_supply() -> None:
     # Even with bounding, lower supply should not give lower bounded price
+    # B3b: price must actually move for scarcity, not just be monotonic
     demand = 120
     base = 5000
     current = 5000
     max_bps = 2000
     resp = 5000
     supplies = [200, 150, 100, 80, 60, 40, 20]
-    # We need to go from high supply to low supply: price should be non-decreasing
-    for _supply in reversed(supplies):  # start low supply?
-        # Actually test decreasing supply -> price non-decreasing
-        pass
-    # Forward: as supply goes down, bounded price should not go down
     bounded_prices = []
     for s in supplies:
         target = _target_price(base, s, demand, resp)
@@ -67,6 +63,12 @@ def test_bounded_price_monotonic_with_supply() -> None:
         assert p_low >= p_high, (
             f"bounded price should be monotonic: supply {s_high}->{s_low} price {p_high}->{p_low}"
         )
+    # Strict movement: scarcity must actually raise bounded price, not stay flat
+    # Direct target comparison and at least one strict step in bounded series
+    assert _target_price(5000, 20, 120, 5000) > _target_price(5000, 200, 120, 5000)
+    assert any(
+        bounded_prices[i + 1][1] > bounded_prices[i][1] for i in range(len(bounded_prices) - 1)
+    )
 
 
 def test_demand_unchanged_cannot_reduce_target_when_supply_falls() -> None:

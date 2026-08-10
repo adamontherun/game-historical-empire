@@ -57,7 +57,7 @@ class RivalPreferences(BaseModel):
     ship_grain: int = Field(ge=0, description="Pref bps for ship_grain")
 
     def get(self, key: str, default: int = 10000) -> int:
-        return getattr(self, key, default) if hasattr(self, key) else default
+        return getattr(self, key, default)
 
 
 class RivalProfile(BaseModel):
@@ -355,7 +355,8 @@ def _expected_return(
     if cmd_type == "ship_grain":
         if not rival_state.route_established:
             return 0
-        q = min(qty_default, cap_route, inv + YIELD_PER_CAPACITY * cap)  # approximate with harvest
+        farm_out, _, _ = compute_farm_output(cap, obs.world_now)
+        q = min(qty_default, cap_route, inv + farm_out)
         if q <= 0:
             return 0
         # Use pre prices for expectation (choice sees pre)
@@ -400,11 +401,12 @@ def _capital_bps(rival_state: RivalState, cmd_type: str, obs: ObservableContext)
             return 0  # no space -> effectively unaffordable for scoring
         cost = cost_for_quantity(q, obs.home_price_pre)
     elif cmd_type == "ship_grain":
-        # ship costs transport; check affordable
+        # ship costs transport; check affordable — S5 drought-aware
+        farm_out, _, _ = compute_farm_output(rival_state.farm_capacity, obs.world_now)
         q = min(
             10,
             obs.route_capacity,
-            rival_state.inventory.grain + YIELD_PER_CAPACITY * rival_state.farm_capacity,
+            rival_state.inventory.grain + farm_out,
         )
         if q <= 0:
             return 0 if not rival_state.route_established else 5000
@@ -447,10 +449,11 @@ def _risk_bps(
         q = min(10, space)
         cost = cost_for_quantity(q, obs.home_price_pre)
     elif cmd_type == "ship_grain":
+        farm_out2, _, _ = compute_farm_output(rival_state.farm_capacity, obs.world_now)
         q = min(
             10,
             obs.route_capacity,
-            rival_state.inventory.grain + YIELD_PER_CAPACITY * rival_state.farm_capacity,
+            rival_state.inventory.grain + farm_out2,
         )
         cost = q * obs.transport_cost_per_unit // 1000
     elif cmd_type == "sell_grain":
@@ -572,17 +575,32 @@ def _headline_for(
     reason_code: str,
     *,
     buy_actual: int = 0,
+    sell_actual: int = 0,
     ship_effective: int = 0,
 ) -> str:
     """Derive truthful headline from reason_code and actual quantities.
 
-    Partial buys/shipments (insufficient_cash but >0 actually moved) must
-    not claim nothing was bought/shipped — select the success wording instead.
+    Partial fills must not claim nothing moved when some did — select the
+    success wording instead. B4: covers buy/sell/ship partials.
     """
     pid = profile.id
-    if reason_code == "insufficient_cash" and buy_actual > 0:
+    # Partial buy: insufficient_cash or insufficient_storage but some grain was bought
+    if reason_code in ("insufficient_cash", "insufficient_storage") and buy_actual > 0:
         return HEADLINES_BY_REASON[pid].get("buy_grain", "Rival acted.")
-    if reason_code == "insufficient_cash_for_transport" and ship_effective > 0:
+    # Partial sell: insufficient_inventory but some grain was sold
+    if reason_code == "insufficient_inventory" and sell_actual > 0:
+        return HEADLINES_BY_REASON[pid].get("sell_grain", "Rival acted.")
+    # Partial ship: any limiting reason but some grain was shipped
+    if (
+        reason_code
+        in (
+            "insufficient_cash_for_transport",
+            "limited_by_capacity",
+            "insufficient_inventory",
+            "ship_limited",
+        )
+        and ship_effective > 0
+    ):
         return HEADLINES_BY_REASON[pid].get("ship_grain", "Rival acted.")
     return HEADLINES_BY_REASON[pid].get(
         reason_code, HEADLINES_BY_REASON[pid].get("hold", "Rival acted.")
@@ -615,7 +633,7 @@ def apply_rival_command(
 
     cmd_type = command.type
     requested_qty = command.quantity if command.quantity is not None else 10
-    requested_qty = int(requested_qty) if requested_qty is not None else 10
+    requested_qty = int(requested_qty)
 
     cash_after_cmd = cash
     inv_after_cmd = inv
@@ -623,8 +641,9 @@ def apply_rival_command(
     farm_after_cmd = farm
     route_after = route_established
     cmd_reason = "hold"
-    # For buy we track actual for later reason handling
+    # For buy/sell we track actual for headline partial handling (B4)
     buy_actual = 0
+    sell_actual = 0
 
     if cmd_type == "expand_farm":
         cash_after_cmd, farm_after_cmd, _delta, cmd_reason = resolve_expand_farm(
@@ -653,7 +672,7 @@ def apply_rival_command(
         farm_after_cmd = farm
         route_after = route_established
     elif cmd_type == "sell_grain":
-        cash_after_cmd, inv_after_cmd, _sell_actual, _rev, cmd_reason = resolve_sell(
+        cash_after_cmd, inv_after_cmd, sell_actual, _rev, cmd_reason = resolve_sell(
             cash=cash,
             price_milli=home_pre,
             inventory=inv,
@@ -686,7 +705,7 @@ def apply_rival_command(
 
     # Settlement — harvest into inventory (shared primitive)
     inv_before_settlement = inv_after_cmd
-    inv_final_pre_ship, settle_delta, settle_reason = resolve_storage_settlement(
+    inv_final_pre_ship, _, _ = resolve_storage_settlement(
         inventory_before=inv_before_settlement,
         farm_output=farm_output,
         storage_capacity=storage_after_cmd,
@@ -694,9 +713,9 @@ def apply_rival_command(
 
     # Shipment — if ship_grain and route established, use resolved River price
     ship_effective = 0
-    ship_delivered = 0
-    ship_revenue = 0
-    ship_cost = 0
+    _ship_delivered = 0
+    _ship_revenue = 0
+    _ship_cost = 0
     trade_cash = 0
     inv_final = inv_final_pre_ship
     ship_reason = "no_shipment"
@@ -704,9 +723,9 @@ def apply_rival_command(
         # Use shared shipment primitive — resolves with correct timing
         (
             ship_effective,
-            ship_delivered,
-            ship_revenue,
-            ship_cost,
+            _ship_delivered,
+            _ship_revenue,
+            _ship_cost,
             trade_cash,
             inv_final,
             ship_reason,
@@ -763,12 +782,13 @@ def apply_rival_command(
     inventory_delta = after.inventory.grain - before.inventory.grain
 
     # Headline — truthful from resolved reason_code and actual quantities
-    # Partial buys/shipments must not claim nothing moved when some did
+    # Partial fills must not claim nothing moved when some did (B4)
     final_reason = ship_reason if cmd_type == "ship_grain" else cmd_reason
     headline = _headline_for(
         profile,
         final_reason,
         buy_actual=buy_actual,
+        sell_actual=sell_actual,
         ship_effective=ship_effective,
     )
 

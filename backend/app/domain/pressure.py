@@ -6,7 +6,7 @@ Pressure is turn-derived/session-authored, not canonical GameState.
 
 from __future__ import annotations
 
-from typing import Literal
+from typing import Literal, cast
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
@@ -42,14 +42,15 @@ class PressureState(BaseModel):
     @classmethod
     def _populate_causal_source_id(cls, data: object) -> object:
         # Populate default causal_source_id before validation (G6: avoid frozen mutation)
-        if isinstance(data, dict):
-            cid = data.get("causal_source_id")
-            if not cid:
-                pid = data.get("pressure_id")
-                stage = data.get("stage")
-                if pid and stage:
-                    data["causal_source_id"] = f"pressure:{pid}:{stage}"
-        return data
+        if not isinstance(data, dict):
+            return data
+        d = cast("dict[str, object]", data)
+        if not d.get("causal_source_id"):
+            pid = d.get("pressure_id")
+            stage = d.get("stage")
+            if pid and stage:
+                d["causal_source_id"] = f"pressure:{pid}:{stage}"
+        return d
 
     @model_validator(mode="after")
     def _validate(self) -> PressureState:

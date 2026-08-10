@@ -137,6 +137,7 @@ class GameView(BaseModel):
 
     game_id: str
     run_seed: str  # B5: echoed so omitted-seed games are reproducible; distinct from game_id
+    ruleset_version: str  # S0c: echo version for determinism reproduction
     revision: int
     turn: int
     turn_limit: int  # derived from prototype.TURN_LIMIT, not literal 5 (B7/C7)

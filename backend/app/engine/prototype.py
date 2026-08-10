@@ -27,6 +27,7 @@ from app.domain.types import (
     RouteState,
     WorldCondition,
 )
+from app.engine.actor import value_for
 from app.engine.pressure import (
     PRESSURE_ARC,
     next_world_known_for_turn,
@@ -71,9 +72,10 @@ def default_start_state(seed: str = "seed-001", version: str = "1.0") -> GameSta
 
     Home Valley: regional_output 360 + farm 5*10=50 => total 410, player 12.2%
     (was 21.7% with farm 10, now lower so free baseline does not saturate storage).
-    Demand 410 gives signal_next≈signal+0 stable in normal (mild), drought cuts
-    regional to 216 + farm 30 = 246 => signal_next≈signal-164 shortage. Supply 280.
-    Responsiveness 4000 keeps price within [2000,9000]. River unchanged.
+    Demand 410 vs supply 280 creates persistent tightness (baseline price 5928, not 5000)
+    so drought 280→116 gives 7113 spike within 20% cap. Demand 410 gives signal_next≈signal+0
+    stable in normal (mild), drought cuts regional to 216 + farm 30 = 246 => signal_next≈signal-164 shortage.
+    Supply 280. Responsiveness 4000 keeps price within [2000,9000]. River unchanged.
     Player: cash 1000 grain 20 farm 5 storage 130 (was 400 — makes granary load-bearing;
     idle accumulates 270 over 5 turns so 400 never binds, 130 does; 130 chosen as
     widest-margin point in sweep 100-150 where hold rank ≥3 with 8.6% margin,
@@ -126,12 +128,7 @@ def default_start_state(seed: str = "seed-001", version: str = "1.0") -> GameSta
 
 def _wealth(state: GameState) -> int:
     """Wealth = cash + inventory value at Home price (milli)."""
-    return state.player.cash + (state.player.inventory.grain * state.market.current_price // 1000)
-
-
-# Backward compat shim: pre-Section 8 code called _next_world_known_for_turn
-def _next_world_known_for_turn(idx: int) -> WorldCondition | None:  # noqa: D103
-    return next_world_known_for_turn(idx)
+    return state.player.cash + value_for(state.player.inventory.grain, state.market.current_price)
 
 
 class StrategicSummary(BaseModel):

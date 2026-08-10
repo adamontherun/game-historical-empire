@@ -332,9 +332,7 @@ def test_secure_route_creates_trade_access() -> None:
         state2, PlayerCommand(type="secure_route"), PRESSURE_NORMAL, state2.to_turn_context()
     )
     assert res2.next_state.route.established is True
-    assert (
-        res2.next_state.player.cash == res2.next_state.player.cash
-    )  # no further cost aside from possibly 0
+    assert res2.next_state.player.cash == res.next_state.player.cash  # no second charge
     # Check reason_code for second is already_established
     route_node = next(n for n in res2.causal_trace.nodes if n.id == "route_established")
     assert route_node.reason_code == "already_established"

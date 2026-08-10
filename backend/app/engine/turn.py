@@ -55,7 +55,6 @@ from app.domain.types import (
 )
 from app.engine.actor import (
     DROUGHT_YIELD_REDUCTION_BPS,  # noqa: F401  re-export for backward compat
-    YIELD_PER_CAPACITY,  # noqa: F401
     compute_farm_output,
     resolve_build_granary,
     resolve_buy,
@@ -64,14 +63,6 @@ from app.engine.actor import (
     resolve_sell,
     resolve_shipment,
     resolve_storage_settlement,
-)
-
-# Regional output reuses the same drought reduction as compute_farm_output
-from app.engine.actor import (
-    affordable_quantity as _affordable_quantity,  # noqa: F401
-)
-from app.engine.actor import (
-    cost_for_quantity as _cost_for_quantity,  # noqa: F401
 )
 from app.engine.actor import (
     value_for as _value,
@@ -409,7 +400,7 @@ def resolve_turn(
         )
         nodes.append(
             CausalNode(
-                id="inventory_after_buy",
+                id="inventory_after_command",
                 label="Inventory after buy",
                 kind="inventory",
                 before=before_inventory,
@@ -477,21 +468,8 @@ def resolve_turn(
         )
         nodes.append(
             CausalNode(
-                id="inventory_after_sell",
+                id="inventory_after_command",
                 label="Inventory after sell",
-                kind="inventory",
-                before=before_inventory,
-                after=inventory_after,
-                delta=-actual,
-                reason_code=cmd_reason,
-                parent_ids=("command",),
-            )
-        )
-        # Also emit inventory_after_buy alias for downstream valuation that expects it
-        nodes.append(
-            CausalNode(
-                id="inventory_after_buy",
-                label="Inventory after sell (alias)",
                 kind="inventory",
                 before=before_inventory,
                 after=inventory_after,
@@ -524,7 +502,7 @@ def resolve_turn(
 
     elif command.type == "secure_route":
         cash_before_cmd = cash
-        cash, route_established, d_route, cmd_reason = resolve_secure_route(
+        cash, route_established, _d_route, cmd_reason = resolve_secure_route(
             cash=cash, route_established=route_established_before
         )
         # For this branch route_established_before is the before, but helper already handles
@@ -1102,7 +1080,7 @@ def resolve_turn(
     if settle_reason == "capped_by_storage":
         excess = inventory_before_settlement + farm_output - storage_capacity
         if command.type in ("buy_grain", "sell_grain"):
-            inv_parents = ("farm_output", "storage_capacity", "inventory_after_buy")
+            inv_parents = ("farm_output", "storage_capacity", "inventory_after_command")
         else:
             inv_parents = ("farm_output", "storage_capacity")
         nodes.append(
@@ -1120,7 +1098,7 @@ def resolve_turn(
     else:
         # harvest_to_inventory
         if command.type in ("buy_grain", "sell_grain"):
-            inv_parents = ("farm_output", "storage_capacity", "inventory_after_buy")
+            inv_parents = ("farm_output", "storage_capacity", "inventory_after_command")
         else:
             inv_parents = ("farm_output", "storage_capacity")
         nodes.append(
@@ -1166,7 +1144,8 @@ def resolve_turn(
     # Track if ship was planned
     is_ship_command = command.type == "ship_grain"
     if is_ship_command:
-        requested = ship_requested  # type: ignore[assignment]
+        assert ship_requested is not None
+        requested = ship_requested
         # ship_requested is set only for ship_grain; but if route not established before, it's blocked
         if not route_established_before:
             # Blocked: no movement
@@ -1567,11 +1546,11 @@ def resolve_turn(
 
     # Purchase/sell quantity — value of bought/sold grain at old price
     if command.type == "buy_grain":
-        purchase_parents: tuple[str, ...] = ("command", "inventory_after_buy")
+        purchase_parents: tuple[str, ...] = ("command", "inventory_after_command")
         purchase_reason = "purchase_quantity_value"
         purchase_label = f"Purchase quantity value {value_before} → {value_after_buy} (delta {purchase_quantity_value:+})"
     elif command.type == "sell_grain":
-        purchase_parents = ("command", "inventory_after_sell")
+        purchase_parents = ("command", "inventory_after_command")
         purchase_reason = "sell_quantity_value"
         purchase_label = f"Sell quantity value {value_before} → {value_after_buy} (delta {purchase_quantity_value:+})"
     else:
@@ -1917,7 +1896,7 @@ def resolve_turn(
         # This is the value of bought/sold grain at old price; harvest is separate
         if command.type == "buy_grain":
             # Use actual purchase amount for label if available
-            # inventory_after_buy - before_inventory is purchase qty
+            # inventory_after_command - before_inventory is purchase qty
             purchase_qty = inventory_before_settlement - before_inventory
             if cmd_reason in ("insufficient_cash", "insufficient_storage"):
                 label = f"Bought {purchase_qty} grain (value {purchase_quantity_value:+}, limited by {cmd_reason})"
@@ -1925,7 +1904,7 @@ def resolve_turn(
             else:
                 label = f"Bought {purchase_qty} grain (value {purchase_quantity_value:+})"
                 reason = "purchase_quantity_value"
-            causal_ids = ("command", "inventory_after_buy", "purchase_quantity_value")
+            causal_ids = ("command", "inventory_after_command", "purchase_quantity_value")
         elif command.type == "sell_grain":
             sold_qty = before_inventory - inventory_before_settlement
             if cmd_reason == "insufficient_inventory":
@@ -1934,7 +1913,7 @@ def resolve_turn(
             else:
                 label = f"Sold {sold_qty} grain (value {purchase_quantity_value:+})"
                 reason = "sell_quantity_value"
-            causal_ids = ("command", "inventory_after_sell", "purchase_quantity_value")
+            causal_ids = ("command", "inventory_after_command", "purchase_quantity_value")
         else:
             label = f"Purchase quantity value {purchase_quantity_value:+}"
             reason = "purchase_quantity_value"
@@ -2007,28 +1986,7 @@ def resolve_turn(
             )
         )
 
-    # Candidate 5: storage constraint — handled via quantity driver label
-    # Already covered; no separate driver to avoid double-count
-    if settle_reason == "capped_by_storage":
-        excess = inventory_before_settlement + farm_output - storage_capacity
-        if excess > 0:
-            # Only add if not already represented and meaningful
-            # Check if quantity driver already covers capped case —
-            # if it does, skip to avoid double-count
-            # Instead, add only if quantity_value_effect ==0 (fully capped)
-            if quantity_value_effect == 0:
-                # This driver would double-count if we add both,
-                # so skip — quantity driver already explains
-                pass
-            # If quantity driver non-zero but capped, we already
-            # have storage info in its label
-
-    # Candidate 6: farm output story as distinct from quantity value (for richer narrative)
-    # Only add if farm_output driver would be distinct and non-zero wealth impact already covered
-    # To avoid double-counting, we do not add a separate farm_output driver beyond quantity_value
-    # The quantity_value driver already represents farm_output's wealth impact exactly.
-
-    # Filter zero-impact candidates (already ensured but double-check) and rank
+    # Filter zero-impact candidates and rank
     candidates = [c for c in candidates if c.impact_money != 0]
     # Rank by impact_bps DESC, id ASC for determinism, keep top 3
     candidates_sorted = sorted(candidates, key=lambda d: (-d.impact_bps, d.id))

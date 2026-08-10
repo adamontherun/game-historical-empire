@@ -24,7 +24,7 @@ class GameSession:
     created_at: str
     lock: asyncio.Lock = field(default_factory=asyncio.Lock)
     # No revision_history — not needed, would be persistence scaffolding (C7).
-    commands: list[PlayerCommand] = field(default_factory=list)
+    commands: list[PlayerCommand] = field(default_factory=list)  # pyright: ignore[reportUnknownVariableType]
 
 
-SESSION_STORE: dict[str, GameSession] = {}
+SESSION_STORE: dict[str, GameSession] = {}  # in-memory until Section 16; eviction deferred

@@ -7,7 +7,7 @@ lint:
 	uv run --project backend ruff check backend
 
 type:
-	uv run --project backend pyright
+	cd backend && uv run pyright
 
 format:
 	uv run --project backend ruff format backend

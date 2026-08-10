@@ -352,11 +352,11 @@ def test_available_choices_turn_invariant() -> None:
 
 def test_available_choices_include_two_quantities(client: TestClient) -> None:
     gv = _create_game(client, seed="two-qty")
-    # initial has buy_grain with 2 quantities when affordable
+    # initial has buy_grain with 2 quantities when affordable — B2 engine-agreement: space 110 → 55/110 (no harness cap)
     buy_ids = [c["id"] for c in gv["available_choices"] if c["kind"] == "buy_grain"]
-    # should be 2 when headroom 60
+    # should be 2 when space 110 (storage 130 - inventory 20)
     assert len(buy_ids) == 2, buy_ids
-    assert "buy_grain:30" in buy_ids or "buy_grain:60" in buy_ids
+    assert "buy_grain:55" in buy_ids and "buy_grain:110" in buy_ids
     # sell also 2 when inventory 20
     sell_ids = [c["id"] for c in gv["available_choices"] if c["kind"] == "sell_grain"]
     assert len(sell_ids) == 2, sell_ids
@@ -374,6 +374,97 @@ def test_available_choices_include_two_quantities(client: TestClient) -> None:
         assert len(ship_ids) == 2, ship_ids
     # also check route_status next_margin present
     assert "next_margin" in gv2["route_status"]
+
+
+def test_choices_engine_agreement_unclamped() -> None:
+    """B2: largest offered quantity must be one the engine resolves unclamped."""
+    import asyncio
+
+    from app.api.mappers import choices_for
+    from app.api.sessions import GameSession
+    from app.domain.types import PlayerCommand
+    from app.engine.pressure import PRESSURE_NORMAL, pressure_for_turn
+    from app.engine.prototype import FiveTurnGame
+    from app.engine.turn import resolve_turn
+
+    # initial state: buy should be unclamped
+    g = FiveTurnGame(seed="engine-agree", version="1.0")
+    sess = GameSession(
+        game_id="x",
+        run_seed="engine-agree",
+        revision=0,
+        game=g,
+        created_at="now",
+        lock=asyncio.Lock(),
+    )
+    choices = choices_for(sess)
+    # group by kind
+    from collections import defaultdict
+
+    by_kind: dict[str, list[int]] = defaultdict(list)
+    for ch in choices:
+        if ch.quantity is not None:
+            by_kind[ch.kind].append(ch.quantity)
+    # buy: largest must be engine max (space 110, affordable 200) — no harness cap
+    assert "buy_grain" in by_kind
+    max_buy = max(by_kind["buy_grain"])
+    # engine max = min(storage-inventory, affordable) = 110 at start state
+    assert max_buy == 110, f"buy max {max_buy} != 110 (engine space 110, harness cap removed)"
+    state = g.state
+    res = resolve_turn(
+        state,
+        PlayerCommand(type="buy_grain", quantity=max_buy),
+        PRESSURE_NORMAL,
+        state.to_turn_context(),
+    )
+    node = next(n for n in res.causal_trace.nodes if n.id == "inventory_after_command")
+    assert node.delta == max_buy, f"buy {max_buy} clamped to {node.delta} reason {node.reason_code}"
+    assert node.reason_code == "buy_grain"
+
+    # sell: largest 20 must be unclamped (S3)
+    assert "sell_grain" in by_kind
+    max_sell = max(by_kind["sell_grain"])
+    res2 = resolve_turn(
+        state,
+        PlayerCommand(type="sell_grain", quantity=max_sell),
+        PRESSURE_NORMAL,
+        state.to_turn_context(),
+    )
+    node2 = next(n for n in res2.causal_trace.nodes if n.id == "inventory_after_command")
+    assert node2.delta is not None
+    assert -node2.delta == max_sell or node2.delta == -max_sell
+    assert node2.reason_code == "sell_grain"
+
+    # ship: after securing route, largest 20 must be unclamped
+    g2 = FiveTurnGame(seed="engine-agree-2", version="1.0")
+    g2.submit(PlayerCommand(type="secure_route"))
+    sess2 = GameSession(
+        game_id="y",
+        run_seed="engine-agree-2",
+        revision=1,
+        game=g2,
+        created_at="now",
+        lock=asyncio.Lock(),
+    )
+    choices2 = choices_for(sess2)
+    by_kind2: dict[str, list[int]] = defaultdict(list)
+    for ch in choices2:
+        if ch.quantity is not None:
+            by_kind2[ch.kind].append(ch.quantity)
+    assert "ship_grain" in by_kind2, f"no ship offered {choices2}"
+    max_ship = max(by_kind2["ship_grain"])
+    assert max_ship == 20, f"ship max {max_ship} != 20 (pre_ship 120, capacity 20)"
+    # pre-ship estimate: inventory 70 + farm 50 =120 capped 130 vs capacity 20 => 20
+    state2 = g2.state
+    p1 = pressure_for_turn(1)
+    res3 = resolve_turn(
+        state2, PlayerCommand(type="ship_grain", quantity=max_ship), p1, state2.to_turn_context()
+    )
+    ship_node = next(n for n in res3.causal_trace.nodes if n.id == "shipment")
+    assert ship_node.delta == -max_ship, (
+        f"ship {max_ship} clamped delta {ship_node.delta} reason {ship_node.reason_code}"
+    )
+    assert ship_node.reason_code == "ship_grain"
 
 
 def test_ship_margin_single_helper() -> None:

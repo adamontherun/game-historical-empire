@@ -14,24 +14,26 @@ from app.api.schemas import (
     RouteStatus,
 )
 from app.api.sessions import GameSession
+from app.domain.types import GameState, MarketState, PlayerCommand
 from app.engine.actor import (
     BUILD_GRANARY_COST,
     EXPAND_FARM_COST,
     ROUTE_ESTABLISH_COST,
-    YIELD_PER_CAPACITY,
+    affordable_quantity,
+    compute_farm_output,
     cost_for_quantity,
     ship_margin,
+    value_for,
 )
 from app.engine.pressure import PRESSURE_ARC, pressure_for_turn
 from app.engine.prototype import TURN_LIMIT, FiveTurnGame
-from app.engine.rng import rng_for  # noqa: F401  keep import for side-effect awareness
 
 
-def _wealth(state) -> int:
-    return state.player.cash + (state.player.inventory.grain * state.market.current_price // 1000)
+def _wealth(state: GameState) -> int:
+    return state.player.cash + value_for(state.player.inventory.grain, state.market.current_price)
 
 
-def _market_view(m) -> MarketView:
+def _market_view(m: MarketState) -> MarketView:
     return MarketView(
         supply=m.supply,
         demand=m.demand,
@@ -84,13 +86,13 @@ def choices_for(session: GameSession) -> tuple[ChoiceView, ...]:
             )
         )
     # buy_grain: ANY turn, if headroom>0 — two options (partial+full)
-    headroom = s.player.storage_capacity - (
-        s.player.inventory.grain + s.player.farm_capacity * YIELD_PER_CAPACITY
-    )
+    # B2 engine-agreement: clamp on actual engine rule storage - inventory
+    # No harness cap — player may fill entire storage; harness 80 is strategy only (DECISIONS 017)
+    space = s.player.storage_capacity - s.player.inventory.grain
     price = s.market.current_price
     if price > 0:
-        affordable = ((s.player.cash + 1) * 1000 - 1) // price if price > 0 else 0
-        max_buy = min(max(headroom, 0), affordable, 80)
+        affordable = affordable_quantity(s.player.cash, price, 10_000_000)
+        max_buy = min(max(space, 0), affordable)
         if max_buy > 0:
             qtys = {max_buy, max(1, max_buy // 2)}
             for qty in sorted(qtys):
@@ -104,7 +106,7 @@ def choices_for(session: GameSession) -> tuple[ChoiceView, ...]:
                         cost=cost,
                     )
                 )
-    # sell_grain: ANY turn, if inventory>0 — two options
+    # sell_grain: ANY turn, if inventory>0 — two options (150 cap avoids dumping entire store at once)
     if s.player.inventory.grain > 0:
         n = min(s.player.inventory.grain, 150)
         qtys_s = {n, max(1, n // 2)}
@@ -120,7 +122,17 @@ def choices_for(session: GameSession) -> tuple[ChoiceView, ...]:
             )
     # ship_grain: if established & inventory>0 — TWO options, no margin gate (B1)
     if s.route.established and s.player.inventory.grain > 0:
-        cap = min(s.player.inventory.grain, s.route.capacity)
+        # B2: pre-ship inventory includes harvest that lands before shipment
+        # Estimate respects drought via compute_farm_output, not raw YIELD_PER_CAPACITY
+        # world for this turn (decision time) — pressure derived
+        curr_pressure = session.game.current_pressure
+        world_for_est = curr_pressure.world if curr_pressure is not None else "normal"
+        farm_output_est, _, _ = compute_farm_output(s.player.farm_capacity, world_for_est)
+        pre_ship = s.player.inventory.grain + farm_output_est
+        # cap by storage (harvest may be capped)
+        if pre_ship > s.player.storage_capacity:
+            pre_ship = s.player.storage_capacity
+        cap = min(pre_ship, s.route.capacity)
         if cap > 0:
             qtys_sh = {cap, max(1, cap // 2)}
             for qty in sorted(qtys_sh):
@@ -146,9 +158,9 @@ def _outcome_view(session: GameSession) -> OutcomeView | None:
     title = pressure.title
     # Use stored command from session.commands — not trace label parsing (C4)
     if session.commands and idx < len(session.commands):
-        cmd = session.commands[idx]
-        cmd_type = cmd.type  # type: ignore[attr-defined]
-        cmd_qty = cmd.quantity  # type: ignore[attr-defined]
+        cmd: PlayerCommand = session.commands[idx]
+        cmd_type = cmd.type
+        cmd_qty = cmd.quantity
     else:
         # fallback to trace parsing if commands missing (should not happen)
         cmd_node = next((n for n in res.causal_trace.nodes if n.id == "command"), None)
@@ -236,13 +248,13 @@ def to_game_view(session: GameSession) -> GameView:
     if game.is_complete:
         signal = PRESSURE_ARC[-1].signal
         pressure_stage = PRESSURE_ARC[-1].stage
-        world = PRESSURE_ARC[-1].world  # type: ignore[assignment]
+        world = PRESSURE_ARC[-1].world
     else:
         idx = len(game.history)
         p = pressure_for_turn(idx)
         signal = p.signal
         pressure_stage = p.stage
-        world = p.world  # type: ignore[assignment]
+        world = p.world
 
     # Build rival headlines (latest)
     rival_headlines: RivalHeadlines | None = None
@@ -259,22 +271,24 @@ def to_game_view(session: GameSession) -> GameView:
     # Wealth
     wealth = _wealth(state)
 
-    # Route next_margin via engine helper (B6), even when negative (B1)
+    # Route next_margin via engine helper (B6), even when negative (B1) — S0a reliability-aware
     next_margin = ship_margin(
         state.river_market.current_price,
         state.route.transport_cost_per_unit,
         state.market.current_price,
+        state.route.reliability_bps,
     )
 
     return GameView(
         game_id=session.game_id,
         run_seed=session.run_seed,
+        ruleset_version=state.ruleset_version,
         revision=session.revision,
         turn=state.turn,
         turn_limit=TURN_LIMIT,
         signal=signal,
-        pressure_stage=pressure_stage,  # type: ignore[arg-type]
-        world=world,  # type: ignore[arg-type]
+        pressure_stage=pressure_stage,
+        world=world,
         player_summary=PlayerSummary(
             cash=state.player.cash,
             inventory_grain=state.player.inventory.grain,
@@ -304,18 +318,16 @@ def to_game_view(session: GameSession) -> GameView:
 
 
 # Helper to build choice_map for fast lookup — maps id -> PlayerCommand
-def choice_map_for(session: GameSession) -> dict[str, object]:
+def choice_map_for(session: GameSession) -> dict[str, PlayerCommand]:
     """Map choice_id -> PlayerCommand for current revision."""
-    from app.domain.types import PlayerCommand
-
-    m: dict[str, object] = {}
+    m: dict[str, PlayerCommand] = {}
     for ch in choices_for(session):
         # ch.id is like "buy_grain:40" -> type "buy_grain", quantity 40
         if ":" in ch.id:
             typ, qty_s = ch.id.split(":", 1)
             qty = int(qty_s)
-            cmd = PlayerCommand(type=typ, quantity=qty)  # type: ignore[arg-type]
+            cmd = PlayerCommand.model_validate({"type": typ, "quantity": qty})
         else:
-            cmd = PlayerCommand(type=ch.id)  # type: ignore[arg-type]
+            cmd = PlayerCommand.model_validate({"type": ch.id})
         m[ch.id] = cmd
     return m

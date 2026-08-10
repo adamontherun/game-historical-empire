@@ -183,8 +183,8 @@ def test_buy_beyond_cash_is_clamped() -> None:
     state = _base_state(cash=100, grain=0, storage=100, current_price=5000)
     cmd = PlayerCommand(type="buy_grain", quantity=50)  # request 50, can only afford 20
     res = resolve_turn(state, cmd, PRESSURE_NORMAL, state.to_turn_context())
-    # Buy itself is clamped to 20 — verify via inventory_after_buy node
-    buy_node = next(n for n in res.causal_trace.nodes if n.id == "inventory_after_buy")
+    # Buy itself is clamped to 20 — verify via inventory_after_command node (S3)
+    buy_node = next(n for n in res.causal_trace.nodes if n.id == "inventory_after_command")
     assert buy_node.delta == 20
     assert buy_node.after == 20
     assert "insufficient_cash" in buy_node.reason_code
@@ -210,7 +210,7 @@ def test_buy_beyond_storage_is_clamped() -> None:
     # With farm 0, farm_output 0, so inventory final = 25 + min(20,5)=30
     assert res.next_state.player.inventory.grain == 30
     # Check reason
-    buy_node = next(n for n in res.causal_trace.nodes if n.id == "inventory_after_buy")
+    buy_node = next(n for n in res.causal_trace.nodes if n.id == "inventory_after_command")
     assert buy_node.reason_code == "insufficient_storage"
     # Cash cost for 5 units at 5 per unit =25
     cash_eff = next(e for e in res.domain_effects if e.metric == "cash")

@@ -25,6 +25,7 @@ def cost_for_quantity(quantity: int, price_milli: int) -> int:
     """Cost in Money for quantity at price_milli (milliunits per unit).
 
     Floor division — deterministic and conservative.
+    Exact inverse of affordable_quantity: qty*price//1000 <= cash iff qty <= ((cash+1)*1000-1)//price.
     Returns 0 if price_milli is 0 (free) or quantity 0.
     """
     if quantity <= 0 or price_milli <= 0:
@@ -98,28 +99,20 @@ def resolve_buy(
         actual = available_space
     cost = cost_for_quantity(actual, price_milli)
 
-    # Reason determination — exact copy of turn.py priority
+    # Reason determination — simplified, dead branches removed (S1)
     if actual < requested and actual == affordable and actual < available_space:
         reason = "insufficient_cash"
     elif actual < requested and actual == available_space:
-        if available_space < affordable:
-            reason = "insufficient_storage"
-        else:
-            reason = "insufficient_cash" if affordable < requested else "insufficient_storage"
         if requested > available_space:
             if affordable < available_space:
                 reason = "insufficient_cash"
             else:
                 reason = "insufficient_storage"
+        else:
+            # Fallback, should not occur with actual==available_space
+            reason = "insufficient_storage"
     elif actual == requested and requested > 0:
         reason = "buy_grain"
-    elif actual == 0 and requested > 0:
-        if affordable == 0 and available_space > 0:
-            reason = "insufficient_cash"
-        elif available_space == 0:
-            reason = "insufficient_storage"
-        else:
-            reason = "buy_grain_zero"
     else:
         reason = "buy_grain" if actual > 0 else "buy_grain_zero"
 
@@ -154,14 +147,13 @@ def resolve_sell(
     if actual > inventory:
         actual = inventory
     revenue = cost_for_quantity(actual, price_milli)
-    if actual == 0 and requested > 0 and inventory == 0:
-        reason = "insufficient_inventory"
-    elif actual < requested and actual == inventory:
+    # S1: simplified, first branch subsumed by second, else unreachable
+    if actual < requested:
         reason = "insufficient_inventory"
     elif actual == requested and requested > 0:
         reason = "sell_grain"
     else:
-        reason = "sell_grain" if actual > 0 else "sell_grain_zero"
+        reason = "sell_grain_zero" if actual == 0 else "sell_grain"
     cash_after = cash + revenue
     inventory_after = inventory - actual
     if inventory_after < 0:
@@ -325,11 +317,13 @@ def ship_margin(
     river_price: int,
     transport_cost_per_unit: int,
     home_price: int,
+    reliability_bps: int = 10000,
 ) -> int:
-    """Pure ship margin at resolved prices: river - transport - home.
+    """Pure ship margin at resolved prices: river*reliability - transport - home.
 
     Single source for engine/harness/mapper. All callers must use this instead
     of inlining `river_price - transport - home_price`.
-    Returns milliunits margin (same units as prices); positive means profitable.
+    Returns milliunits margin (same units as prices); positive means profitable
+    after reliability. Defaults to 10000 (fully reliable) for backward compat.
     """
-    return river_price - transport_cost_per_unit - home_price
+    return (river_price * reliability_bps // 10_000) - transport_cost_per_unit - home_price

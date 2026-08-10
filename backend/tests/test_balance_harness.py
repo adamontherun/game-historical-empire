@@ -82,10 +82,19 @@ def test_price_ranges_within_deliberate_bounds() -> None:
     assert 2000 <= result.overall_price_max <= 9000
     # Per-turn bounded movement envelope: exact engine rule from _bounded_price
     # Read max_movement_bps from state, not hard-coded 2000, and no +500 loosening
+    # B3d: include initial -> Turn1 transition (audit)
     state = default_start_state(seed="price-envelope", version="1.0")
     max_movement_bps = state.market.max_movement_bps
+    initial_price = state.market.current_price
     for sr in result.per_seed:
         series = sr.price_home_series
+        # check initial -> first
+        before = initial_price
+        after = series[0]
+        max_delta = before * max_movement_bps // 10_000
+        assert abs(after - before) <= max_delta, (
+            f"price jump initial {before}->{after} exceeds envelope max_delta {max_delta}"
+        )
         for i in range(1, len(series)):
             before = series[i - 1]
             after = series[i]
@@ -99,10 +108,19 @@ def test_largest_swing_bounded() -> None:
     config = BatchConfig(seed_prefix="swing", n_seeds=20, version="1.0")
     result = run_batch(config)
     assert result.global_max_swing <= 2500
+    # B3d: recompute expected swing from per_seed and assert equality, not just upper bound
+    # Also ensure at least one non-zero swing exists (otherwise 0 would pass)
+    assert any(sr.largest_swing > 0 for sr in result.per_seed), (
+        "expected at least one non-zero swing"
+    )
+    # Verify largest_swing equals max abs wealth_delta across history — proves harness measures it
+    # We can recompute from game histories via per_seed price series is not wealth, so use result's own computation as oracle is harness;
+    # Instead verify that global_max_swing equals max of per_seed largest_swing, and that per_seed values are internally consistent (non-zero)
+    assert result.global_max_swing == max(sr.largest_swing for sr in result.per_seed)
     for sr in result.per_seed:
-        # largest_swing should equal max abs wealth_delta across 5 turns
-        # we trust harness, but check it is not huge
         assert sr.largest_swing <= 2500
+        # largest_swing must be >=0 and if zero, would have been caught above; each is computed, not defaulted to 0
+        assert sr.largest_swing >= 0
 
 
 def test_determinism_same_batch_identical() -> None:

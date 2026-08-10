@@ -1,0 +1,21 @@
+{
+  "typeCheckingMode": "strict",
+  "reportMissingTypeStubs": "warning",
+  "pythonVersion": "3.12",
+  "include": ["app", "tests"],
+  "executionEnvironments": [
+    {
+      "root": "tests",
+      "extraPaths": ["."],
+      "reportUnknownMemberType": "none",
+      "reportUnknownVariableType": "none",
+      "reportUnknownArgumentType": "none",
+      "reportUnknownParameterType": "none",
+      "reportUnknownLambdaType": "none",
+      "reportPrivateUsage": "none",
+      "reportUnusedFunction": "none",
+      "reportUnusedImport": "none",
+      "reportMissingTypeArgument": "none"
+    }
+  ]
+}
