@@ -319,3 +319,17 @@ def resolve_secure_route(
     if cash >= ROUTE_ESTABLISH_COST:
         return cash - ROUTE_ESTABLISH_COST, True, 1, "secure_route"
     return cash, False, 0, "insufficient_cash_for_route"
+
+
+def ship_margin(
+    river_price: int,
+    transport_cost_per_unit: int,
+    home_price: int,
+) -> int:
+    """Pure ship margin at resolved prices: river - transport - home.
+
+    Single source for engine/harness/mapper. All callers must use this instead
+    of inlining `river_price - transport - home_price`.
+    Returns milliunits margin (same units as prices); positive means profitable.
+    """
+    return river_price - transport_cost_per_unit - home_price

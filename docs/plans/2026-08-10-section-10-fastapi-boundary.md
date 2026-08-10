@@ -1,11 +1,11 @@
 # Section 10 — Minimal FastAPI Boundary — Plan
 
-**Date:** 2026-08-10 — Revised 2026-08-10 per consolidated review round 1 (B1–B7, B1 BLOCKING)
+**Date:** 2026-08-10 — Revised 2026-08-10 per consolidated review rounds 1+2 (B1–B7 BLOCKING, C1–C7 BLOCKING C3/C4)
 **Branch:** `section/10-fastapi-boundary` (from `origin/main` at `0d28df6` Section 9 COMPLETE)
 **Spec Authority:** `BUILD_SPEC.md` Section 10 (Status: NOT STARTED) + global §§10–16 + `DECISIONS.md` 015/016 + `STATE.md` §9 + `AGENTS.md` §§6/10
-**Related:** `backend/app/domain/types.py`, `backend/app/domain/trace.py`, `backend/app/domain/pressure.py`, `backend/app/engine/prototype.py` (`TURN_LIMIT:49`, `turn_limit:211`), `backend/app/engine/turn.py` (`arbitrage_margin:215,1297`), `backend/app/engine/actor.py`, `backend/app/engine/rivals.py`, `backend/tests/test_engine_purity.py:8`
+**Related:** `backend/app/domain/types.py:40` (`OperationState` dormant), `backend/app/domain/trace.py`, `backend/app/domain/pressure.py`, `backend/app/engine/prototype.py` (`TURN_LIMIT:49`, `turn_limit:211`, `StrategicSummary:137`), `backend/app/engine/turn.py` (`arbitrage_margin:215,1297`), `backend/app/engine/actor.py`, `backend/app/engine/rivals.py`, `backend/tests/test_engine_purity.py:8`
 
-**Review disposition:** This revision addresses every item in `docs/plans/2026-08-10-section-10-plan-review-round-1.md`. B1 and B2 are blocking and both change `GameView`/mapper shape — resolved below before any implementation.
+**Review disposition:** Round 1 B1–B7 verified fixed. Round 2 adds C1 (B4 reason correction — `OperationState` exists but dormant), C2 (B2 reason trim), plus two new blockers **C3** (completion_summary smuggles history) and **C4** (current-turn vs latest-outcome context conflation), and C5–C7 (per-session lock, missing deps, cleanup). This revision addresses all of B1–B7 and C1–C7; C3/C4 change `GameView`/`OutcomeView` shape and are blocking. Approved to implement once reflected — see Work items below.
 
 ---
 
@@ -96,9 +96,9 @@ ship_grain:N    # if route.established and inventory.grain > 0 — DO NOT gate o
 
 - **B6 co-fix:** `next_margin = river_price - transport - home_price` exists in three places. Extract one pure helper in the engine — e.g. `actor.ship_margin(river_price: PriceMilliunits, transport_cost_per_unit: PriceMilliunits, home_price: PriceMilliunits) -> int` — and have `engine/harness.py:policy_trade_heavy`, `engine/turn.py:1297` (replacing inline `ship_revenue - ship_cost - …` or post-hoc), and `api/mappers.py:route_status.next_margin` all call it. Economic formulas belong in the engine (global §10). Mapper stays a mapper.
 
-### K3 — Revision semantics (where, increment, failure, atomicity) — **REVISED per B7**
+### K3 — Revision semantics (where, increment, failure, atomicity) — **REVISED per B7/C5**
 
-- **Where:** `revision: int` lives on the **session envelope**, not `GameState`. `GameState.turn` is economic turn (0→TURN_LIMIT); `revision` is optimistic concurrency. Envelope is `GameSession{game_id: str, revision: int, game: FiveTurnGame, created_at}` stored in `backend/app/api/sessions.py: SESSION_STORE: dict[str, GameSession]`. **No `revision_history`** — cut per B7; no history in this section.
+- **Where:** `revision: int` lives on the **session envelope**, not `GameState`. `GameState.turn` is economic turn (0→TURN_LIMIT); `revision` is optimistic concurrency. Envelope is `GameSession{game_id: str, revision: int, game: FiveTurnGame, created_at, lock: asyncio.Lock}` stored in `backend/app/api/sessions.py: SESSION_STORE: dict[str, GameSession]`. `lock` is **per-session** (C5) — see Atomicity. **No `revision_history`** — cut per B7/C7; no history in this section. `created_at` harmless.
 
 - **Increment:** Exactly `+1` on each **successful** `POST …/choices/{choice_id}`. `GET` never increments. `POST /games` creates `revision=0`. Failed validations (stale, invalid choice_id, game complete) leave `revision` unchanged. `turn_limit` is **derived** from `prototype.TURN_LIMIT` (imported, not hard-coded `5`).
 
@@ -108,17 +108,18 @@ ship_grain:N    # if route.established and inventory.grain > 0 — DO NOT gate o
   - `POST` on complete game (`session.game.is_complete`) → `409 Conflict` `{"detail":"game complete"}` — **consistently 409**, documented. Not 400.
   - Unknown `game_id` on `GET` or `POST` → `404 Not Found` `{"detail":"game not found"}`. Unknown `choice_id` → `404`.
 
-- **Atomicity & lock choice (B7 fix):**
+- **Atomicity & lock choice (B7/C5 fix):**
   - Handlers are `async def`.
-  - Guard with a **single global `asyncio.Lock` called `SESSION_LOCK`** in `backend/app/api/sessions.py`. Honest reasoning: with `async def` handlers and **no `await` between the revision check and the mutate**, the operation is already atomic on a single-threaded event loop — the lock is **defensive belt-and-braces** against a future `await` sneaking between check and mutate. That is a fine reason to keep it; state it rather than implying the race exists today.
-  - A global lock serializes every game; acceptable for an in-memory MVP. Note in code comment: "global lock acceptable here; Section 16 persistence will replace store and can move to per-session locks then." Alternative (per-session `asyncio.Lock` on each `GameSession`) noted as rejected for now only to avoid extra bookkeeping — either is acceptable if documented; plan picks global for smallest diff.
-  - The `asyncio.gather` concurrency test (`test_concurrent_same_revision_one_wins`) only exercises the race under `asyncio.Lock` + `async def` — which is why that combination is chosen. With `threading.Lock` under `async def`, the gather would not actually race; with sync def + `threading.Lock`, it would block the event loop.
+  - Each `GameSession` owns its own `asyncio.Lock` (`session.lock`). Both `get_game()` and `choose()` acquire `async with session.lock:` — C5: GET must also take the same per-session lock because the mapper walks `state`, `history`, and `rivals` while building the view; a concurrent `choose()` mutating midway would produce a **torn view** mixing pre- and post-turn values. Per-session locks let unrelated games proceed independently, removing the global-serialization concern. Honest reasoning: with `async def` handlers and **no `await` between the revision check and the mutate**, the operation is already atomic on a single-threaded event loop — the lock is **defensive belt-and-braces** against a future `await` sneaking between check and mutate. State it rather than implying the race exists today.
+  - The `asyncio.gather` concurrency test (`test_concurrent_same_revision_one_wins`) must use a real async client (`httpx.AsyncClient` + `ASGITransport`) and `pytest-asyncio` (C6), not `TestClient` gymnastics, because only `async def` + `asyncio.Lock` is exercised that way. `threading.Lock` under `async def` would not correctly block the event loop.
 
-- **Rejected:** `If-Match`/ETag header (spec says body field), `412 Precondition Failed`, `threading.Lock` + async mix.
+- **Rejected:** Single global `SESSION_LOCK` (replaced by per-session per C5), `If-Match`/ETag header (spec says body field), `412 Precondition Failed`, `threading.Lock` + async mix, `GET` without lock.
 
-### K4 — AC4 "no frontend formula needed" — **REVISED per B2/B3/B4/B5**
+### K4 — AC4 "no frontend formula needed" — **REVISED per B2/B3/B4/B5/C1/C3/C4**
 
 - **Risk:** Prior sections were bitten by unfalsifiable ACs; original plan had two such lapses (B3).
+
+- **Correction C1 to B4 reason:** Round 1 claimed `OperationState` was invented (grep returned 0). That grep was wrong — `OperationState` **does exist** at `domain/types.py:40` (`id/kind/capacity/level`). The conclusion (`empire_summary` must not synthesize operations) is still correct, for a better reason: `types.py:59` says `OperationState` "exists as a standalone type for future Section 5 use" — a **dormant type deliberately not embedded in `PlayerState`** to avoid duplicate sources of truth for capacity. Synthesizing `farm_1`/`granary_1` with invented `level` values would turn a dormant type into fictional canonical-looking state and create a second source of truth for `farm_capacity`/`storage_capacity`. Keep as three concrete fields; fix the stated reason (C1). Also drop one B2 argument per C2: `?trace=1` on `GET /games/{id}` would not violate the three-endpoint spec (still same endpoint), but the conclusion rests on the other three reasons (unmeasured optimization, two shapes of GameView, drivers referencing `causal_node_ids` while omitting those nodes — unresolvable reveal). `empire_summary` reason below is updated accordingly.
 
 - **Decision — what `GameView` must carry (concrete, exhaustive):**
 
@@ -129,11 +130,11 @@ class GameView(BaseModel):
     revision: int
     turn: int
     turn_limit: int                        # B7: derived from prototype.TURN_LIMIT, not literal 5
-    signal: str                            # pressure signal prose for this turn
-    pressure_stage: str                    # "early_dry" etc (structured, never parsed prose)
-    world: WorldCondition                  # "drought" | "normal" (from PressureState.world)
+    signal: str                            # B4/C4: "the decision you are about to make" — from pressure_for_turn(len(history)) or "" when complete
+    pressure_stage: str                    # B4/C4: next-turn context; OutcomeView carries resolved context separately
+    world: WorldCondition                  # B4/C4: next-turn world
     player_summary: {cash, inventory_grain, farm_capacity, storage_capacity, wealth}
-    empire_summary: {farm_capacity, storage_capacity, route_established}  # B4: exactly the three concrete fields that exist; no invented operations list
+    empire_summary: {farm_capacity, storage_capacity, route_established}  # C1: dormant OperationState not embedded; exactly the three concrete fields to avoid second source of truth
     home_valley_market: {supply, demand, base_price, current_price, responsiveness}
     river_town_market: {supply, demand, base_price, current_price}
     route_status: {established, capacity, transport_cost_per_unit, reliability_bps, next_margin}
@@ -142,14 +143,39 @@ class GameView(BaseModel):
     available_choices: list[ChoiceView{id, label, kind, quantity?, cost?}]
                                            # B1: two quantities per verb (partial+full), legality/affordability only
                                            # B3: each choice's label AND its cash cost via actor.cost_for_quantity()
-    latest_outcome: {
-        wealth_delta, inventory_delta, price_delta,
-        drivers: tuple[OutcomeDriver{label, impact_money, impact_bps, reason_code, causal_node_ids}, 0..3],
-        domain_effects: list[DomainEffect{metric, before, after, delta, reason_code}],
-        causal_trace: CausalTrace{nodes: tuple[CausalNode{id, label, kind, before, after, delta, reason_code, parent_ids}>}
-                                           # B2: UNCONDITIONAL, latest turn only — not debug_trace, not ?trace=1
-    } | None  # None before first turn
-    completion_summary: StrategicSummary | None  # populated when turn == turn_limit
+    latest_outcome: OutcomeView | None     # None before first turn; C4: carries its OWN resolved context below
+    completion_summary: CompletionSummaryView | None  # C3: API-owned, end-screen values only — NOT StrategicSummary
+
+class OutcomeView(BaseModel):              # C4 — resolves current-turn vs latest-outcome conflation
+    # Context of the turn just resolved — distinct from top-level "next decision" context
+    resolved_turn: int                     # turn index just submitted (0..TURN_LIMIT-1)
+    title: str                             # TURN_LIMIT title for that turn (e.g. "Drought")
+    pressure_stage: str                    # stage of resolved turn (e.g. "drought") — check vs top-level aftermath
+    world: WorldCondition                  # world of resolved turn — "drought" when drought just resolved
+    command_type: str                      # submitted PlayerCommand.type (e.g. "hold")
+    command_quantity: int | None           # submitted quantity if any
+    # Economic result
+    wealth_delta: int
+    inventory_delta: int
+    price_delta: int
+    drivers: tuple[OutcomeDriver{label, impact_money, impact_bps, reason_code, causal_node_ids}, 0..3]
+    domain_effects: list[DomainEffect{metric, before, after, delta, reason_code}]
+    causal_trace: CausalTrace{nodes: tuple[CausalNode{id, label, kind, before, after, delta, reason_code, parent_ids}>}
+                                           # B2: UNCONDITIONAL, latest turn only — not debug_trace, not ?trace=1 (C2 trims one reason, keeps three)
+
+class CompletionSummaryView(BaseModel):    # C3 — API-owned, no history smuggling
+    initial_wealth: int
+    final_wealth: int
+    wealth_delta_total: int
+    final_cash: int
+    final_grain: int
+    final_farm_capacity: int
+    final_storage_capacity: int
+    cash_low: int
+    peak_inventory: int
+    is_complete: bool
+    final_rival_headlines: {mira: str, daran: str} | None  # pre-rendered strings only, no raw RivalState/RivalTurnResult
+    # NO initial_state, NO final_state, NO history: tuple[TurnResolution,...], NO raw rival states
 ```
 
 Key properties:
@@ -157,15 +183,18 @@ Key properties:
   - Each `available_choices[*].cost` is precomputed by the mapper via `actor.cost_for_quantity(quantity, current_price)` — frontend does not multiply.
   - `route_status.next_margin` is engine helper `actor.ship_margin(river_price, transport, home_price)` — frontend does not recompute margin.
   - `rival_headlines` are pre-rendered `RivalTurnResult.headline` strings.
-  - Full `causal_trace.nodes` (expected ~40–60 nodes per turn — B2 says measure before optimizing) is inside `latest_outcome`, not a separate `debug_trace` and not behind a query param. The spec authorizes exactly three endpoints with no query params; global §14 makes the trace first-class and §9 makes the reveal signature. Latest turn only, not all five — no history endpoint this section.
+  - Full `causal_trace.nodes` (expected ~40–60 nodes per turn — B2 says measure before optimizing) is inside `latest_outcome` (OutcomeView), not a separate `debug_trace` and not behind a query param. C2: `?trace=1` would still be the same endpoint, so not a spec violation — the conclusion rests on the other three reasons (unmeasured optimization, two shapes of `GameView`, `drivers[*].causal_node_ids` referencing omitted nodes — unresolvable reveal); global §14 makes the trace first-class and §9 makes the reveal signature. Latest turn only — C3 ensures `completion_summary` does not smuggle the other four traces.
+  - `OutcomeView` (C4) disambiguates: top-level `world/pressure_stage/signal` = "the decision you are about to make"; `OutcomeView.world/pressure_stage/title/resolved_turn/command_*` = "the decision you just made". After drought, top-level `world` is `aftermath` while `latest_outcome.world` is `drought` — a client rendering the reveal alongside next-turn context never confuses them. `CompletionSummaryView` (C3) is API-owned — no `initial_state`/`final_state`/`history`/`RivalState`.
 
-- **Operational test — rewritten per B3:**
+- **Operational test — rewritten per B3/C3/C4:**
 
   `test_frontend_needs_no_formula` is a **completeness** check, not a recomputation:
 
   For a game with `run_seed="formula-test"` (or any seed) and for each of 5 turns, assert the `GET` / mutated `GameView` JSON **contains as fields** every number Section 11's decision screen must display — without arithmetic:
-  - current `wealth`, `player_summary{cash, inventory_grain, farm_capacity, storage_capacity}`, both markets' `current_price`, `route_status{established, capacity, transport_cost_per_unit, next_margin}`, `available_choices[*].{id, label, cost}`, `latest_outcome` after turn 1 with `wealth_delta`, and `drivers[*].{label, impact_money, impact_bps, reason_code}` plus `causal_trace.nodes[*].{reason_code, parent_ids}`.
+  - current `wealth`, `player_summary{cash, inventory_grain, farm_capacity, storage_capacity}`, both markets' `current_price`, `route_status{established, capacity, transport_cost_per_unit, next_margin}`, `available_choices[*].{id, label, cost}`, `latest_outcome` after turn 1 with `wealth_delta` and `OutcomeView{resolved_turn, title, pressure_stage, world, command_type, command_quantity}` plus `drivers[*].{label, impact_money, impact_bps, reason_code}` plus `causal_trace.nodes[*].{reason_code, parent_ids}`.
   - If any value can only be obtained by multiplying/dividing two response fields (e.g. choice cost from `qty*price`), that field is missing and the test fails.
+  - C3 check inside the same test (or `test_no_history_in_gameview`): the serialized `GameView` at turn 5 JSON has **no `history` key** and no nested `TurnResolution` beyond `latest_outcome` — `completion_summary` is `CompletionSummaryView`, not `StrategicSummary`.
+  - C4 check: after submitting on the drought turn (turn index 3), assert `latest_outcome.world == "drought"` while top-level `world` is `aftermath` (since mapper derives top-level from `len(history)`), and `latest_outcome.resolved_turn == 3` with submitted `command_type`.
 
   Deleted: step 4 ("grep that Section 11's future client imports only GameView JSON") — Section 11 does not exist, so it passes against nothing. Replaced by the completeness list above — the failure mode it was trying to catch (missing field forces formula) is now caught by the list rather than by a vacuous grep.
 
@@ -182,9 +211,9 @@ Key properties:
 - **Decision:** `POST /api/v1/games` body `CreateGameRequest{run_seed?: str, ruleset_version?: str}` optional. If `run_seed` absent, server generates `uuid4().hex` via `uuid`/`secrets` (not `random` global), creates `FiveTurnGame(seed=run_seed, version=...)`, and **echoes `run_seed` in `GameView.run_seed`** (B5 fix — original K4 schema omitted it, so omitted-seed games were unreproducible). `game_id` remains a separate session UUID. `ruleset_version` defaults to `"1.0"`. Same `(run_seed, ruleset_version, choice sequence)` → same history via `rng_for` BLAKE2 substreams.
 - **Reproduction test:** `test_api_determinism` — two sessions with same explicit `run_seed="det-api-001"` and same 5 `choice_id`s produce identical `GET` JSON (prices, headlines, drivers). Second test: server-minted seed is echoed and re-POSTing a new game with that seed reproduces the first game's history.
 
-### K7 — Minimal server surface & app wiring — **AMENDED per B6/B7**
+### K7 — Minimal server surface & app wiring — **AMENDED per B6/B7/C6/C7**
 
-- **Decision:** `backend/app/main.py` `create_app() -> FastAPI` factory (no DB lifespan), mounts `backend/app/api/router.py` (`APIRouter(prefix="/api/v1")`) with three routes. Plain module functions in `backend/app/api/service.py` (`create_game`, `get_game`, `choose`) — no class-based service. Add `fastapi` + `uvicorn` to `backend/pyproject.toml`. `SESSION_STORE: dict[str, GameSession]` + `SESSION_LOCK: asyncio.Lock` in `backend/app/api/sessions.py`. `turn_limit` imported from `prototype.TURN_LIMIT`. Also extract `actor.ship_margin` per B6 covering `harness` + `turn.py` + `mappers.py`.
+- **Decision:** `backend/app/main.py` `create_app() -> FastAPI` factory (no DB lifespan), mounts `backend/app/api/router.py` (`APIRouter(prefix="/api/v1")`) with three routes. Plain module functions in `backend/app/api/service.py` (`create_game`, `get_game`, `choose`) — no class-based service. Add `fastapi` + `uvicorn` to `backend/pyproject.toml` `[project].dependencies`; add `httpx` + `pytest-asyncio` to **dev** dependencies per C6 (not relying on transitive `httpx` from `fastapi`; needed for `TestClient` + real async client in concurrency test). `SESSION_STORE: dict[str, GameSession]` where each `GameSession` owns its own `asyncio.Lock` (C5) in `backend/app/api/sessions.py`. `turn_limit` imported from `prototype.TURN_LIMIT`. Also extract `actor.ship_margin` per B6 covering `harness` + `turn.py` + `mappers.py`. C7 confirmed: no `revision_history` on `GameSession`; `created_at` harmless.
 
 ---
 
@@ -197,22 +226,23 @@ POST /api/v1/games {run_seed?, ruleset_version?}
   └─ FiveTurnGame(seed=run_seed, version=ruleset_version or "1.0")
   └─ revision=0
   └─ build GameView via mappers.to_game_view(session)
-       signal = pressure_for_turn(len(history)).signal
+       signal = pressure_for_turn(len(history)).signal  # top-level = NEXT decision context (C4)
        markets = state.market / state.river_market
        route_status{established, capacity, transport_cost_per_unit, reliability_bps,
                     next_margin = actor.ship_margin(river_price, transport, home_price)}  # B6
        available_choices = mappers.choices_for(session)  # B1: legality/affordability only, 2 qty options each
        latest_outcome = None
-       empire_summary = {farm_capacity, storage_capacity, route_established}  # B4
+       empire_summary = {farm_capacity, storage_capacity, route_established}  # C1: dormant OperationState reason
        turn_limit = TURN_LIMIT  # B7: imported, not literal
-  └─ store SESSION_STORE[game_id] = GameSession{game_id, run_seed, revision, game, created_at}
+       completion_summary = None (not yet complete; C3: CompletionSummaryView when turn==TURN_LIMIT)
+  └─ store SESSION_STORE[game_id] = GameSession{game_id, run_seed, revision, game, created_at, lock=asyncio.Lock()}  # C5 per-session
 
 GET /api/v1/games/{game_id}
   └─ 404 if missing (B7)
-  └─ return to_game_view(session)  # includes current revision, no lock needed for read
+  └─ async with session.lock: return to_game_view(session)  # C5: same per-session lock as choose; torn-view fix
 
 POST /api/v1/games/{game_id}/choices/{choice_id} {expected_revision: int}
-  └─ async with SESSION_LOCK:                      # B7: asyncio.Lock, async def
+  └─ async with session.lock:                      # C5: per-session asyncio.Lock, async def
        1) missing field → 422 (FastAPI validation)
        2) unknown game_id → 404
        3) stale check: body.expected_revision != session.revision → 409 (no mutation)
@@ -223,8 +253,10 @@ POST /api/v1/games/{game_id}/choices/{choice_id} {expected_revision: int}
           never resolve_turn separately (would double-advance)
        8) revision += 1
        9) rebuild & return new GameView
-          latest_outcome{wealth_delta, drivers, domain_effects,
-                        causal_trace: CausalTrace from game.history[-1]}  # B2: unconditional, latest only
+          latest_outcome: OutcomeView{resolved_turn, title, pressure_stage, world, command_type, command_quantity,   # C4
+                                     wealth_delta, drivers, domain_effects, causal_trace}  # B2: unconditional, latest only
+          top-level signal/pressure_stage/world now = NEXT decision context (derived from len(history)); OutcomeView carries resolved context
+          completion_summary: CompletionSummaryView when turn==TURN_LIMIT (C3)
 ```
 
 Critical invariants still: API never calls `resolve_turn` besides `game.submit`; `choice_id` lookup is exact; `available_choices` recomputed on every response (B1/B7 regression `test_available_choices_turn_invariant` would fail if turn-index leaked in).
@@ -270,34 +302,36 @@ Amount constants (`80`, `150`, `capacity`) mirror the mapper's pre-clamp choices
 
 **Slice 1 — Engine helper + dependency + app skeleton (no logic, keeps AC6 green)**
 
-1. Extract `actor.ship_margin(river_price, transport, home_price) -> int` in `backend/app/engine/actor.py`; update `engine/turn.py:1297` and `engine/harness.py:policy_trade_heavy` to call it (B6). Pure refactor, no behaviour change — `make test` still 133 pass.
-2. Add `fastapi>=0.110`, `uvicorn>=0.30` to `backend/pyproject.toml` `[project].dependencies`; `httpx` for `TestClient`. `uv sync --project backend`.
-3. Create `backend/app/api/__init__.py`, `backend/app/api/sessions.py` (`SESSION_STORE`, global `SESSION_LOCK: asyncio.Lock`, `GameSession{game_id, run_seed, revision, game, created_at}` — no revision_history), `backend/app/api/schemas.py` (`CreateGameRequest`, `CreateChoiceRequest{expected_revision: Annotated[int, Field(ge=0)]}`, `ChoiceView`, `GameView` with `run_seed`, `turn_limit` imported, `latest_outcome.causal_trace` unconditional, `empire_summary` three fields), `backend/app/api/mappers.py` (`to_game_view`, `choices_for` with B1 legality/affordability + two qty options, `ship_margin` import), `backend/app/main.py` (`create_app()`), `backend/app/api/router.py` (three handlers, thin, delegate to service).
+1. Extract `actor.ship_margin(river_price, transport, home_price) -> int` in `backend/app/engine/actor.py`; update `engine/turn.py:1297` and `engine/harness.py:policy_trade_heavy` to call it (B6/C6). Pure refactor, no behaviour change — `make test` still 133 pass.
+2. Add `fastapi>=0.110`, `uvicorn>=0.30` to `backend/pyproject.toml` `[project].dependencies`; add `httpx` + `pytest-asyncio` to **dev** (`[dependency-groups].dev`) per C6 (not transitive). `uv sync --project backend`.
+3. Create `backend/app/api/__init__.py`, `backend/app/api/sessions.py` (`SESSION_STORE`, `GameSession{game_id, run_seed, revision, game, created_at, lock: asyncio.Lock}` — per-session lock C5, no revision_history C7), `backend/app/api/schemas.py` (`CreateGameRequest`, `CreateChoiceRequest{expected_revision: Annotated[int, Field(ge=0)]}`, `ChoiceView`, `GameView` with `run_seed`, `turn_limit` from `TURN_LIMIT`, `latest_outcome: OutcomeView` unconditional causal_trace, `CompletionSummaryView` API-owned, `empire_summary` three fields), `backend/app/api/mappers.py` (`to_game_view`, `choices_for` with B1 legality/affordability + two qty options, `OutcomeView` resolved context C4, `ship_margin` import), `backend/app/main.py` (`create_app()`), `backend/app/api/router.py` (three handlers, thin, delegate to service).
 
-**Slice 2 — Logic + error semantics (B1/B2/B7)**
+**Slice 2 — Logic + error semantics (B1/B2/B7/C3/C4/C5)**
 
-4. Implement `backend/app/api/service.py` `create_game()`, `get_game()` (404 on unknown game_id), `choose()` with: `async with SESSION_LOCK:`, stale→409, complete→409, unknown choice_id→404, then single `game.submit(command)`, `revision+=1`.
-5. Ensure `latest_outcome` always carries `causal_trace` (latest turn only) — no `?trace=1`, no `debug_trace` (B2). Measure payload size (node count, JSON bytes) in a test and assert ~40–60 nodes; if measurement shows blow-up, file finding instead of hiding.
+4. Implement `backend/app/api/service.py` `create_game()`, `get_game()` (async with session.lock, 404 on unknown game_id), `choose()` with `async with session.lock:`, stale→409, complete→409, unknown choice_id→404, then single `game.submit(command)`, `revision+=1`, rebuild `GameView` with `OutcomeView` resolved context (C4) + `CompletionSummaryView` when complete (C3). Both `get_game` and `choose` take same per-session lock (C5 torn-view fix).
+5. Ensure `latest_outcome` always carries `causal_trace` (latest turn only) — no `?trace=1`, no `debug_trace` (B2/C2). Measure payload size (node count, JSON bytes) in a test and assert ~40–60 nodes; if measurement shows blow-up, file finding instead of hiding.
 
-**Slice 3 — Purity + tests + gates (B1–B5/B7)**
+**Slice 3 — Purity + tests + gates (B1–B5/B7/C3–C6)**
 
 6. Extend `backend/tests/test_engine_purity.py` — add `alembic` to forbidden + reverse `from app.api` check (K5).
 7. Add `backend/tests/test_api.py` (or `test_api_sessions.py`) covering:
-   - `test_create_and_complete_five_turn_game` (AC1) — 1×create + 5× choices → `turn==TURN_LIMIT`, `revision==5`, `completion_summary` present, 6th POST → 409.
+   - `test_create_and_complete_five_turn_game` (AC1) — 1×create + 5× choices → `turn==TURN_LIMIT`, `revision==5`, `CompletionSummaryView` present (not StrategicSummary), 6th POST → 409.
    - `test_invalid_choice_cannot_mutate` (AC2) — POST bad `choice_id` → 404, GET unchanged (turn+revision).
    - `test_unknown_game_id_404` (B7) — `GET`/`POST` on random id → 404.
+   - `test_no_history_in_gameview` (C3) — at turn 5 serialized `GameView` has no `history` key and no nested `TurnResolution` beyond `latest_outcome`; `completion_summary` has no `initial_state`/`final_state`/`history`.
+   - `test_outcome_context_disambiguated` (C4) — after drought turn (idx 3), `latest_outcome.world=="drought"`, `latest_outcome.resolved_turn==3`, while top-level `world=="normal"` (aftermath); `latest_outcome.command_type` matches submitted.
    - `test_stale_revision_cannot_mutate` (AC3) — same-revision double POST, second 409, GET unchanged.
-   - `test_concurrent_same_revision_one_wins` (K3/B7) — `asyncio.gather` two correct-revision POSTs → one 200 one 409 (requires `async def` + `asyncio.Lock`).
-   - `test_frontend_needs_no_formula` (AC4 completeness per B3) — exhaustive field checklist: wealth/cash/inventory/both prices/route_status.next_margin/each choice's label+cost/wealth_delta/drivers{label,impact_money,reason_code}+causal_trace.nodes; fails if any value requires `qty*price`.
+   - `test_concurrent_same_revision_one_wins` (K3/C5/C6) — real `httpx.AsyncClient` + `pytest-asyncio`, `asyncio.gather` two correct-revision POSTs → one 200 one 409.
+   - `test_frontend_needs_no_formula` (AC4 completeness per B3) — exhaustive field checklist including `OutcomeView{resolved_turn, title, pressure_stage, world, command_type}+CompletionSummaryView` fields; fails if any value requires `qty*price`.
    - `test_gameview_internal_consistency` (labelled as such, not AC4) — `wealth == cash + grain*price//1000` from response fields.
-   - `test_api_determinism` (K6/B5) — two sessions same explicit `run_seed` + same 5 choice_ids → identical GET JSON; plus echoed `run_seed` reproduces when re-seeded.
-   - `test_available_choices_turn_invariant` (B1 regression) — fixed cash/inventory/route state produces identical available_choices across turn_idx 0..4 except where `route.established` genuinely changed.
+   - `test_api_determinism` (K6/B5) — two sessions same explicit `run_seed` + same 5 choice_ids → identical GET JSON; minted `run_seed` echoed and re-seedable.
+   - `test_available_choices_turn_invariant` (B1 regression) — fixed cash/inventory/route produces identical available_choices across turn_idx 0..4 except where `route.established` genuinely changed.
    - `test_available_choices_include_two_quantities` — `buy_grain:40`+`buy_grain:80` both present when affordable; `ship_grain` present even when `next_margin<0`.
    - `test_ship_margin_single_helper` — grep that `river - transport - home` appears only in `actor.ship_margin`.
-   - `test_causal_trace_unconditional` — `latest_outcome.causal_trace` always present after turn 1, no `?trace` required.
+   - `test_causal_trace_unconditional` — `latest_outcome.causal_trace` always present after turn 1, no `?trace` required, ~40–60 nodes.
    All existing 133 tests stay green.
 
-Ordering invariant: Slice 1→2→3; each slice keeps `make test/lint/type` passing incrementally. Record quantity design call (two per verb) in `DECISIONS.md` as new entry (e.g. 017).
+Ordering invariant: Slice 1→2→3; each slice keeps `make test/lint/type` passing incrementally. Record in `DECISIONS.md` as new entry (e.g. 017): two-quantity design call plus verbatim principle "Section 10 exposes engine capabilities; it does not decide strategy …".
 
 ---
 
@@ -305,16 +339,18 @@ Ordering invariant: Slice 1→2→3; each slice keeps `make test/lint/type` pass
 
 | Check | Command | Expected evidence |
 |-------|---------|-------------------|
-| Unit | `make test` (= `uv run --project backend pytest -v`) | 133 + ~12 new API tests pass. |
-| API 5-turn | `test_create_and_complete_five_turn_game` | After 5th choice: `turn==TURN_LIMIT==5`, `revision==5`, `completion_summary` present; 6th choice → 409. |
+| Unit | `make test` (= `uv run --project backend pytest -v`) | 133 + ~14 new API tests pass. |
+| API 5-turn | `test_create_and_complete_five_turn_game` | After 5th choice: `turn==TURN_LIMIT==5`, `revision==5`, `CompletionSummaryView` present (not StrategicSummary); 6th choice → 409. |
+| No history | `test_no_history_in_gameview` (C3) | At turn 5 `GameView` JSON has no `history` key, no nested `TurnResolution` beyond `latest_outcome`; completion no `initial_state`/`final_state`. |
+| Outcome context | `test_outcome_context_disambiguated` (C4) | After drought submit: `latest_outcome.world=="drought"` `resolved_turn==3` while top-level `world=="normal"` (aftermath). |
 | Invalid choice | `test_invalid_choice_cannot_mutate` | Bad `choice_id` → 404; `GET` revision/turn unchanged. |
 | Unknown game | `test_unknown_game_id_404` | `GET /games/bad` and `POST /games/bad/choices/hold` → 404 `detail:"game not found"`. |
 | Stale revision | `test_stale_revision_cannot_mutate` | Second same-revision POST → 409 with `current_revision`; `GET` unchanged. |
-| Concurrent | `test_concurrent_same_revision_one_wins` | `asyncio.gather` two same-revision POSTs → one 200 one 409. |
+| Concurrent | `test_concurrent_same_revision_one_wins` (C5/C6) | Real `httpx.AsyncClient` + `pytest-asyncio`, `asyncio.gather` two same-revision POSTs → one 200 one 409. |
 | Turn invariant | `test_available_choices_turn_invariant` | Fixed state, turn 0..4 → identical choice sets (except established flip). |
 | Two quantities | `test_available_choices_include_two_quantities` | `buy_grain:40`+`80`, `ship_grain` present even when `next_margin<0`. |
 | Single helper | `test_ship_margin_single_helper` | Inline margin expression appears only in `actor.ship_margin`. |
-| AC4 completeness | `test_frontend_needs_no_formula` | All decision-screen numbers present as fields; no `qty*price` needed. |
+| AC4 completeness | `test_frontend_needs_no_formula` | All decision-screen numbers present as fields incl. OutcomeView+CompletionSummaryView; no `qty*price` needed. |
 | Consistency | `test_gameview_internal_consistency` | `wealth == cash+grain*price//1000` from response fields (labelled, not AC4). |
 | Trace unconditional | `test_causal_trace_unconditional` | `latest_outcome.causal_trace.nodes` present (40–60 nodes measured), no `?trace`. |
 | Determinism | `test_api_determinism` | Same seed+same choice_ids → identical JSON; minted `run_seed` echoed and re-seedable. |
@@ -332,8 +368,9 @@ Manual/smoke not needed (headless API only until Section 11).
 - **Risk: `choice_id:qty` invents arbitrary quantity.** Mitigated by server-chosen 2-quantity buckets in `available_choices`; unknown id → 404 before engine.
 - **Risk: double `resolve_turn`.** Mitigated by single `game.submit()` delegation; test asserts `turn` +1 per POST.
 - **Risk: `revision` vs `turn` confusion.** Keep distinct; tests assert both; `turn_limit` imported not literal.
-- **Risk: causal_trace payload blow-up.** B2 resolved: trace is unconditional, latest-only; measure node count and report if genuinely large (~40–60 expected).
-- **Rollback:** Delete `backend/app/api/`, `backend/app/main.py`, `actor.ship_margin` reverts to three inline copies, and `fastapi`/`uvicorn` from deps — engine/domain unchanged so `make test` reverts to Section 9 green.
+- **Risk: causal_trace payload blow-up.** B2/C2 resolved: trace is unconditional, latest-only; measure node count and report if genuinely large (~40–60 expected); C3 ensures `completion_summary` does not smuggle 5 more traces.
+- **Risk: torn view (C5).** Mitigated by per-session `asyncio.Lock` held by both `GET` and `POST`; without it a concurrent `POST` mid-`GET` mapper would mix pre/post values.
+- **Rollback:** Delete `backend/app/api/`, `backend/app/main.py`, `actor.ship_margin` reverts to three inline copies, `CompletionSummaryView`/`OutcomeView` deleted, and `fastapi`/`uvicorn`/`httpx`/`pytest-asyncio` from deps — engine/domain unchanged so `make test` reverts to Section 9 green.
 
 ---
 
@@ -351,11 +388,11 @@ Manual/smoke not needed (headless API only until Section 11).
 
 **Answer:** Extend forbidden set to include `alembic` and add reverse check for `from app.api` / `import app.api`. Converts good intentions into a test (K5, retained per review "keep as-is").
 
-### Q3 — Could two concurrent `POST choices` with the same correct `expected_revision` both mutate?
+### Q3 — Could two concurrent `POST choices` with the same correct `expected_revision` both mutate? Could `GET` tear?
 
-**Evidence:** Today `FiveTurnGame.submit` is synchronous with no lock; `sessions.py` does not exist, so no `SESSION_LOCK`.
+**Evidence:** Today `FiveTurnGame.submit` is synchronous with no lock; `sessions.py` does not exist, so no lock at all. The original plan also had `GET` without a lock ("no lock needed for read-only") — but the mapper walks `state/history/rivals`; a concurrent `choose()` mutating midway would produce a torn view mixing pre/post values (C5).
 
-**Answer:** Wrap read-check-mutate in `async with SESSION_LOCK` (`asyncio.Lock`, `async def` handlers) — B7 decided (not "or"). Honest note: with no `await` between check and mutate it's already atomic on the single-threaded loop; the lock is defensive against a future `await` sneaking in. Global lock acceptable for MVP; comment notes Section 16 can move to per-session. Test `test_concurrent_same_revision_one_wins` via `asyncio.gather` only exercises the race under this combination.
+**Answer:** Each `GameSession` owns its own `asyncio.Lock` (C5). Both `choose()` and `get_game()` do `async with session.lock:`. Honest note: with no `await` between check and mutate the operation is already atomic on a single-threaded loop; the lock is defensive against a future `await` sneaking in, and for `GET` against torn reads. Per-session locks let unrelated games proceed independently (removing global serialization). Test `test_concurrent_same_revision_one_wins` uses a real `httpx.AsyncClient` + `pytest-asyncio` + `asyncio.gather` (C6) — only `async def` + `asyncio.Lock` is correctly exercised that way.
 
 ### Q4 — If the API returns a capped `actual=2` for `buy_grain:80`, does the frontend see the cap or just "bought 80"?
 
@@ -403,22 +440,28 @@ Manual/smoke not needed (headless API only until Section 11).
 
 ## What The Grill Changed (vs original draft)
 
-1. **Revision atomicity made explicit.** `async with SESSION_LOCK` (`asyncio.Lock`, `async def`) + `test_concurrent_same_revision_one_wins` — Q3/B7.
-2. **AC4 operationalized then corrected per B3.** Original Q1 made a recomputation assertion the AC4 proof; B3 exposed it as circular (writes a formula to prove no formula needed) and step 4 as vacuous (grep against non-existent Section 11). Now AC4 is a completeness checklist (every decision-screen number present as a field; `qty*price` means missing field), with the recomputation relabelled as internal-consistency only and the grep deleted.
-3. **AC5 guard extended beyond `fastapi`.** Surfaced `alembic` + reverse `app.api` leak (Section 8 shim pattern) — B7 keep-as-is affirmed.
+1. **Revision atomicity made explicit then tightened to per-session + GET.** Original `async with SESSION_LOCK` + `test_concurrent...` — Q3/B7. Round 2 C5 fixed the torn `GET` by giving each `GameSession` its own `asyncio.Lock` and requiring both `choose()` and `get_game()` to acquire it; global lock removed.
+2. **AC4 operationalized then corrected per B3.** Original Q1 made a recomputation assertion the AC4 proof; B3 exposed it as circular and step 4 as vacuous. Now AC4 is a completeness checklist, with recomputation relabelled internal-consistency and grep deleted.
+3. **AC5 guard extended beyond `fastapi`.** Surfaced `alembic` + reverse `app.api` leak (Section 8 shim pattern) — keep-as-is affirmed.
 4. **Choice vs engine bound split clarified.** Unknown `choice_id` 404 (API), short-cash clamped 200 (engine) — Q4/B1 keep-as-is affirmed.
-5. **Available-choices originally turn-gated + margin-gated — DELETED per B1 (BLOCKING).** Q5 originally preserved `margin>0` and harness turn windows; review proved `prototype.available_commands()` is unconditional and `resolve_turn` turn-agnostic. Now legality/affordability only, `ship_grain` even when `next_margin<0`, two quantities per verb, turn-invariant regression test. This was a harness-as-rules leak that silently invalidated Section 9's "no dominant strategy" meaning.
+5. **Available-choices originally turn-gated + margin-gated — DELETED per B1 (BLOCKING).** Q5 originally preserved `margin>0` and harness turn windows; review proved `prototype.available_commands()` is unconditional and `resolve_turn` turn-agnostic. Now legality/affordability only, `ship_grain` even when `next_margin<0`, two quantities per verb, turn-invariant regression test. Harness as rules silently invalidated Section 9's "no dominant strategy".
 6. **Rejected integer `choice_id`.** Q10 — stable strings (keep-as-is).
+7. **Round 2 blockers C3/C4:** `completion_summary: StrategicSummary` → API-owned `CompletionSummaryView` (no history smuggling); `latest_outcome` conflation fixed by `OutcomeView` with `resolved_turn/title/pressure_stage/world/command_*` so top-level = next decision, `latest_outcome` = just-resolved.
 
 ## What This Revision Changed (vs plan before review)
 
 1. **B1 (BLOCKING):** Deleted every turn-index condition (`turn<4`, `turn in (1,2)`, `turn==4`, `turn==0`) and the `river - transport - home > 0` gate on `ship_grain` from `available_choices`. Rebuilt from legality/affordability only (`cash>=cost`, `not established`, `inventory>0`, `headroom>0`). Added `test_available_choices_turn_invariant` regression and `test_available_choices_include_two_quantities` (partial+full). Changed quantity policy from single server-chosen amount to **two per verb** (partial+full) and will record in `DECISIONS.md` (e.g. 017) — design call per reviewer, keeps list ~6–8 items instead of 4–7.
-2. **B2:** `latest_outcome` now carries **full `causal_trace` unconditionally, latest turn only** — deleted `debug_trace` / `?trace=1` path. "If it bloats" was unmeasured; plan now measures ~40–60 nodes and reports if genuinely large.
+2. **B2:** `latest_outcome` now carries **full `causal_trace` unconditionally, latest turn only** — deleted `debug_trace` / `?trace=1` path. "If it bloats" was unmeasured; plan now measures ~40–60 nodes and reports if genuinely large. Per C2, `?trace=1` would not have violated the spec (still same endpoint) — conclusion rests on the other three reasons (two `GameView` shapes, unresolvable reveal via `causal_node_ids` without nodes).
 3. **B3:** Deleted vacuous step 4 (grep Section 11 imports). Relabelled `wealth == cash + grain*price//1000` as `test_gameview_internal_consistency` (not AC4 evidence). Replaced AC4 step with **completeness** assertions (every decision-screen number present as field; `qty*price` in test means missing field).
-4. **B4:** `empire_summary` is now `{farm_capacity, storage_capacity, route_established}` — deleted invented `operations: list[{id,kind,capacity,level}]` / `name_stage` (global §15: no abstraction before two use cases; grepped 0 hits for operations/kind/level).
+4. **B4/C1:** `empire_summary` stays `{farm_capacity, storage_capacity, route_established}` — but reason corrected per C1: `OperationState` **does exist** at `types.py:40` (mirrored a real type, not invented). The correct reason is dormant-type / single source of truth: `types.py:59` says it "exists as a standalone type for future Section 5 use" — not embedded in `PlayerState` to avoid duplicate capacity truth. Synthesizing `farm_1`/`granary_1` with invented `level` would create fictional canonical-looking state. Fix stated reason, keep shape.
 5. **B5:** Added `run_seed: str` to `GameView` — fixes internal contradiction where K6 promised echo but K4 schema had only `game_id`.
 6. **B6:** Added `actor.ship_margin(river_price, transport, home_price) -> int` — single pure helper replacing three copies (harness policy, `turn.py:1297` `arbitrage_margin`, mapper's `next_margin`).
 7. **B7:** Decided lock = single global `asyncio.Lock` with `async def` handlers + honest atomicity note and MVP justification; cut `revision_history`; derived `turn_limit` from `prototype.TURN_LIMIT`; fixed game-complete to `409` consistently (`404` on unknown game_id already planned but now explicitly tested).
+8. **C3 (BLOCKING):** `completion_summary: StrategicSummary` (contained `initial_state`/`final_state`/`history: tuple[TurnResolution,5]` with 5 full traces + `final_rivals`/`rival_history`) → API-owned `CompletionSummaryView{initial_wealth, final_wealth, wealth_delta_total, final_cash, final_grain, final_farm_capacity, final_storage_capacity, cash_low, peak_inventory, is_complete, final_rival_headlines: strings only}` — no `history`, no raw rival states. Test `test_no_history_in_gameview` asserts no `history` key in turn-5 `GameView`. Contradicted B2's "latest turn only".
+9. **C4 (BLOCKING):** `latest_outcome` conflation fixed — added `OutcomeView{resolved_turn, title, pressure_stage, world, command_type, command_quantity}` so top-level `signal/pressure_stage/world` = next decision (`len(history)`), `OutcomeView.*` = just-resolved turn. Test `test_outcome_context_disambiguated` after drought turn checks `latest_outcome.world=="drought"` vs top-level `aftermath` and `resolved_turn==3`.
+10. **C5:** `GET` now takes same **per-session** lock as `POST` (`session.lock`) — fixes torn view where mapper walks `state/history/rivals` mid-mutate. Global `SESSION_LOCK` replaced by `GameSession.lock: asyncio.Lock`; unrelated games no longer serialised.
+11. **C6:** Added `httpx` + `pytest-asyncio` to dev deps (not transitive); concurrency test uses real `httpx.AsyncClient` + `ASGITransport` per `pytest-asyncio`.
+12. **C7:** Confirmed `revision_history` dropped (no requirement/consumer; persistence scaffolding). `created_at` kept harmless.
 
 ## Revisions To Be Made Before Implementation (downward only)
 
@@ -435,17 +478,22 @@ Manual/smoke not needed (headless API only until Section 11).
 
 ---
 
-## Review Round 1 — Change Log
+## Review Round 1 — Change Log (B) + Round 2 — Change Log (C)
 
 | ID | Before | After | Verdict |
 |----|--------|-------|---------|
 | B1 | `available_choices` gated on `turn<4`, `turn in (1,2)`, `turn==4`, `turn==0`, `margin>0`; single qty per verb; ~4–7 choices | Legality/affordability only (`cash>=cost`, `not established`, `inventory>0`, `headroom>0`); `ship_grain` even at loss; **two** qty options per verb (~6–8 choices); `ship_margin` helper; regression `test_available_choices_turn_invariant` | **BLOCKING — fixed** |
-| B2 | `debug_trace` optional behind `?trace=1` ("if it bloats") | `latest_outcome.causal_trace` unconditional, latest turn only; measure ~40–60 nodes | Fixed |
+| B2 | `debug_trace` optional behind `?trace=1` ("if it bloats") | `latest_outcome.causal_trace` unconditional, latest turn only; measure ~40–60 nodes; C2: drop spec-violation claim, keep 3 reasons | Fixed (reason trimmed C2) |
 | B3 | AC4 step 4 grep Section 11 imports (vacuous); `wealth==cash+grain*price//1000` as AC4 proof (circular) | Step 4 deleted; recomputation relabelled internal-consistency; AC4 is **completeness** (every screen number present as field) | Fixed |
-| B4 | `empire_summary.operations: list[{id,kind,capacity,level}]` | `empire_summary: {farm_capacity, storage_capacity, route_established}` | Fixed |
+| B4/C1 | `empire_summary.operations` claimed invented (grep wrong) | `empire_summary: {farm_capacity, storage_capacity, route_established}` — reason corrected: `OperationState` exists at `types.py:40` but dormant per `types.py:59`, not embedded in `PlayerState`; synthesizing would create second source of truth for capacity | Fixed (reason corrected C1) |
 | B5 | `GameView` had `game_id` but no `run_seed` | `GameView.run_seed: str` added, distinct from `game_id` | Fixed |
 | B6 | `river - transport - home` in 3 places | `actor.ship_margin()` single pure helper, called by harness + `turn.py` + mapper | Fixed |
-| B7 | `asyncio.Lock` "or `threading.Lock`"; literal `turn_limit=5`; `revision_history` present; `409 or 400` on complete; no test for unknown game_id | `asyncio.Lock` + `async def` + honest atomicity note + global-justification comment; `turn_limit` from `prototype.TURN_LIMIT`; `revision_history` cut; **consistently `409`**; `test_unknown_game_id_404` added | Fixed |
+| B7 | `asyncio.Lock` "or `threading.Lock`"; literal `turn_limit=5`; `revision_history` present; `409 or 400` on complete; no test for unknown game_id | **Per-session** `asyncio.Lock` + `async def` + honest note + `GET` also locked (C5); `turn_limit` from `TURN_LIMIT`; `revision_history` cut; **consistently `409`**; `test_unknown_game_id_404` | Fixed (lock upgraded C5) |
+| C3 | `completion_summary: StrategicSummary` (with `history: tuple[TurnResolution,5]` + 5 traces + `final_rivals`/`rival_history`) — smuggled history endpoint, contradicts B2 | `CompletionSummaryView` API-owned: `{initial_wealth, final_wealth, wealth_delta_total, final_cash, final_grain, final_farm_capacity, final_storage_capacity, cash_low, peak_inventory, is_complete, final_rival_headlines: strings only}`; test `test_no_history_in_gameview` | **BLOCKING — fixed** |
+| C4 | `latest_outcome` had no own context; top-level `world/pressure_stage` = next turn, `latest_outcome` = just-resolved — conflated reveal context | `OutcomeView{resolved_turn, title, pressure_stage, world, command_type, command_quantity, wealth_delta..., causal_trace}` — top-level = next decision, OutcomeView = just-resolved; test `test_outcome_context_disambiguated` drought vs aftermath | **BLOCKING — fixed** |
+| C5 | `GET` without lock ("no lock needed for read-only") | `GET` + `POST` both `async with session.lock` — fixes torn view; global lock → per-session | Fixed |
+| C6 | dev deps only `pytest` — `httpx`/`pytest-asyncio` missing | `httpx` + `pytest-asyncio` added explicitly; concurrency test uses `httpx.AsyncClient` + `pytest-asyncio` | Fixed |
+| C7 | `revision_history` on `GameSession` | Dropped (no requirement/consumer) | Fixed |
 | Keep-as-is | K3 revision-on-envelope + `409` stale/`422` missing, K5 guard, Q4 API-vs-engine split, Q10 stable string ids, `game.submit()` only, no DB/LLM/history | Untouched | Affirmed |
 
-No implementation has been written — plan revision only. Awaiting approval to implement.
+Implementing now per approval once C3–C6 reflected.

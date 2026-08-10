@@ -5,7 +5,7 @@ from __future__ import annotations
 import ast
 from pathlib import Path
 
-FORBIDDEN_TOP_LEVEL = {"fastapi", "sqlalchemy", "httpx", "asyncpg", "openai", "clerk"}
+FORBIDDEN_TOP_LEVEL = {"fastapi", "sqlalchemy", "httpx", "asyncpg", "openai", "clerk", "alembic"}
 
 ENGINE_DIR = Path(__file__).parent.parent / "app" / "engine"
 DOMAIN_DIR = Path(__file__).parent.parent / "app" / "domain"
@@ -36,3 +36,25 @@ def test_engine_source_contains_no_forbidden_imports() -> None:
     for root in (ENGINE_DIR, DOMAIN_DIR):
         for filepath in root.rglob("*.py"):
             _assert_no_forbidden_imports(filepath)
+
+
+def test_engine_does_not_import_from_app_api() -> None:
+    """Reverse dependency — engine/domain must not import from app.api (C1 dormancy)."""
+    for root in (ENGINE_DIR, DOMAIN_DIR):
+        for filepath in root.rglob("*.py"):
+            source = filepath.read_text(encoding="utf-8")
+            if not source.strip():
+                continue
+            tree = ast.parse(source, filename=str(filepath))
+            for node in ast.walk(tree):
+                if isinstance(node, ast.Import):
+                    for alias in node.names:
+                        assert not alias.name.startswith("app.api"), (
+                            f"{filepath.name} imports forbidden package 'app.api' ({alias.name})"
+                        )
+                elif isinstance(node, ast.ImportFrom):
+                    if node.module is None:
+                        continue
+                    assert not node.module.startswith("app.api"), (
+                        f"{filepath.name} imports from forbidden package 'app.api' ({node.module})"
+                    )
