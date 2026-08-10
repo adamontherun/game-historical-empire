@@ -2,9 +2,9 @@
 
 > Handoff snapshot for Muse / human. Concise and current, not a history log.
 
-## Section 10 — COMPLETE + Audit Round 2 fixes (2026-08-10) — R1/R2/R3
+## Section 11 — COMPLETE (2026-08-10) — Mobile-First React Playable
 
-**Minimal FastAPI Boundary — in-memory sessions, three endpoints, presentation-correct GameView:** Exposes `FiveTurnGame` via `POST /api/v1/games`, `GET /api/v1/games/{id}`, `POST /api/v1/games/{id}/choices/{choice_id}` with `expected_revision` optimistic concurrency (per-session `asyncio.Lock` on `GameSession`, both GET and POST take lock; `choose` holds `await sleep(0)` inside lock per DECISIONS 021 to keep lock load-bearing until DB I/O lands (B3a falsifiable), `get_game` lock without yield; stale `409`, missing `422`, complete `409`, unknown id/choice `404`). `GameView` echoes `run_seed`+`ruleset_version`/`game_id`/`revision`/`turn`/`turn_limit=TURN_LIMIT`, `signal/pressure_stage/world` = next decision and `OutcomeView{resolved_turn,title,pressure_stage,world,command_type,command_quantity,drivers,domain_effects,causal_trace}` = just-resolved (C4); top-level aftermath vs outcome drought disambiguated. `causal_trace` unconditional latest-only (~40-60 nodes) inside `latest_outcome` (B2/C2), `CompletionSummaryView` API-owned end-screen values only (`initial_wealth/final_wealth/wealth_delta_total/final_cash/final_grain/final_farm_capacity/final_storage_capacity/cash_low/peak_inventory/is_complete/final_rival_headlines` strings — no `history`/`initial_state`/`final_state`/`RivalState`, C3). `empire_summary` is exactly `{farm_capacity, storage_capacity, route_established}` — dormant `OperationState` at `types.py:40` not embedded per `types.py:40` (C1 fixed). `available_choices` is legality+affordability only (`cash>=cost`, `not established`, `inventory>0`, `space>0`, no turn gating or `margin>0`, B1), two quantities per verb (partial+full, ~6-8 items; e.g. `buy_grain:55/110` unclamped `min(space, affordable)` no harness 80 cap per DECISIONS 022, `ship 10/20` even when `next_margin<0` via `actor.ship_margin` reliability-aware `river*reliability-transport-home` S0a used by harness+turn+mapper, B6/C3; S5 harvest via `compute_farm_output`). Engine stays pure via `test_engine_purity` forbidding `fastapi/alembic` and `from app.api` imports; `game.submit()` is sole mutation path.
+**Vertical slice:** Vite + React + TypeScript + TanStack Query single-column playable (390×844 excellent, desktop 480px centred) with phase-selected `data-pressure` theming, verb cards with verbatim quantities + exact `id` submit, `hold` cost 0 via `cost !== null`, staged outcome reveal (7 beats, `latest_outcome.*` + top-level `rival_headlines` + `signal` hand-off, `0→delta` anim, `Home price` label, `Current route spread` quote, drivers `impact_money` only), empire tableau 3 independent rows (no arrows), market cards `price / grain` + Availability + Demand (R2), StartScreen `Begin` + `Age of Grain · Chapter I` + `seed · rules` footer, `format.ts` as only `/1000`/`/10000` site, `committingRef` + `isPending` double-submit guard, fifth reveal before completion (B2), `displayPressure` phase-selected (B3), `expected_revision: game.revision` (B4), all 8 AC plus 4 screenshots + console-error guard verified via Playwright.
 
 ### What exists
 
@@ -14,80 +14,143 @@ backend/
     main.py                    # create_app() -> FastAPI, mounts /api/v1 router
     api/
       __init__.py
-      sessions.py              # GameSession{game_id, run_seed, revision, game, created_at, lock: asyncio.Lock, commands}, SESSION_STORE (eviction deferred until Section 16)
+      sessions.py              # GameSession{game_id, run_seed, revision, game, created_at, lock: asyncio.Lock, commands}, SESSION_STORE
       schemas.py               # CreateGameRequest/ChoiceRequest, ChoiceView, PlayerSummary, EmpireSummary{3 fields}, MarketView, RouteStatus{next_margin}, RivalHeadlines, OutcomeView{resolved context + causal_trace}, CompletionSummaryView{no history}, GameView{run_seed, ruleset_version, turn_limit=TURN_LIMIT}
-      mappers.py               # choices_for legality/affordability +2 qty: buy min(space,affordable)=55/110 no harness cap (R2/DECISIONS 022), ship pre-harvest, no turn/margin gate + to_game_view + choice_map_for + ship_margin/value_for helpers
-      service.py               # create_game/get_game(with lock, no yield)/choose(with lock+sleep per DECISIONS 021, falsifiable) 404/409/422 game.submit() only
+      mappers.py               # choices_for legality/affordability +2 qty: buy 55/110 uncapped (DECISIONS 022), sell uncapped (DECISIONS 024 — was 150), ship pre-harvest, no turn/margin gate
+      service.py               # create_game/get_game(with lock, no yield)/choose(with lock+sleep per DECISIONS 021) 404/409/422
       router.py                # POST /api/v1/games, GET /api/v1/games/{id}, POST /.../choices/{choice_id}
     domain/
       types.py                 # OperationState dormant, RouteState delay 0, regional_output 360
-      trace.py                 # CausalNode delta strict, OutcomeDriver top-3 residual doc (S4), top_drivers string view
-      pressure.py              # PressureState 7 fields, causal_source_id single source
+      trace.py                 # CausalNode delta strict, OutcomeDriver top-3
+      pressure.py              # PressureState 7 fields
     engine/
-      prototype.py             # TURN_LIMIT=5, default_start_state retuned 280/410/360/4000/130 (S7 value_for, demand tightness 5928 baseline)
-      actor.py                 # ship_margin reliability-aware, cost/affordable inverse doc (N9), resolve_buy/sell
-      harness.py               # policy_trade_heavy ship_margin reliability-aware, BatchConfig validation S0b, _wealth removed
-      turn.py                  # S3 inventory_after_command, _bounded_price, arbitrage quantity-weighted
-      rivals.py                # B4 partial-fill headlines, S5 harvest via compute_farm_output
+      prototype.py             # TURN_LIMIT=5, default_start_state 280/410/360/4000/130
+      actor.py                 # ship_margin reliability-aware, cost/affordable
+      harness.py               # BatchConfig validation
+      turn.py                  # _bounded_price, arbitrage quantity-weighted
+      rivals.py                # harvest via compute_farm_output
       rng.py
       rounding.py
-      cli.py                   # model_validate
+      cli.py
     tests/
-      test_api.py                # 15 tests: AC1 5-turn, AC2 invalid, AC3 stale, AC4 completeness, determinism, turn-invariant, two quantities (55/110 no cap R2), engine-agreement unclamped 110 (R2), ship_margin helper, causal unconditional, no-history, outcome disambiguated, concurrent lock (B3a falsifiable via DECISIONS 021), unknown 404, ruleset_version
-      test_engine_purity.py      # forbids alembic + from app.api reverse dep
-      test_balance_harness.py    # B3d swing falsifiable + price envelope
+      test_api.py                # 15 tests incl. sell uncapped 024, buy uncapped 022, concurrent lock
+      test_engine_purity.py
+      test_balance_harness.py
       test_five_turn_prototype.py
       test_deterministic_rivals.py
-      test_invariants.py         # B3b strict movement
-      test_two_markets_route.py  # B3c cash equality already_established
+      test_invariants.py
+      test_two_markets_route.py
       test_causal_trace.py
-      test_turn_kernel.py        # B3b price_bounded_movement
-  pyrightconfig.json           # strict app + standard tests (38 files) via executionEnvironments
-docs/plans/2026-08-10-section-10-fastapi-boundary.md  # plan revised for B1-B7 + C1-C7
-docs/plans/2026-08-10-audit-sections-1-10-review-round-1.md  # consolidated audit round1
-docs/plans/2026-08-10-audit-sections-1-10-review-round-2.md  # consolidated audit round2 (R1/R2/R3)
-docs/plans/2026-08-10-audit-muse-findings.md  # independent audit
+      test_turn_kernel.py
+  pyrightconfig.json
+frontend/
+  index.html
+  vite.config.ts               # proxy /api → 8000, VITE_API_URL fallback
+  tsconfig.json / tsconfig.node.json
+  package.json                 # vite 6.4, react 18.3, tanstack query 5, vitest 3, playwright 1.49, eslint 9 flat
+  eslint.config.js             # no-restricted-syntax bans /1000 and /10000 outside format.ts, waitForTimeout
+  vitest.config.ts             # jsdom
+  playwright.config.ts         # two projects mobile 390×844 + desktop 1280×800, webServer backend+frontend
+  src/
+    main.tsx
+    App.tsx                    # phase machine start→decision→reveal→completion (B2), displayPressure phase-selected (B3), committingRef guard (B8), revision: game.revision (B4)
+    api/
+      client.ts                # createGame/getGame/commitChoice (expected_revision)
+      types.ts                 # GameView shapes
+      queries.ts
+    lib/
+      format.ts                # money/pricePerUnit/percent — ONLY /1000 & /10000 site (K2)
+      tableau.ts               # 3 independent rows (R1): estate farm≥15, storage≥180, trade route
+    components/
+      StartScreen.tsx          # R8 Begin + R9 Age of Grain · Chapter I
+      HeaderBar.tsx            # turn pips Turn n of 5, cash format.money
+      WorldBand.tsx            # signal serif 22px, data-pressure-stage
+      EmpireTableau.tsx        # R1 no arrows, data-testid tier-*
+      MarketCard.tsx           # R2: price / grain + Availability + Demand
+      MarketPulse.tsx          # side-by-side Home/River + RouteLine
+      RouteLine.tsx            # R4: Current route spread … / grain (quote)
+      RivalsStrip.tsx          # B5: rival_headlines resolved context, empty state turn 0
+      DecisionBlock.tsx        # B1: group by kind, qty verbatim, exact id submit
+      OutcomeReveal.tsx        # B2/B5/B7/R6/R7: 7 beats data-reveal-beat/state, drivers impact_money, Home price, from 0
+      CompletionSummary.tsx    # R10: hero wealth, total change, estate, run record, rivals, seed·rules
+      FooterDebug.tsx          # R12: seed · rules
+    styles/
+      tokens.css               # --market-home/--market-river identity + --page-ground atmosphere + [data-pressure] + font stacks R11 + tabular-nums
+      app.css                  # 480px centred, cards (verb 8px/13px, qty 3px/11px), reveal, commit bar static 8px (J2 0% occlusion, J4 river single line)
+    __tests__/
+      format.test.ts           # 8 tests inc. /1000 grep via eslint
+      tableau.test.ts          # 7 tests inc. positive investing + negative hold×5 flat (B9)
+      decisionBlock.test.tsx   # 5 tests inc. verbatim {7,999} (B1), hold cost 0 (B6), 9→6 cards
+      commit.test.tsx          # 1 test synthetic turn 2 rev 7 → 7 (B4) — vestigial removed J3
+      outcomeReveal.test.tsx   # B7 magnitude
+  e2e/
+    critical.spec.ts           # 4 tests: full 5-turn mobile (expand→granary S2, 4 viewport 390×844 J1 mobile-only, B2/B3/B5/B6/B7/B9), desktop smoke, AC2 no table, AC4 rivals; B8 sync double-click, no waitForTimeout, console+pageerror
+    screenshots/
+      first-decision.png        # 390×844 viewport J1 scrolled top — J2 0% (static bar, was 82%)
+      drought-warning.png       # turn 2 worsening_dry — viewport J1 1073×2321@2.75x
+      drought-reveal.png        # after turn 3: header aftermath vs reveal drought B3 — viewport J1
+      final-summary.png         # turn 5 R10 — viewport J1
+  dist/                        # vite build output (rebuilt, 7.50kB css)
+Makefile                       # test/lint/type/format-check + front-type/front-lint/front-test/front-e2e + check-all
+docs/plans/2026-08-10-section-11-mobile-react-playable.md  # plan revised for B1–B9 + R1–R12 + S1–S2
+docs/plans/2026-08-10-section-11-design-direction.md      # partially superseded banner (review wins)
+docs/plans/2026-08-10-section-11-review-round-1.md        # consolidated review (9 blocking, 12 rulings)
 ```
 
 ### Boundaries
 
-- In-memory sessions only; no Postgres/SQLAlchemy/Alembic/auth/LLM/history endpoint/cloud deploy; no frontend scaffolding.
-- `GameView` is presentation — frontend never recomputes cost/margin/wealth; `actor.ship_margin` reliability-aware + `actor.value_for`/`cost_for_quantity`/`affordable_quantity` single helpers, `actor.compute_farm_output` for harvest estimates.
-- Per-session `asyncio.Lock` held by both GET and POST; `choose` holds `await sleep(0)` inside lock per DECISIONS 021 to keep lock load-bearing until DB I/O (Section 16) — removal makes `test_concurrent_same_revision_one_wins` fail `[200,200]` vs `[200,409]`; `get_game` lock without yield (no falsifying test, kept minimal); unrelated games independent. Revision is envelope `revision` distinct from `GameState.turn`; `turn_limit` derived from `prototype.TURN_LIMIT`.
-- `available_choices` transport projection via `actor.affordable_quantity`/`value_for` and `actor.compute_farm_output` (B2/S5/S7), not recommendation engine — `buy_grain` is `min(space, affordable)=55/110` at start state with **no harness 80 cap** per DECISIONS 022 (harness keeps its own 80 as strategy); player may make economically bad choices (DECISIONS 017 principle verbatim). `ship_margin` includes reliability `(river*reliability//10000)-transport-home` (S0a). Removing `_bounded_price` cap fails `test_price_bounded_movement` (2505000 vs 1000), second `secure_route` double-charge fails `test_secure_route_creates_trade_access`, `largest_swing=0` fails `test_largest_swing_bounded` non-zero guard.
-- Pure engine boundary: `engine`+`domain` import no `fastapi`/`alembic`/`app.api`; tested via `test_engine_purity`.
-- `Makefile type` is `cd backend && uv run pyright` with `pyrightconfig.json` `include=["app","tests"]` `executionEnvironments` `app strict` / `tests standard` (38 files, 0 errors, proved via injection in `app/engine/rounding.py` and `tests/test_sanity.py` both failing) — DECISIONS 018 revised; `backend/pyproject.toml` also `include=["app","tests"]` for consistency.
+- In-memory sessions only; no Postgres/SQLAlchemy/Alembic/auth/LLM/history endpoint/cloud deploy.
+- `GameView` is presentation — frontend never recomputes cost/margin/wealth/quantity; `ChoiceView.cost`/`quantity`/`label`/`id` verbatim per B1/B6, `route_status.next_margin` as quote per R4, `format.ts` only `/1000`/`/10000` site per K2 (eslint no-restricted-syntax). `ship_margin` reliability-aware.
+- Per-session `asyncio.Lock` with `sleep(0)` in `choose` per DECISIONS 021; `revision` distinct from `turn` (B4) — `expected_revision: game.revision` always, falsified by synthetic `turn 2 rev 7` test.
+- `available_choices` legality+affordability only, `buy`/`sell`/`ship` uncapped per DECISIONS 022/024 (sell `min(inventory,150)` removed), `ship` no margin gate, pre-harvest estimate via `compute_farm_output`. Two quantities per verb where applicable, grouped into one verb card (max 6 cards, 9 choices after route).
+- Frontend phase machine `start → decision → reveal → completion` (B2) — fifth commit has both `latest_outcome` and `completion_summary`, reveal shown before completion via `displayPressure` phase-selected (B3). Top-level `rival_headlines` is resolved-turn context (B5) — reveal source matrix enforced.
+- Drivers top-3 with residual NOT represented (B7) — no stacked bar, `impact_bps` is magnitude, colour from `impact_money`. `price_delta` is Home price (R6), delta animates `0→delta` (R7), `command_quantity` is requested (R5).
+- Pure engine boundary: `engine`+`domain` no `fastapi`/`alembic`/`app.api`; `tableau()` pure with 3 independent rows (R1) thresholds `farm≥15`/`storage≥180`/`route` (B9 exact before/after + negative hold flat).
+- `Makefile` now has `front-type/front-lint/front-test/front-e2e` plus `make check-all` per S1 — `ORCHESTRATION.md` §4 verification is `make test && make lint && make type && make format-check` plus frontend via `check-all`.
 
 ### Normal verification
 
 ```bash
-make test              # 149 passed
+make test              # 150 passed, 1 warning in 2.01s
 make lint              # All checks passed!
-make type              # 0 errors, 0 warnings, 0 informations (pyrightconfig.json strict app + standard tests, 38 files)
+make type              # 0 errors, 0 warnings, 0 informations — 38 files analyzed
 make format-check      # 39 files already formatted
+make front-type        # tsc --noEmit — 0 errors
+make front-lint        # eslint . --ext .ts,.tsx — 0 problems (no-restricted-syntax, no waitForTimeout)
+make front-test        # vitest run — 5 passed (5), 25 passed (25) — J3 vestigial removed (was 26)
+make check-all         # backend + frontend gates green — check-all: backend + frontend gates green
+# e2e (via npx playwright test)
+# — 8 passed (4 mobile 390×844 + 4 desktop 1280×800, 43.5s) — full 5-turn mobile (expand→granary, 4 viewport screenshots J1 1073×2321@2.75x, scrolled top, desktop no longer overwrites), drought-warning turn2 worsening_dry, drought-reveal B3 header aftermath vs reveal drought, final-summary R10; J2 0% occlusion at scroll 0 (static bar, verb 8px, tap target fully visible, was 82%/98%), J4 route single calm river line with sign-coloured spread only, B1 verbatim, B6 sell no Cost, B8 sync double-click requestCount 1, no waitForTimeout, console+pageerror zero
 ```
 
 ### Last known green
 
 ```
-pytest 149 passed in 1.93s
+pytest 150 passed in 2.01s (1 warning: StarletteDeprecationWarning)
 ruff check All checks passed!
-pyright 0 errors, 0 warnings, 0 informations — 38 files analyzed (strict app + standard tests via executionEnvironments)
+pyright 0 errors, 0 warnings, 0 informations — 38 files analyzed
 ruff format --check 39 files already formatted
+tsc --noEmit — 0 errors (frontend)
+eslint — 0 problems (no-restricted-syntax for /1000 and /10000 outside format.ts, no waitForTimeout)
+vitest — 5 passed (5), 25 passed (25) — J3 vestigial removed, B4 revision 7 vs turn 2 + B7 impact_money mutation-proven
+playwright — 8 passed (4 mobile 390×844 + 4 desktop 1280×800) — 43.5s — screenshots: first-decision.png 1073×2321 viewport J1 0% occlusion (static bar), drought-warning.png turn2 worsening_dry viewport, drought-reveal.png header aftermath vs reveal drought B3 viewport, final-summary.png turn5 R10 viewport; J4 route single line river colour sign-only
+check-all: backend + frontend gates green
 ```
 
 ### Decisions relevant
 
-- DECISIONS 017: two-quantity verb (partial+full), per-session lock, trace/latest-only, CompletionSummaryView (no history), OutcomeView disambiguation, OperationState dormant reason, ship_margin single helper, no-strategy-gatekeeping principle verbatim.
-- DECISIONS 018 revised (R1): pyright scope `include=["app","tests"]` executionEnvironments app strict / tests standard (38 files, injection-proven).
-- DECISIONS 021 (R3): per-session lock yield point — `choose` `await sleep(0)` inside lock load-bearing until DB I/O, `get_game` without yield.
-- DECISIONS 022 (R2): buy cap removal — `choices_for` `min(space, affordable)` 55/110, harness 80 kept as strategy only.
-- DECISIONS 016: matched controls, price-taking, hold rank 4/4 etc. unchanged.
+- DECISIONS 017: no-strategy-gatekeeping, two quantities, per-session lock, trace/latest-only, OperationState dormant, ship_margin single helper (principle verbatim).
+- DECISIONS 018 revised (R1): pyright strict app + standard tests (38 files).
+- DECISIONS 021 (R3): per-session lock `sleep(0)` load-bearing.
+- DECISIONS 022 (R2): buy cap removal 55/110.
+- DECISIONS 023 (NEW): Section 11 decision surface — verb cards + quantity verbatim + exact id + Commit + phase-selected pressure + `cost !== null` (reframed per BUILD_SPEC §0.2 — active section outranks DECISIONS.md).
+- DECISIONS 024: sell cap removal — `sell` now uncapped at inventory (was 150), `85/170` at 170.
+- DECISIONS 016: matched controls, price-taking, hold rank 4/4, etc.
 
 ### Intentionally missing
 
-History endpoint, SQLAlchemy/Alembic/Postgres, auth, LLM, frontend (Section 11).
+History endpoint, SQLAlchemy/Alembic/Postgres, auth, LLM, `render.yaml` cloud deploy. Section 12 human playtest remains autonomous-blocked.
 
 ### Next milestone
 
-Section 11 Mobile-First React Playable.
+Section 12 First Human Playtest and Refinement Gate — requires real humans; prepare playtest script + instrumentation and proceed to Section 13+ rather than stall per `ORCHESTRATION.md` §8.

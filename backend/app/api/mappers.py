@@ -106,9 +106,12 @@ def choices_for(session: GameSession) -> tuple[ChoiceView, ...]:
                         cost=cost,
                     )
                 )
-    # sell_grain: ANY turn, if inventory>0 — two options (150 cap avoids dumping entire store at once)
+    # sell_grain: ANY turn, if inventory>0 — two options (partial+full)
+    # No presentation cap — full commit is actual inventory, matching the engine's clamp.
+    # A 150 cap here was strategy ("avoid dumping the whole store") constraining authorization,
+    # the same category error DECISIONS 022 removed from buy_grain (DECISIONS 024).
     if s.player.inventory.grain > 0:
-        n = min(s.player.inventory.grain, 150)
+        n = s.player.inventory.grain
         qtys_s = {n, max(1, n // 2)}
         for qty in sorted(qtys_s):
             out.append(

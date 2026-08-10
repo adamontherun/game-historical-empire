@@ -1,0 +1,48 @@
+:root {
+  --ink: #1f1a14;
+  --ink-soft: #5c5245;
+  --parchment: #f5ede0;
+  --parchment-hi: #fffaf1;
+  --rule: #dccfba;
+  --market-home: #c8912f;
+  --market-river: #2f7b78;
+  --drought: #a6412b;
+  --gain: #4a7c43;
+
+  --font-display: ui-serif, Georgia, "Iowan Old Style", "Palatino Linotype", serif;
+  --font-ui:
+    ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+
+[data-pressure="normal"] {
+  --page-ground: #f5ede0;
+  --page-rule: #dccfba;
+  --world-accent: #c8912f;
+}
+[data-pressure="early_dry"] {
+  --page-ground: #f0e6d3;
+  --page-rule: #dccfba;
+  --world-accent: #c59a3e;
+}
+[data-pressure="worsening_dry"] {
+  --page-ground: #e8ddc8;
+  --page-rule: #d8ccb4;
+  --world-accent: #bc9b55;
+}
+[data-pressure="drought"] {
+  --page-ground: #e0d5be;
+  --page-rule: #c9b99e;
+  --world-accent: #a6412b;
+}
+[data-pressure="aftermath"] {
+  --page-ground: #ede8dc;
+  --page-rule: #dccfba;
+  --world-accent: #b8964a;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    transition: none !important;
+    animation: none !important;
+  }
+}

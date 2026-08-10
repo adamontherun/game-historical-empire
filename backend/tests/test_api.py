@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+from typing import Any
 
 import pytest
 from fastapi.testclient import TestClient
@@ -538,3 +539,52 @@ def test_api_determinism(client: TestClient) -> None:
     # not asserting full replay here, just that run_seed echoed
     assert gv_a["run_seed"] == minted_seed
     assert gv_b["run_seed"] == minted_seed
+
+
+def test_sell_choices_uncapped_above_150(client: TestClient) -> None:
+    """DECISIONS 024: sell full-commit is actual inventory, not a 150 presentation cap.
+
+    Reachable path: build_granary (storage 130->180), hold, hold -> inventory 170.
+    With the 150 cap restored this fails (offers 150, hiding 20 legal units).
+    """
+    gv = client.post("/api/v1/games", json={"run_seed": "sell-cap"}).json()
+
+    def commit(view: dict[str, Any], choice_id: str) -> dict[str, Any]:
+        gid = view["game_id"]
+        return client.post(
+            f"/api/v1/games/{gid}/choices/{choice_id}",
+            json={"expected_revision": view["revision"]},
+        ).json()
+
+    gv = commit(gv, "build_granary")
+    gv = commit(gv, "hold")
+    gv = commit(gv, "hold")
+
+    player = gv["player_summary"]
+    inventory = player["inventory_grain"]
+    assert inventory > 150, f"path did not reach inventory>150 (got {inventory})"
+    assert inventory <= player["storage_capacity"]
+
+    sells = [c["quantity"] for c in gv["available_choices"] if c["kind"] == "sell_grain"]
+    assert sells, "sell_grain must be offered when inventory > 0"
+    assert max(sells) == inventory, (
+        f"API offers max sell {max(sells)} but engine accepts {inventory} "
+        f"— presentation cap is hiding {inventory - max(sells)} legal units"
+    )
+
+    # engine agreement: the largest offered sell must resolve unclamped
+    from app.api.sessions import SESSION_STORE
+    from app.domain.types import PlayerCommand
+    from app.engine.pressure import PRESSURE_NORMAL
+    from app.engine.turn import resolve_turn
+
+    session = SESSION_STORE[str(gv["game_id"])]
+    state = session.game.state
+    res = resolve_turn(
+        state,
+        PlayerCommand(type="sell_grain", quantity=max(sells)),
+        PRESSURE_NORMAL,
+        state.to_turn_context(),
+    )
+    node = next(n for n in res.causal_trace.nodes if n.id == "inventory_after_command")
+    assert node.delta == -max(sells), f"sell {max(sells)} clamped to {node.delta}"
