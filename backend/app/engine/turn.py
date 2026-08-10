@@ -22,15 +22,18 @@ Section 5 adds: Home Valley (existing market) + River Town (river_market)
 + River Route (route) with transport cost / capacity / reliability.
 Ship trade is settlement after harvest, valued at river price.
 
-Supply semantics (Section 6): MarketState.supply is the persistent
-regional stock at the start of the turn. Home Valley stock evolves as
-stock_next = max(0, stock + farm_output - demand), i.e. each turn's
-available grain (stock + harvest) is drained by regional consumption
-(up to demand) before the next turn. Price is set on stock_next
-(post-consumption stock) via _target_price with effective_supply guard,
-so surplus (farm_output > demand) raises stock and depresses price,
-shortage (drought) drains stock and raises price. River Town supply
-remains stable (exogenous) for Section 6.
+Supply semantics (Section 6): MarketState.supply is a regional
+market-availability signal/index at the start of the turn, not a literal
+conserved physical stock. Home Valley signal evolves as
+signal_next = max(0, signal + farm_output - demand), i.e. each turn's
+availability index is adjusted by harvest and drained by regional
+consumption (demand). Price is set on signal_next via _target_price
+with effective_supply guard, so surplus (farm_output > demand) raises the
+signal and depresses price, shortage (drought) lowers the signal and
+raises price. The same farm_output also enters player inventory; for this
+prototype no conservation is implied between the regional signal and
+player inventory (ownership/flow accounting is deferred to Section 14).
+River Town signal remains stable (exogenous) for Section 6.
 
 Spec: drought reduces production/yield, not directly price.
 """
@@ -708,6 +711,33 @@ def resolve_turn(
             )
         )
 
+    # Emit demand signal nodes (stable inputs) — Section 6 causal graph fix
+    # Home demand directly causes stock changes and price pressure
+    nodes.append(
+        CausalNode(
+            id="demand",
+            label=f"Home demand {before_demand}",
+            kind="demand",
+            before=before_demand,
+            after=before_demand,
+            delta=0,
+            reason_code="demand_stable",
+            parent_ids=(),
+        )
+    )
+    nodes.append(
+        CausalNode(
+            id="home_demand",
+            label=f"Home Valley demand {before_demand}",
+            kind="demand",
+            before=before_demand,
+            after=before_demand,
+            delta=0,
+            reason_code="demand_stable",
+            parent_ids=(),
+        )
+    )
+
     # 2. Production — farm output depends on post-command farm_capacity + world
     base_output = farm_capacity * YIELD_PER_CAPACITY
     if world == "drought":
@@ -762,7 +792,7 @@ def resolve_turn(
             after=next_supply,
             delta=supply_delta,
             reason_code=supply_reason,
-            parent_ids=("farm_output",),
+            parent_ids=("farm_output", "demand"),
         )
     )
     # Also emit alias home_supply for clarity
@@ -775,7 +805,7 @@ def resolve_turn(
             after=next_supply,
             delta=supply_delta,
             reason_code=supply_reason,
-            parent_ids=("farm_output",),
+            parent_ids=("farm_output", "home_demand"),
         )
     )
     effects.append(
@@ -845,7 +875,7 @@ def resolve_turn(
             reason_code="supply_below_demand"
             if before_demand > next_supply
             else "supply_above_demand",
-            parent_ids=("supply",),
+            parent_ids=("supply", "demand"),
         )
     )
     nodes.append(
@@ -884,7 +914,7 @@ def resolve_turn(
             reason_code="supply_below_demand"
             if before_demand > next_supply
             else "supply_above_demand",
-            parent_ids=("home_supply",),
+            parent_ids=("home_supply", "home_demand"),
         )
     )
     nodes.append(

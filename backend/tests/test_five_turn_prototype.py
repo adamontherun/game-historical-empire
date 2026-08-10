@@ -151,6 +151,49 @@ def test_three_strategies_diverge() -> None:
     assert TURN_SPECS[2].world == "normal"
 
 
+def test_no_single_policy_dominates_all_metrics() -> None:
+    """AC5 non-dominance: no one policy wins every meaningful outcome.
+
+    Hold may win final wealth, but storage/trade win other measures, proving
+    tradeoffs rather than a universally best strategy.
+    """
+    seed = "nondom-seed-001"
+    policies = {
+        "hold": _choices("hold", "hold", "hold", "hold", "hold"),
+        "farm": _choices("expand_farm", "expand_farm", "hold", "hold", "hold"),
+        "storage": _choices("build_granary", "buy_grain:20", "hold", "hold", "hold"),
+        "trade": _choices(
+            "secure_route", "build_granary", "hold", "ship_grain:10", "ship_grain:10"
+        ),
+    }
+    from app.engine.prototype import StrategicSummary
+
+    results: dict[str, StrategicSummary] = {}
+    for name, choices in policies.items():
+        g = FiveTurnGame(seed=seed)
+        results[name] = g.run(choices)
+
+    # Extract metrics
+
+    metrics: dict[str, dict[str, int]] = {
+        "final_wealth": {k: v.final_wealth for k, v in results.items()},
+        "peak_inventory": {k: v.peak_inventory for k, v in results.items()},
+        "cash_low": {k: v.cash_low for k, v in results.items()},
+        "t4_wealth": {k: v.history[3].player_outcome.wealth_delta for k, v in results.items()},
+        "final_cash": {k: v.final_state.player.cash for k, v in results.items()},
+    }
+    winners = {metric: max(vals, key=vals.get) for metric, vals in metrics.items()}  # type: ignore[arg-type]
+    distinct = set(winners.values())
+    assert len(distinct) >= 2, (
+        f"expected tradeoffs, but one policy dominates all: winners={winners} metrics={metrics}"
+    )
+    # At least final_wealth and peak_inventory must have different winners (hold vs storage/trade)
+    assert (
+        winners["final_wealth"] != winners["peak_inventory"]
+        or winners["final_wealth"] != winners["t4_wealth"]
+    )
+
+
 def test_drought_rewards_preparation() -> None:
     seed = "prepare-seed"
     # Unprepared: farm-heavy before drought — overexpands farm, wastes storage, low cash
@@ -245,6 +288,42 @@ def test_run_requires_exactly_five_choices() -> None:
         raise AssertionError("should require exactly 5")
     except ValueError as e:
         assert "exactly 5" in str(e)
+
+
+def test_start_state_must_be_turn_zero() -> None:
+
+    bad = default_start_state(seed="bad-seed").model_copy(update={"turn": 4})
+    try:
+        FiveTurnGame(seed="bad-seed", start_state=bad)
+        raise AssertionError("should reject non-zero start turn")
+    except ValueError as e:
+        assert "turn must be 0" in str(e).lower()
+    # Also check turn 1
+    bad2 = default_start_state(seed="bad2").model_copy(update={"turn": 1})
+    try:
+        FiveTurnGame(start_state=bad2)
+        raise AssertionError("should reject turn 1")
+    except ValueError:
+        pass
+
+
+def test_demand_in_causal_graph() -> None:
+    """Demand must be explicit in causal graph as parent of supply and price."""
+    state = default_start_state(seed="demand-graph")
+    res = resolve_turn(state, _hold(), "normal", state.to_turn_context())
+    ids = {n.id for n in res.causal_trace.nodes}
+    assert "demand" in ids
+    assert "home_demand" in ids
+    supply_node = next(n for n in res.causal_trace.nodes if n.id == "supply")
+    assert "demand" in supply_node.parent_ids
+    assert "farm_output" in supply_node.parent_ids
+    home_supply = next(n for n in res.causal_trace.nodes if n.id == "home_supply")
+    assert "home_demand" in home_supply.parent_ids
+    price_pressure = next(n for n in res.causal_trace.nodes if n.id == "price_pressure")
+    assert "demand" in price_pressure.parent_ids
+    assert "supply" in price_pressure.parent_ids
+    home_pp = next(n for n in res.causal_trace.nodes if n.id == "home_price_pressure")
+    assert "home_demand" in home_pp.parent_ids
 
 
 def test_cli_parse_choices() -> None:

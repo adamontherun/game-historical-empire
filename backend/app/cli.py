@@ -171,12 +171,6 @@ def main(argv: list[str] | None = None) -> int:
                 f"\n  6 MONTHS LATER — wealth {res.player_outcome.wealth_delta:+}  inventory {res.player_outcome.inventory_delta:+}  price {res.player_outcome.price_delta:+}"
             )
             print(
-                f"  Home price {game.history[-1].next_state.market.current_price if False else ''} {choices and ''}  {res.next_state.market.current_price}  River {res.next_state.river_market.current_price}"
-            )
-            # Better: show before->after from res
-            # We have res; but we lost before price. Let's print from res.causal trace? Use res stats
-            # Use next_state vs previous before? For now print current state's price
-            print(
                 f"  Home price now {res.next_state.market.current_price}  River now {res.next_state.river_market.current_price}"
             )
             print(f"  Player now {format_player_state(game)}")

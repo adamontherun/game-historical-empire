@@ -39,7 +39,7 @@ def _sample_state() -> GameState:
         ),
         market=MarketState(
             supply=100,
-            demand=120,
+            demand=90,
             base_price=5000,
             current_price=5000,
             responsiveness=5000,

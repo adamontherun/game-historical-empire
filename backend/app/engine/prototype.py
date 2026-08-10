@@ -3,9 +3,11 @@
 Orchestrates exactly five deterministic turns with an authored world/signal arc.
 Pure engine: no FastAPI, no DB, no LLM, no rivals (Section 7).
 
-Supply semantics: MarketState.supply is stock, drained by demand each turn
-(turn.py Section 6). Prototype start state is tuned so that surplus is
-truthfully weak and drought tightens, making signals truthful.
+Supply semantics: MarketState.supply is a market-availability signal/index,
+drained by demand each turn (turn.py Section 6, not a conserved physical
+stock — farm_output also enters player inventory without conservation
+implied). Prototype start state is tuned so that surplus is truthfully
+weak and drought tightens, making signals truthful.
 
 TURN_SPECS is the only world schedule (hardcoded, not a DSL).
 """
@@ -187,6 +189,10 @@ class FiveTurnGame:
         self._initial_state = (
             start_state if start_state is not None else default_start_state(seed, version)
         )
+        if self._initial_state.turn != 0:
+            raise ValueError(
+                f"start_state.turn must be 0 for Section 6 (got {self._initial_state.turn}) — resume semantics belong to later sections, Section 6 requires exactly five decisions from turn 0"
+            )
         # ensure seed/version match state
         if self._initial_state.run_seed != seed or self._initial_state.ruleset_version != version:
             # if caller passed start_state with different seed/version, respect state's values
