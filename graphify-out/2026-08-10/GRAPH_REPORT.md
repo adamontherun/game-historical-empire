@@ -1,23 +1,23 @@
 # Graph Report - game-historical-empire  (2026-08-10)
 
 ## Corpus Check
-- 88 files · ~131,190 words
+- 89 files · ~138,505 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
-- 1239 nodes · 2242 edges · 102 communities (91 shown, 11 thin omitted)
-- Extraction: 95% EXTRACTED · 5% INFERRED · 0% AMBIGUOUS · INFERRED: 109 edges (avg confidence: 0.51)
+- 1293 nodes · 2311 edges · 96 communities (85 shown, 11 thin omitted)
+- Extraction: 95% EXTRACTED · 5% INFERRED · 0% AMBIGUOUS · INFERRED: 110 edges (avg confidence: 0.51)
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `85d8ec04`
+- Built from commit: `c5b6ab09`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
 ## Community Hubs (Navigation)
 - SECTION 9 — Headless Strategy and Balance Harness
-- engine/__init__.py
-- harness.py
+- test_pressure_arc.py
+- prototype.py
 - test_five_turn_prototype.py
 - What You Must Do When Invoked
 - mappers.py
@@ -29,7 +29,7 @@
 - Section 8 plan — consolidated review (round 2, against Rev 3)
 - Historical Empire — Agent Guide
 - graphify reference: extra exports and benchmark
-- Section 10 — COMPLETE (2026-08-10)
+- Section 10 — COMPLETE + Audit Round 1 fixes (2026-08-10)
 - graphify reference: extra exports and benchmark
 - graphify reference: query, path, explain
 - graphify reference: query, path, explain
@@ -80,20 +80,20 @@
 - SECTION 4 — Causal Explanation and Outcome Model
 - Section 9 plan — consolidated review (round 1)
 - Section 8 plan — consolidated review (round 1)
-- test_determinism.py
-- InventoryState
+- harness.py
+- Audit — Sections 1-10 Full-Codebase (Muse, 2026-08-10)
 - Section 8 — Pressure-Driven Event Arc — Plan (Rev 4 — incorporates R1–R8 + grill Q1–Q7 + review round 2 F1–F5)
 - Section 7 — Deterministic Rivals — Plan (Rev 2)
 - test_balance_harness.py
 - SECTION 8 — Pressure-Driven Event Arc
-- resolve_turn
+- PlayerCommand
 - Section 10 plan — consolidated review (round 1)
 - Section 9 — Headless Strategy and Balance Harness — Plan (Rev 2 — regional_output fix, per review round 1)
-- PlayerCommand
+- FiveTurnGame
 - Section 9 — implementation review, round 2 (consolidated)
 - Section 10 — Minimal FastAPI Boundary — Plan
 - test_deterministic_rivals.py
-- FiveTurnGame
+- SHOULD-FIX
 - cli.py
 - Section 8 implementation — consolidated review (round 3, against commit 28a0963)
 - SECTION 20 — Visual Asset System and Polish
@@ -105,24 +105,18 @@
 - Orchestration Guide — how BUILD_SPEC sections get built
 - turn.py
 - test_invariants.py
-- rivals.py
-- apply_rival_command
 - Part VIII — Agent Guardrails
 - api/__init__.py
 - GameState
-- RivalProfile
-- test_engine_purity.py
 - Section 10 implementation — review round 3
-- test_explanation.py
-- default_start_state
 
 ## God Nodes (most connected - your core abstractions)
-1. `PlayerCommand` - 111 edges
+1. `PlayerCommand` - 112 edges
 2. `resolve_turn()` - 89 edges
-3. `FiveTurnGame` - 77 edges
-4. `GameState` - 54 edges
+3. `FiveTurnGame` - 80 edges
+4. `GameState` - 53 edges
 5. `InventoryState` - 50 edges
-6. `MarketState` - 32 edges
+6. `MarketState` - 34 edges
 7. `PlayerState` - 30 edges
 8. `RivalState` - 30 edges
 9. `apply_rival_command()` - 26 edges
@@ -137,37 +131,37 @@
   backend/app/cli.py → backend/app/engine/prototype.py
 - `FiveTurnGame` --uses--> `PressureState`  [INFERRED]
   backend/app/engine/prototype.py → backend/app/domain/pressure.py
-- `test_causal_source_id_single_source()` --calls--> `PressureState`  [EXTRACTED]
-  backend/tests/test_pressure_arc.py → backend/app/domain/pressure.py
+- `StrategicSummary` --uses--> `PressureState`  [INFERRED]
+  backend/app/engine/prototype.py → backend/app/domain/pressure.py
 
 ## Import Cycles
 - None detected.
 
-## Communities (102 total, 11 thin omitted)
+## Communities (96 total, 11 thin omitted)
 
 ### Community 0 - "SECTION 9 — Headless Strategy and Balance Harness"
 Cohesion: 0.40
 Nodes (5): Acceptance criteria, Goal, In scope, SECTION 9 — Headless Strategy and Balance Harness, Stop condition
 
-### Community 1 - "engine/__init__.py"
-Cohesion: 0.06
-Nodes (44): Engine package — deterministic RNG and rounding., next_world_known_for_turn(), pressure_for_turn(), WorldCondition, Derive world for turn idx from pressure arc., Structured threat known at turn idx (pre-turn). Only T3 (idx=2, worsening_dry)…, Return PressureState for turn idx (0..4), else raise., world_for_turn() (+36 more)
+### Community 1 - "test_pressure_arc.py"
+Cohesion: 0.08
+Nodes (28): PressureState, BaseModel, model_validator, One step of the authored pressure arc — frozen, validated. Exactly 7 fields per…, next_world_known_for_turn(), pressure_for_turn(), Derive world for turn idx from pressure arc., Structured threat known at turn idx (pre-turn). Only T3 (idx=2, worsening_dry)… (+20 more)
 
-### Community 2 - "harness.py"
-Cohesion: 0.14
-Nodes (17): _can_afford(), policy_cash_preserving(), policy_production_heavy(), policy_random_legal(), policy_storage_heavy(), policy_trade_heavy(), _policy_trade_heavy_no_route(), PolicyAggregate (+9 more)
+### Community 2 - "prototype.py"
+Cohesion: 0.11
+Nodes (25): Full result of resolving one turn., TurnResolution, Inventory value in Money at price_milli., value_for(), BaseModel, Five-turn headless prototype — Section 8 pressure-driven arc. Orchestrates…, Wealth = cash + inventory value at Home price (milli)., Concise end-of-run summary — both human and structured (now with rivals). (+17 more)
 
 ### Community 3 - "test_five_turn_prototype.py"
-Cohesion: 0.12
-Nodes (23): _choices(), _hold(), Section 6 — Five-Turn Headless Prototype acceptance tests. AC1: exactly 5…, AC5 non-dominance: no one policy wins every meaningful outcome. Hold may win…, Helper to build choice list from type strings like 'buy_grain:20'., Demand must be explicit in causal graph as parent of supply and price., Every authored signal must not assert a mechanic not in the model., Regression: summary must show true initial Home/River prices, not Turn-1-after… (+15 more)
+Cohesion: 0.13
+Nodes (22): _choices(), _hold(), Section 6 — Five-Turn Headless Prototype acceptance tests. AC1: exactly 5…, AC5 non-dominance: no one policy wins every meaningful outcome. Hold may win…, Helper to build choice list from type strings like 'buy_grain:20'., Demand must be explicit in causal graph as parent of supply and price., Every authored signal must not assert a mechanic not in the model., Regression: summary must show true initial Home/River prices, not Turn-1-after… (+14 more)
 
 ### Community 4 - "What You Must Do When Invoked"
 Cohesion: 0.08
 Nodes (24): For /graphify add and --watch, For /graphify query, For the commit hook and native AGENTS.md integration, For --update and --cluster-only, /graphify, Honesty Rules, Interpreter guard for subcommands, Part A - Structural extraction for code files (+16 more)
 
 ### Community 5 - "mappers.py"
-Cohesion: 0.10
-Nodes (52): choice_map_for(), choices_for(), _completion_summary(), _market_view(), _outcome_view(), Mappers: FiveTurnGame -> GameView. Pure, no mutation., Map choice_id -> PlayerCommand for current revision., Legality + affordability ONLY (B1). No turn gating, no margin>0 gating. Two… (+44 more)
+Cohesion: 0.09
+Nodes (55): choice_map_for(), choices_for(), _completion_summary(), _market_view(), _outcome_view(), Mappers: FiveTurnGame -> GameView. Pure, no mutation., Map choice_id -> PlayerCommand for current revision., Legality + affordability ONLY (B1). No turn gating, no margin>0 gating. Two… (+47 more)
 
 ### Community 6 - "Plan — Section 1: Repository Contract and Walking Skeleton"
 Cohesion: 0.10
@@ -193,9 +187,9 @@ Nodes (16): 10. API Contract (from Section 10, for reference), 11. Frontend Rule
 Cohesion: 0.22
 Nodes (8): graphify reference: extra exports and benchmark, Step 6b - Wiki (only if --wiki flag), Step 7 - Neo4j export (only if --neo4j or --neo4j-push flag), Step 7a - FalkorDB export (only if --falkordb or --falkordb-push flag), Step 7b - SVG export (only if --svg flag), Step 7c - GraphML export (only if --graphml flag), Step 7d - MCP server (only if --mcp flag), Step 8 - Token reduction benchmark (only if total_words > 5000)
 
-### Community 16 - "Section 10 — COMPLETE (2026-08-10)"
+### Community 16 - "Section 10 — COMPLETE + Audit Round 1 fixes (2026-08-10)"
 Cohesion: 0.20
-Nodes (9): Boundaries, Decisions relevant, Intentionally missing, Last known green, Next milestone, Normal verification, Section 10 — COMPLETE (2026-08-10), STATE — Historical Empire (+1 more)
+Nodes (9): Boundaries, Decisions relevant, Intentionally missing, Last known green, Next milestone, Normal verification, Section 10 — COMPLETE + Audit Round 1 fixes (2026-08-10), STATE — Historical Empire (+1 more)
 
 ### Community 17 - "graphify reference: extra exports and benchmark"
 Cohesion: 0.22
@@ -258,8 +252,8 @@ Cohesion: 0.17
 Nodes (12): Acceptance criteria, CLI requirements, Exact prototype scope, Five-turn arc, Goal, SECTION 6 — Five-Turn Headless Prototype, Stop condition, Turn 1 — A Growing Settlement (+4 more)
 
 ### Community 40 - "Decisions"
-Cohesion: 0.11
-Nodes (18): 001 — Scope Strategy (2026-08-09), 002 — FastAPI Conventions (2026-08-09), 003 — Tooling (2026-08-09), 004 — Testing Strategy (2026-08-09), 005 — Frontend Stack (2026-08-09), 006 — Persistence (2026-08-09), 007 — Autonomy (2026-08-09), 008 — Plan Mode (2026-08-09) — revised 2026-08-09 (+10 more)
+Cohesion: 0.09
+Nodes (21): 001 — Scope Strategy (2026-08-09), 002 — FastAPI Conventions (2026-08-09), 003 — Tooling (2026-08-09), 004 — Testing Strategy (2026-08-09), 005 — Frontend Stack (2026-08-09), 006 — Persistence (2026-08-09), 007 — Autonomy (2026-08-09), 008 — Plan Mode (2026-08-09) — revised 2026-08-09 (+13 more)
 
 ### Community 41 - "SECTION 11 — Mobile-First React Playable"
 Cohesion: 0.20
@@ -365,13 +359,13 @@ Nodes (9): E1 — The engine is completely seed-invariant (confirms Q6, more str
 Cohesion: 0.18
 Nodes (10): Keep as-is (both reviewers agree), R1 — Pressure must be the single source of truth for the turn (BLOCKING), R2 — Delete `world_modifiers` (BLOCKING), R3 — Trace root: no numeric hash, and no validator change (BLOCKING), R4 — T2/T3 prose must be mechanically truthful (BLOCKING), R5 — AC3 must test preparation, not balance (BLOCKING), R6 — AC1 needs the same instrument, R7 — Fix the validation commands (+2 more)
 
-### Community 67 - "test_determinism.py"
-Cohesion: 0.19
-Nodes (19): derive_seed(), make_rng(), Deterministic RNG substreams via stable hash. Spec: never use global random…, Derive deterministic int seed from key material via BLAKE2b. Canonical…, Create isolated random.Random from int seed — no global state. Args: seed: Int…, Convenience: derive seed from key material and return Random. Args: run_seed:…, rng_for(), Tests for deterministic RNG — AC #3, #4, #5. (+11 more)
+### Community 67 - "harness.py"
+Cohesion: 0.07
+Nodes (44): BatchResult, _can_afford(), format_markdown(), policy_cash_preserving(), policy_production_heavy(), policy_random_legal(), policy_storage_heavy(), policy_trade_heavy() (+36 more)
 
-### Community 68 - "InventoryState"
-Cohesion: 0.21
-Nodes (20): InventoryState, MarketState, OperationState, PlayerState, BaseModel, Player grain inventory — single good grain for Sections 2-4., Economic operation — stub for farm/granary, extensible later. Represents a farm…, Player economic exposure — single source of truth for capacities. For Sections… (+12 more)
+### Community 68 - "Audit — Sections 1-10 Full-Codebase (Muse, 2026-08-10)"
+Cohesion: 0.06
+Nodes (30): 1.1 SHOULD-FIX — `turn.py` sell path emits `inventory_after_buy` alias with sell delta (modelling lie, trace consumer will misread), 1.2 SHOULD-FIX — `mappers.py` ship quantity underestimates post-harvest capacity (offered choice smaller than engine allows), 1.3 NIT — `domain/trace.py:58-72` dead first branch (unreachable validator), 1.4 UNPROVEN (not filed as BLOCKING) — `actor.resolve_buy` reason priority when both cash and storage bind, 1 — REAL BUGS (proven with input → wrong output, or unreachable invariant), 2.1 `test_api.py:268-279` `test_gameview_internal_consistency` — tautological, 2.2 `test_balance_harness.py:186-207` `test_build_granary_not_worthless` — necessary but not sufficient, 2.3 `test_invariants.py:44-69` `test_bounded_price_monotonic_with_supply` — dead loop, then trivial monotonic check (+22 more)
 
 ### Community 69 - "Section 8 — Pressure-Driven Event Arc — Plan (Rev 4 — incorporates R1–R8 + grill Q1–Q7 + review round 2 F1–F5)"
 Cohesion: 0.09
@@ -382,16 +376,16 @@ Cohesion: 0.10
 Nodes (20): 1 — Extract shared actor primitives (behavior-preserving, no market/trace change), 2 — Rival profile/state/result types, 3 — Integer scoring & deterministic choice, 4 — Rival execution via shared primitives + truthful headlines, 5 — Prototype integration with corrected timing, 6 — Structured threat plumbing, 7 — CLI reveal, 8 — Tests (behavioral, not scripted) (+12 more)
 
 ### Community 71 - "test_balance_harness.py"
-Cohesion: 0.27
-Nodes (15): BatchConfig, Run batch — deterministic, pure, no global random., run_batch(), Section 9 — Balance harness acceptance tests. Covers AC1-6 with confound-…, Matched control: policy_storage_heavy must beat itself with build_granary…, Matched control: policy_trade_heavy must beat itself with secure_route…, AC2: no universally dominant (median_ratio <1.60) and no dead (median…, test_determinism_same_batch_identical() (+7 more)
+Cohesion: 0.14
+Nodes (23): BatchConfig, _policy_trade_heavy_no_route(), PolicyAggregate, BaseModel, model_validator, Matched control: identical to trade_heavy but never secures route., Run batch — deterministic, pure, no global random., run_batch() (+15 more)
 
 ### Community 72 - "SECTION 8 — Pressure-Driven Event Arc"
 Cohesion: 0.40
 Nodes (5): Acceptance criteria, Goal, In scope, SECTION 8 — Pressure-Driven Event Arc, Stop condition
 
-### Community 73 - "resolve_turn"
-Cohesion: 0.10
-Nodes (36): River Route — single route between Home Valley and River Town (Section 5).…, RouteState, pressure_for_world(), Return canonical test pressure for a WorldCondition (G1 helper)., Resolve one deterministic turn. Order is explicit: pressure_stage -> world ->…, resolve_turn(), Rivals must not mutate shared market availability — player supply same as…, test_player_market_isolation() (+28 more)
+### Community 73 - "PlayerCommand"
+Cohesion: 0.05
+Nodes (86): CausalNode, One step in the causal chain with explicit parent links., PlayerCommand, Player turn command — one major action per turn (Sections 3–5, sell_grain added…, pressure_for_world(), Pressure arc — Section 8 authored 5-turn arc. Hard-coded, deterministic, no…, Return canonical test pressure for a WorldCondition (G1 helper)., Resolve one deterministic turn. Order is explicit: pressure_stage -> world ->… (+78 more)
 
 ### Community 74 - "Section 10 plan — consolidated review (round 1)"
 Cohesion: 0.18
@@ -401,9 +395,9 @@ Nodes (10): B1 — BLOCKING: the plan makes the balance harness's scripted polic
 Cohesion: 0.12
 Nodes (15): Constraints And Non-goals, Context And Current Facts (verified against code), Fit to Stack & Hosting, Goal, Grill — Headless Stress Test (Rev 2, answered from code/evidence, folded into plan), Implementation Authority, Key Decisions (all settled — no open choices), Open Questions (+7 more)
 
-### Community 76 - "PlayerCommand"
-Cohesion: 0.24
-Nodes (17): PlayerCommand, Player turn command — one major action per turn (Sections 3–5, sell_grain added…, _base_state(), Section 3 kernel tests — AC #1,3,4,5,6., test_build_granary_increases_storage(), test_buy_beyond_cash_is_clamped(), test_buy_beyond_storage_is_clamped(), test_determinism_same_inputs_same_result() (+9 more)
+### Community 76 - "FiveTurnGame"
+Cohesion: 0.10
+Nodes (10): FiveTurnGame, In-memory 5-turn game — owns GameState, history, and session rivals. Rivals are…, Derived headlines per turn for UI convenience., test_harness_uses_pressure_not_bare_string(), Canonical hold-5 run must have ≥1 turn where Mira/Daran choose different types…, test_canonical_run_has_three_diffs(), test_headlines_derived_and_visible_after_first_turn(), test_rival_determinism_same_seed() (+2 more)
 
 ### Community 77 - "Section 9 — implementation review, round 2 (consolidated)"
 Cohesion: 0.18
@@ -414,16 +408,16 @@ Cohesion: 0.06
 Nodes (33): Constraints And Non-goals, Context And Current Facts, Goal, K1 — Where `GameView` lives (pure engine boundary, global §13), K2 — `choice_id`: what it IS and how it prevents mutation (AC2) — **REVISED per B1/B6**, K3 — Revision semantics (where, increment, failure, atomicity) — **REVISED per B7/C5**, K4 — AC4 "no frontend formula needed" — **REVISED per B2/B3/B4/B5/C1/C3/C4**, K5 — AC5 "engine imports no FastAPI" enforced by TEST (+25 more)
 
 ### Community 79 - "test_deterministic_rivals.py"
-Cohesion: 0.15
-Nodes (27): _capital_bps(), choose_rival_command(), ObservableContext, Information visible to rivals when choosing (pre-turn)., Capital factor in bps: 0 if unaffordable, 5000 if tight, 10000 if comfortable., Integer/bps score for a given rival + command + observable context. score =…, Deterministically choose rival command via integer scoring. Rankings by…, Economic state — cash/inventory/capacities/route, no headline. (+19 more)
+Cohesion: 0.09
+Nodes (47): compute_farm_output(), cost_for_quantity(), Cost in Money for quantity at price_milli (milliunits per unit). Floor division…, Compute farm output for given capacity and world. Returns (farm_output,…, _capital_bps(), choose_rival_command(), _expected_return(), _exposure_bps() (+39 more)
 
-### Community 80 - "FiveTurnGame"
-Cohesion: 0.11
-Nodes (8): FiveTurnGame, In-memory 5-turn game — owns GameState, history, and session rivals. Rivals are…, Derived headlines per turn for UI convenience., test_harness_uses_pressure_not_bare_string(), Canonical hold-5 run must have ≥1 turn where Mira/Daran choose different types…, test_canonical_run_has_three_diffs(), test_headlines_derived_and_visible_after_first_turn(), test_rival_determinism_same_seed()
+### Community 80 - "SHOULD-FIX"
+Cohesion: 0.08
+Nodes (23): Audit — Sections 1–10, Consolidated Review Round 1, B1 — `make type` has never run pyright in strict mode. The type gate is not the gate we think it is., B2 — The API hides legal moves from the player. `choices_for` models the coming harvest for `buy` and ignores it for `ship`, under-offering in both directions., B3 — Two acceptance tests are non-falsifiable. Both survive deletion of the feature they name., B4 — Rival headlines report total failure on partial fills. The rival sold, and the game says it didn't., BLOCKING, Explicitly checked and found clean, How to read this (+15 more)
 
 ### Community 81 - "cli.py"
-Cohesion: 0.23
-Nodes (14): format_market_pulse(), format_player_state(), format_rivals(), format_route_state(), main(), parse_choice(), parse_choices_arg(), Thin CLI for the five-turn headless prototype — Section 6. Pure I/O around… (+6 more)
+Cohesion: 0.27
+Nodes (11): format_market_pulse(), format_player_state(), format_rivals(), format_route_state(), main(), parse_choice(), parse_choices_arg(), Thin CLI for the five-turn headless prototype — Section 6. Pure I/O around… (+3 more)
 
 ### Community 82 - "Section 8 implementation — consolidated review (round 3, against commit 28a0963)"
 Cohesion: 0.22
@@ -439,10 +433,10 @@ Nodes (9): C1 — Correction to round 1's B4: `OperationState` is not invented, 
 
 ### Community 85 - ".edges"
 Cohesion: 0.33
-Nodes (4): Deprecated string view — derived from drivers for backward compat., Derived edges as (parent, child) tuples from parent_ids., CausalEdge, computed_field
+Nodes (4): String view of driver labels (derived from drivers)., Derived edges as (parent, child) tuples from parent_ids., CausalEdge, computed_field
 
 ### Community 86 - "test_api.py"
-Cohesion: 0.21
+Cohesion: 0.23
 Nodes (22): asyncio, _choose(), _clear_store(), client(), _create_game(), _get_game(), Section 10 API tests — AC1-4 + C3/C4/B1 guards., Internal consistency — labelled as such, not AC4 evidence (B3 circular). (+14 more)
 
 ### Community 87 - "Section 9 — review round 3 (consolidated) — SUPERSEDES round 2 on the route"
@@ -457,64 +451,40 @@ Nodes (14): Do not, Final target config, R1 — The granary does not repay its c
 Cohesion: 0.20
 Nodes (9): 1. The loop, per section, 2. Driving Muse headlessly, 3. Driving ChatGPT, 4. Verification discipline (non-negotiable), 5. Standing decisions (set by the product owner), 6. Recurring failure patterns to watch for, 7. Where things live, 8. Known upcoming blockers (+1 more)
 
-### Community 90 - "turn.py"
-Cohesion: 0.08
-Nodes (33): Domain package — re-exports canonical types., CausalNode, PlayerOutcome, Causal trace, domain effects, and player outcome for Sections 4–5. Structural…, Concise player outcome for the turn reveal., Full result of resolving one turn., One step in the causal chain with explicit parent links., TurnResolution (+25 more)
+### Community 91 - "turn.py"
+Cohesion: 0.13
+Nodes (19): Pressure domain — Section 8 world-pressure arc types. Small, frozen, validated…, affordable_quantity(), Shared actor-level economic primitives — Section 7 extraction. Single source of…, Resolve a sell_grain command — inverse of buy, at Home price. Args: cash: cash…, Settle harvest into inventory with storage cap. Returns…, Resolve ship_grain settlement with shared clamping. Uses pre-turn…, Shared expand_farm affordability/mutation. Returns (cash_after, farm_after,…, Shared build_granary affordability/mutation. Returns (cash_after,… (+11 more)
 
-### Community 91 - "test_invariants.py"
-Cohesion: 0.27
-Nodes (11): _bounded_price(), Integer-safe target price from supply/demand., Bound movement toward target_price within max_movement_bps of current., _target_price(), Invariant and property tests for Section 3 — AC #2, #4., test_bounded_price_monotonic_with_supply(), test_demand_unchanged_cannot_reduce_target_when_supply_falls(), test_price_stays_positive_extreme() (+3 more)
-
-### Community 92 - "rivals.py"
-Cohesion: 0.12
-Nodes (24): affordable_quantity(), compute_farm_output(), cost_for_quantity(), Shared actor-level economic primitives — Section 7 extraction. Single source of…, Resolve a sell_grain command — inverse of buy, at Home price. Args: cash: cash…, Settle harvest into inventory with storage cap. Returns…, Resolve ship_grain settlement with shared clamping. Uses pre-turn…, Cost in Money for quantity at price_milli (milliunits per unit). Floor division… (+16 more)
-
-### Community 93 - "apply_rival_command"
-Cohesion: 0.18
-Nodes (15): Inventory value in Money at price_milli., value_for(), apply_rival_command(), Economic settlement context post player market resolution., Execute one rival's full turn via shared primitives with correct timing. Buy…, Wealth = cash + inventory value at home_price., rival_wealth(), SettlementContext (+7 more)
+### Community 92 - "test_invariants.py"
+Cohesion: 0.11
+Nodes (27): apply_basis_points(), clamp_non_negative(), div_round_half_up(), mul_basis_points(), Deterministic integer rounding helpers for canonical economic math. All…, Multiply value by basis points (10_000 = 100%) with floor division.…, Alias for mul_basis_points — semantic for price adjustments., Integer division rounding half away from zero for positive denominators. For… (+19 more)
 
 ### Community 94 - "Part VIII — Agent Guardrails"
 Cohesion: 0.40
 Nodes (5): 31. Do Not Build Ahead, 32. Do Not Rewrite Working Systems Without Evidence, 33. Dependencies Require Justification, 34. Agent Completion Report Template, Part VIII — Agent Guardrails
 
 ### Community 96 - "GameState"
-Cohesion: 0.11
-Nodes (22): In-memory game sessions — Section 10. Per-session asyncio.Lock so GET and POST…, PressureState, BaseModel, model_validator, Pressure domain — Section 8 world-pressure arc types. Small, frozen, validated…, One step of the authored pressure arc — frozen, validated. Exactly 7 fields per…, GameState, Canonical economic types for Sections 2-5. Integer-only canonical state per… (+14 more)
-
-### Community 97 - "RivalProfile"
-Cohesion: 0.15
-Nodes (13): _exposure_bps(), _headline_for(), BaseModel, Risk factor: penalize if post-command cash would be low., Immutable preference vector — bps per command, frozen so profile cannot mutate., Exposure factor: Mira penalizes farm concentration, Daran rewards it., Derive truthful headline from reason_code and actual quantities. Partial…, Personality — preferences and risk, not economic state. (+5 more)
-
-### Community 98 - "test_engine_purity.py"
-Cohesion: 0.20
-Nodes (10): Ensure deterministic hash uses hashlib, not built-in hash()., AC #5: engine must not use global random functions (all files)., test_no_global_random_usage_in_engine(), test_no_hash_builtin_in_domain_or_engine(), _assert_no_forbidden_imports(), Gate 4: engine and domain must not import web/DB/LLM packages (AST check)., Reverse dependency — engine/domain must not import from app.api (C1 dormancy)., test_engine_does_not_import_from_app_api() (+2 more)
+Cohesion: 0.12
+Nodes (35): Domain package — re-exports canonical types., PlayerOutcome, Causal trace, domain effects, and player outcome for Sections 4–5. Structural…, Concise player outcome for the turn reveal., GameState, InventoryState, MarketState, OperationState (+27 more)
 
 ### Community 99 - "Section 10 implementation — review round 3"
 Cohesion: 0.50
 Nodes (3): D1 — BLOCKING: `test_available_choices_turn_invariant` cannot detect the defect it exists for, D2 — Secondary, Section 10 implementation — review round 3
 
-### Community 100 - "test_explanation.py"
-Cohesion: 0.33
-Nodes (8): Section 4 — multi-step drought to wealth chain tests., Same command, different world should produce different driver impacts., Drought chain must be structurally present via parent_ids and exact wealth math., _state(), test_concise_le_three_full_trace_preserved(), test_drought_to_wealth_structural_chain_exact(), test_normal_vs_drought_different_drivers(), test_story_drivers_cover_wealth_chain()
-
-### Community 101 - "default_start_state"
-Cohesion: 0.25
-Nodes (7): default_start_state(), Tuned start state — Section 9 retuned for binding constraints (storage…, New invariant: drought raises price even with farm_capacity=0 via regional., Regression: starting storage must be scarce enough that granary matters. Idle…, test_build_granary_not_worthless(), test_regional_output_chain_truthful(), test_start_state_must_be_turn_zero()
-
 ## Knowledge Gaps
-- **556 isolated node(s):** `historical-empire-backend`, `Usage`, `What graphify is for`, `Step 0 - GitHub repos and multi-path merge (only if a URL or several paths)`, `Step 1 - Ensure graphify is installed` (+551 more)
+- **603 isolated node(s):** `historical-empire-backend`, `Usage`, `What graphify is for`, `Step 0 - GitHub repos and multi-path merge (only if a URL or several paths)`, `Step 1 - Ensure graphify is installed` (+598 more)
   These have ≤1 connection - possible missing edges or undocumented components.
 - **11 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
 
 ## Suggested Questions
 _Questions this graph is uniquely positioned to answer:_
 
-- **Why does `PlayerCommand` connect `PlayerCommand` to `GameState`, `engine/__init__.py`, `harness.py`, `RivalProfile`, `InventoryState`, `mappers.py`, `default_start_state`, `test_balance_harness.py`, `test_explanation.py`, `resolve_turn`, `test_five_turn_prototype.py`, `test_deterministic_rivals.py`, `FiveTurnGame`, `cli.py`, `turn.py`, `test_invariants.py`, `rivals.py`, `apply_rival_command`?**
-  _High betweenness centrality (0.042) - this node is a cross-community bridge._
-- **Why does `resolve_turn()` connect `resolve_turn` to `GameState`, `engine/__init__.py`, `test_determinism.py`, `InventoryState`, `mappers.py`, `default_start_state`, `test_balance_harness.py`, `test_explanation.py`, `test_five_turn_prototype.py`, `PlayerCommand`, `test_deterministic_rivals.py`, `turn.py`, `test_invariants.py`, `rivals.py`, `apply_rival_command`?**
-  _High betweenness centrality (0.038) - this node is a cross-community bridge._
-- **Why does `FiveTurnGame` connect `FiveTurnGame` to `GameState`, `engine/__init__.py`, `harness.py`, `RivalProfile`, `InventoryState`, `mappers.py`, `default_start_state`, `test_balance_harness.py`, `test_five_turn_prototype.py`, `resolve_turn`, `PlayerCommand`, `test_deterministic_rivals.py`, `cli.py`, `turn.py`, `apply_rival_command`?**
-  _High betweenness centrality (0.033) - this node is a cross-community bridge._
+- **Why does `FiveTurnGame` connect `FiveTurnGame` to `GameState`, `test_pressure_arc.py`, `prototype.py`, `harness.py`, `test_five_turn_prototype.py`, `mappers.py`, `test_balance_harness.py`, `PlayerCommand`, `test_deterministic_rivals.py`, `cli.py`, `test_api.py`?**
+  _High betweenness centrality (0.045) - this node is a cross-community bridge._
+- **Why does `PlayerCommand` connect `PlayerCommand` to `GameState`, `test_pressure_arc.py`, `prototype.py`, `harness.py`, `test_five_turn_prototype.py`, `mappers.py`, `test_balance_harness.py`, `FiveTurnGame`, `test_deterministic_rivals.py`, `cli.py`, `test_api.py`, `turn.py`, `test_invariants.py`?**
+  _High betweenness centrality (0.040) - this node is a cross-community bridge._
+- **Why does `resolve_turn()` connect `PlayerCommand` to `GameState`, `test_pressure_arc.py`, `prototype.py`, `harness.py`, `test_five_turn_prototype.py`, `mappers.py`, `test_balance_harness.py`, `test_deterministic_rivals.py`, `test_api.py`, `turn.py`, `test_invariants.py`?**
+  _High betweenness centrality (0.025) - this node is a cross-community bridge._
 - **Are the 14 inferred relationships involving `PlayerCommand` (e.g. with `GameSession` and `BatchConfig`) actually correct?**
   _`PlayerCommand` has 14 INFERRED edges - model-reasoned connections that need verification._
 - **Are the 17 inferred relationships involving `FiveTurnGame` (e.g. with `GameSession` and `BatchConfig`) actually correct?**
