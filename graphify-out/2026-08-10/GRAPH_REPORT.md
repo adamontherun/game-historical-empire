@@ -1,16 +1,16 @@
 # Graph Report - game-historical-empire  (2026-08-10)
 
 ## Corpus Check
-- 128 files · ~169,313 words
+- 128 files · ~183,447 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
-- 1595 nodes · 2684 edges · 128 communities (101 shown, 27 thin omitted)
+- 1595 nodes · 2684 edges · 128 communities (102 shown, 26 thin omitted)
 - Extraction: 96% EXTRACTED · 4% INFERRED · 0% AMBIGUOUS · INFERRED: 110 edges (avg confidence: 0.51)
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `0450b9c3`
+- Built from commit: `3f4f023e`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
@@ -105,7 +105,7 @@
 - Orchestration Guide — how BUILD_SPEC sections get built
 - 2. SHOULD-FIX
 - App.tsx
-- test_turn_order_string
+- _regional_output_after_world
 - default_start_state
 - jsdom
 - api/__init__.py
@@ -116,7 +116,7 @@
 - harness.py
 - compilerOptions
 - Audit — Sections 1–10, Consolidated Review Round 2
-- @eslint/js
+- typescript
 - StrategicSummary
 - devDependencies
 - scripts
@@ -163,7 +163,7 @@
 ## Import Cycles
 - None detected.
 
-## Communities (128 total, 27 thin omitted)
+## Communities (128 total, 26 thin omitted)
 
 ### Community 0 - "SECTION 9 — Headless Strategy and Balance Harness"
 Cohesion: 0.40
@@ -175,7 +175,7 @@ Nodes (30): PressureState, BaseModel, model_validator, Pressure domain — Secti
 
 ### Community 2 - "PlayerCommand"
 Cohesion: 0.07
-Nodes (70): PlayerCommand, Player turn command — one major action per turn (Sections 3–5, sell_grain added…, pressure_for_world(), Return canonical test pressure for a WorldCondition (G1 helper)., Resolve one deterministic turn. Order is explicit: pressure_stage -> world ->…, resolve_turn(), _base_state(), Section 4 — causal trace hardening, exact wealth decomposition, and story… (+62 more)
+Nodes (62): PlayerCommand, Player turn command — one major action per turn (Sections 3–5, sell_grain added…, pressure_for_world(), Return canonical test pressure for a WorldCondition (G1 helper)., Resolve one deterministic turn. Order is explicit: pressure_stage -> world ->…, resolve_turn(), Wealth delta must equal cash + purchase + harvest + price effects exactly., AC #1: every important mutated node has parents, including valuation subgraph. (+54 more)
 
 ### Community 3 - "test_five_turn_prototype.py"
 Cohesion: 0.13
@@ -490,8 +490,8 @@ Cohesion: 0.25
 Nodes (7): default_start_state(), Tuned start state — Section 9 retuned for binding constraints (storage…, New invariant: drought raises price even with farm_capacity=0 via regional., Regression: starting storage must be scarce enough that granary matters. Idle…, test_build_granary_not_worthless(), test_regional_output_chain_truthful(), test_start_state_must_be_turn_zero()
 
 ### Community 96 - "GameState"
-Cohesion: 0.10
-Nodes (44): Domain package — re-exports canonical types., CausalNode, PlayerOutcome, Causal trace, domain effects, and player outcome for Sections 4–5. Structural…, Concise player outcome for the turn reveal., Full result of resolving one turn., One step in the causal chain with explicit parent links., TurnResolution (+36 more)
+Cohesion: 0.09
+Nodes (49): Domain package — re-exports canonical types., CausalNode, PlayerOutcome, Causal trace, domain effects, and player outcome for Sections 4–5. Structural…, Concise player outcome for the turn reveal., Full result of resolving one turn., One step in the causal chain with explicit parent links., TurnResolution (+41 more)
 
 ### Community 97 - "Section 11 — Mobile-First React Playable — Plan"
 Cohesion: 0.07
@@ -517,9 +517,13 @@ Nodes (23): compilerOptions, allowImportingTsExtensions, forceConsistentCasingIn
 Cohesion: 0.25
 Nodes (7): Audit — Sections 1–10, Consolidated Review Round 2, Not carried forward, R1 — BLOCKING. The type-gate fix excluded the test suite from type checking entirely., R2 — SHOULD-FIX. Buy is still capped by a harness-policy constant, which DECISIONS 017 forbids., R3 — SHOULD-FIX. A production `await` was added to serve a test; make it a documented decision., Verified good — round 1 genuinely fixed these, Work order
 
+### Community 104 - "StrategicSummary"
+Cohesion: 0.25
+Nodes (5): BaseModel, Concise end-of-run summary — both human and structured (now with rivals)., One turn's authored world and signal — plain strings, not a DSL., StrategicSummary, TurnSpec
+
 ### Community 105 - "devDependencies"
 Cohesion: 0.12
-Nodes (17): eslint, devDependencies, eslint, globals, @testing-library/react, @types/react, typescript, typescript-eslint (+9 more)
+Nodes (17): eslint, @eslint/js, devDependencies, eslint, @eslint/js, globals, @testing-library/react, @types/react (+9 more)
 
 ### Community 106 - "scripts"
 Cohesion: 0.17
@@ -540,7 +544,7 @@ Nodes (7): dependencies, react, react-dom, @tanstack/react-query, react, react-d
 ## Knowledge Gaps
 - **779 isolated node(s):** `historical-empire-backend`, `name`, `private`, `version`, `type` (+774 more)
   These have ≤1 connection - possible missing edges or undocumented components.
-- **27 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
+- **26 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
 
 ## Suggested Questions
 _Questions this graph is uniquely positioned to answer:_
@@ -549,7 +553,7 @@ _Questions this graph is uniquely positioned to answer:_
   _High betweenness centrality (0.033) - this node is a cross-community bridge._
 - **Why does `FiveTurnGame` connect `FiveTurnGame` to `GameState`, `test_pressure_arc.py`, `PlayerCommand`, `test_five_turn_prototype.py`, `harness.py`, `mappers.py`, `test_balance_harness.py`, `StrategicSummary`, `test_canonical_run_has_three_diffs`, `prototype.py`, `cli.py`, `test_api.py`, `default_start_state`?**
   _High betweenness centrality (0.027) - this node is a cross-community bridge._
-- **Why does `resolve_turn()` connect `PlayerCommand` to `GameState`, `test_pressure_arc.py`, `engine/__init__.py`, `test_five_turn_prototype.py`, `mappers.py`, `test_balance_harness.py`, `StrategicSummary`, `prototype.py`, `test_explanation.py`, `test_api.py`, `default_start_state`?**
+- **Why does `resolve_turn()` connect `PlayerCommand` to `GameState`, `test_pressure_arc.py`, `engine/__init__.py`, `test_five_turn_prototype.py`, `mappers.py`, `test_balance_harness.py`, `StrategicSummary`, `prototype.py`, `test_explanation.py`, `test_api.py`, `_regional_output_after_world`, `default_start_state`?**
   _High betweenness centrality (0.020) - this node is a cross-community bridge._
 - **Are the 14 inferred relationships involving `PlayerCommand` (e.g. with `GameSession` and `BatchConfig`) actually correct?**
   _`PlayerCommand` has 14 INFERRED edges - model-reasoned connections that need verification._
