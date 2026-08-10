@@ -30,11 +30,14 @@ BasisPoints = Annotated[int, Field(strict=True)]
 
 
 class InventoryState(BaseModel):
-    """Player grain inventory — single good grain for Sections 2-4."""
+    """Player inventory — grain for Sections 2-4, finished_goods added Section 13."""
 
     model_config = ConfigDict(frozen=True)
 
     grain: Quantity = Field(default=0, description="Grain quantity on hand")
+    finished_goods: Quantity = Field(
+        default=0, description="Finished goods (city craft) — Section 13"
+    )
 
 
 class OperationState(BaseModel):
@@ -59,6 +62,7 @@ class PlayerState(BaseModel):
     OperationState exists as a standalone type for future Section 5 use
     but is not embedded here to avoid coherent-state duplication
     (frozen + mutable list + duplicate capacity sources).
+    Section 13 adds skilled_labour (workshop bottleneck).
     """
 
     model_config = ConfigDict(frozen=True)
@@ -67,6 +71,9 @@ class PlayerState(BaseModel):
     inventory: InventoryState = Field(description="Player inventory")
     farm_capacity: Quantity = Field(description="Total farm capacity")
     storage_capacity: Quantity = Field(description="Total storage capacity")
+    skilled_labour: Quantity = Field(
+        default=0, description="Skilled labour (city craft) — Section 13"
+    )
 
 
 class MarketState(BaseModel):
@@ -155,7 +162,7 @@ class RouteState(BaseModel):
 
 
 class PlayerCommand(BaseModel):
-    """Player turn command — one major action per turn (Sections 3–5, sell_grain added Section 9)."""
+    """Player turn command — one major action per turn (Sections 3–5, sell_grain Section 9, craft/hire Section 13)."""
 
     model_config = ConfigDict(frozen=True)
 
@@ -167,10 +174,13 @@ class PlayerCommand(BaseModel):
         "hold",
         "secure_route",
         "ship_grain",
+        "craft_goods",
+        "sell_finished_goods",
+        "hire_labour",
     ] = Field(description="Command type")
     quantity: Quantity | None = Field(
         default=None,
-        description="Grain quantity for buy_grain / sell_grain / ship_grain (ignored otherwise)",
+        description="Grain quantity for buy_grain / sell_grain / ship_grain / craft_goods / sell_finished_goods (ignored otherwise)",
     )
 
 
@@ -197,6 +207,9 @@ class GameState(BaseModel):
         description="River Town market state",
     )
     route: RouteState = Field(default_factory=RouteState, description="River Route state")
+    legacies: tuple[str, ...] = Field(
+        default=(), description="Earned legacies carried into epilogue (Section 13)"
+    )
 
     def to_turn_context(self) -> TurnContext:
         """Derive TurnContext for RNG calls."""

@@ -20,6 +20,19 @@ BUILD_GRANARY_COST: int = 300
 BUILD_GRANARY_DELTA: int = 50
 ROUTE_ESTABLISH_COST: int = 400
 
+# Section 13 — city craft epilogue
+GRAIN_PER_LABOUR: int = 10  # grain convertible per labour per turn
+FINISHED_PER_GRAIN_NUM: int = 3
+FINISHED_PER_GRAIN_DENOM: int = 10  # 10 grain -> 3 finished (30% yield)
+FINISHED_GOODS_PRICE: int = 9500  # milliunits per finished unit (urban buyer)
+FINISHED_GOODS_PRICE_RIVER_EXTRA: int = 800  # River Contracts extra
+HIRE_LABOUR_COST: int = 400
+HIRE_LABOUR_COST_REPUTATION: int = 200  # Crisis Reputation discount
+LAND_NETWORK_EXTRA_GRAIN_PER_TURN: int = 15  # deliberately weak vs labour*10 cap
+EPILOGUE_RAW_DEMAND: tuple[int, ...] = (280, 220, 180)  # turns 5,6,7 vs agriculture 410
+# Crisis Reputation inventory threshold — tuned from measured distribution (~25-40% band)
+CRISIS_INVENTORY_THRESHOLD: int = 80  # grain held into drought turn (turn 3)
+
 
 def cost_for_quantity(quantity: int, price_milli: int) -> int:
     """Cost in Money for quantity at price_milli (milliunits per unit).
@@ -327,3 +340,105 @@ def ship_margin(
     after reliability. Defaults to 10000 (fully reliable) for backward compat.
     """
     return (river_price * reliability_bps // 10_000) - transport_cost_per_unit - home_price
+
+
+def resolve_craft(
+    *,
+    grain_inventory: int,
+    skilled_labour: int,
+    requested: int,
+    efficiency_num: int = FINISHED_PER_GRAIN_NUM,
+    efficiency_den: int = FINISHED_PER_GRAIN_DENOM,
+) -> tuple[int, int, int, int, str]:
+    """Resolve craft_goods — grain -> finished_goods capped by labour.
+
+    Returns (grain_after, finished_produced, actual_grain_consumed, finished_out, reason).
+    finished_out = actual * efficiency_num // efficiency_den.
+    Reasons: craft_goods, skilled_labour_limited, insufficient_inventory, craft_zero.
+    """
+    requested = int(requested)
+    if requested <= 0:
+        return grain_inventory, 0, 0, 0, "craft_zero"
+    max_by_grain = grain_inventory
+    max_by_labour = skilled_labour * GRAIN_PER_LABOUR
+    # Determine binding limit
+    actual = requested
+    if actual > max_by_grain:
+        actual = max_by_grain
+    if actual > max_by_labour:
+        actual = max_by_labour
+    if actual <= 0:
+        if max_by_labour <= 0 and skilled_labour == 0:
+            return grain_inventory, 0, 0, 0, "no_skilled_labour"
+        if max_by_labour <= 0:
+            return grain_inventory, 0, 0, 0, "skilled_labour_limited"
+        return grain_inventory, 0, 0, 0, "insufficient_inventory"
+    finished = (actual * efficiency_num) // efficiency_den
+    grain_after = grain_inventory - actual
+    # Reason: if actual limited by labour vs inventory
+    if actual == max_by_labour and actual < requested:
+        reason = "skilled_labour_limited"
+    elif actual == max_by_grain and actual < requested:
+        reason = "insufficient_inventory"
+    elif actual < requested:
+        # Could be both, prefer labour as binding per spec
+        if max_by_labour <= max_by_grain:
+            reason = "skilled_labour_limited"
+        else:
+            reason = "insufficient_inventory"
+    else:
+        reason = "craft_goods"
+    return grain_after, finished, actual, finished, reason
+
+
+def resolve_sell_finished(
+    *,
+    cash: int,
+    finished_inventory: int,
+    price_milli: int,
+    requested: int,
+) -> tuple[int, int, int, int, str]:
+    """Resolve sell_finished_goods at urban price.
+
+    Returns (cash_after, finished_after, actual, revenue, reason).
+    Clamped to inventory; same integer conventions as sell_grain.
+    """
+    requested = int(requested)
+    if requested <= 0:
+        return cash, finished_inventory, 0, 0, "sell_finished_zero"
+    actual = requested
+    if actual > finished_inventory:
+        actual = finished_inventory
+    revenue = cost_for_quantity(actual, price_milli)
+    if actual < requested:
+        reason = "insufficient_finished_inventory"
+    elif actual == requested and requested > 0:
+        reason = "sell_finished_goods"
+    else:
+        reason = "sell_finished_zero" if actual == 0 else "sell_finished_goods"
+    cash_after = cash + revenue
+    finished_after = finished_inventory - actual
+    if finished_after < 0:
+        finished_after = 0
+    return cash_after, finished_after, actual, revenue, reason
+
+
+def resolve_hire_labour(
+    *,
+    cash: int,
+    skilled_labour: int,
+    has_reputation: bool = False,
+) -> tuple[int, int, int, str]:
+    """Resolve hire_labour — +1 labour, consumes turn, cost depends on reputation.
+
+    Returns (cash_after, labour_after, delta, reason).
+    """
+    cost = HIRE_LABOUR_COST_REPUTATION if has_reputation else HIRE_LABOUR_COST
+    if cash < cost:
+        return cash, skilled_labour, 0, "insufficient_cash_for_hire"
+    return (
+        cash - cost,
+        skilled_labour + 1,
+        1,
+        "hire_labour" if not has_reputation else "hire_labour_cheaper_with_reputation",
+    )

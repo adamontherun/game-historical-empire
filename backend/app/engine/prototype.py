@@ -127,8 +127,64 @@ def default_start_state(seed: str = "seed-001", version: str = "1.0") -> GameSta
 
 
 def _wealth(state: GameState) -> int:
-    """Wealth = cash + inventory value at Home price (milli)."""
-    return state.player.cash + value_for(state.player.inventory.grain, state.market.current_price)
+    """Wealth = cash + grain*home_price + finished*finished_price (milli)."""
+    from app.engine.actor import FINISHED_GOODS_PRICE, FINISHED_GOODS_PRICE_RIVER_EXTRA
+
+    finished_price = FINISHED_GOODS_PRICE + (
+        FINISHED_GOODS_PRICE_RIVER_EXTRA if "river_contracts" in state.legacies else 0
+    )
+    return (
+        state.player.cash
+        + value_for(state.player.inventory.grain, state.market.current_price)
+        + value_for(state.player.inventory.finished_goods, finished_price)
+    )
+
+
+# Section 13 — epilogue constants
+EPILOGUE_TURNS: int = 3
+EIGHT_TURN_LIMIT: int = 5 + EPILOGUE_TURNS  # 8
+
+
+def derive_legacies(summary: StrategicSummary) -> tuple[str, ...]:
+    """Derive legacies deterministically from final agricultural state.
+
+    Four legacies per design direction §3 / review §5-6.
+    - granary_expertise: final_storage >=180
+    - river_contracts: route_established
+    - land_network: final_farm >=15 (deliberately weakest)
+    - crisis_reputation: inventory_at_drought >=80 and cash_low >=300 (exposure+survival)
+    """
+    from app.engine.actor import CRISIS_INVENTORY_THRESHOLD
+
+    leg: list[str] = []
+    fs = summary.final_state
+    if fs.player.storage_capacity >= 180:
+        leg.append("granary_expertise")
+    if fs.route.established:
+        leg.append("river_contracts")
+    if fs.player.farm_capacity >= 15:
+        leg.append("land_network")
+    # Crisis: need inventory at drought entry
+    inventory_at_drought = None
+    if len(summary.history) >= 3:
+        # after turn 2 (warning) is before drought (turn 3)
+        inventory_at_drought = (
+            summary.history[1].next_state.player.inventory.grain
+            if len(summary.history) > 1
+            else fs.player.inventory.grain
+        )
+        # More precise: use history[2] if available (after warning), else fallback
+        if len(summary.history) >= 3:
+            inventory_at_drought = summary.history[2].next_state.player.inventory.grain
+    else:
+        inventory_at_drought = fs.player.inventory.grain
+    if (
+        inventory_at_drought is not None
+        and inventory_at_drought >= CRISIS_INVENTORY_THRESHOLD
+        and summary.cash_low >= 300
+    ):
+        leg.append("crisis_reputation")
+    return tuple(leg)
 
 
 class StrategicSummary(BaseModel):
@@ -394,6 +450,258 @@ class FiveTurnGame:
         rival_hist = tuple(self._rival_history)
         return StrategicSummary(
             initial_state=self._initial_state,
+            final_state=self._state,
+            history=tuple(self._history),
+            final_wealth=final_wealth,
+            initial_wealth=initial_wealth,
+            wealth_delta_total=wealth_delta_total,
+            cash_low=cash_low,
+            peak_inventory=peak_inventory,
+            is_complete=self.is_complete,
+            final_rivals=final_rivals,
+            rival_history=rival_hist,
+        )
+
+
+class EightTurnGame:
+    """Eight-turn game — 5 agriculture + 3 epilogue (Section 13).
+
+    Orchestrates 5-turn agriculture via FiveTurnGame, then derives legacies deterministically
+    and continues 3 epilogue turns with demand shift 410→280→220→180, workshop labour bottleneck,
+    and land_network weak extra (+15 grain per epilogue turn vs labour×10 cap).
+    Supports Control C (demand shift disabled) and Control L (legacies disabled) for harness.
+    """
+
+    turn_limit: int = EIGHT_TURN_LIMIT
+
+    def __init__(
+        self,
+        seed: str = "seed-001",
+        version: str = "1.0",
+        start_state: GameState | None = None,
+        disable_demand_shift: bool = False,
+        disable_legacies: bool = False,
+    ) -> None:
+        self._seed = seed
+        self._version = version
+        self._disable_demand_shift = disable_demand_shift
+        self._disable_legacies = disable_legacies
+        # Agriculture phase owns its own FiveTurnGame
+        self._agri = FiveTurnGame(seed=seed, version=version, start_state=start_state)
+        self._state: GameState = self._agri.state
+        self._history: list[TurnResolution] = []
+        self._legacies: tuple[str, ...] = ()
+        self._epilogue_started = False
+        # Mirror rivals from agri for continuity
+        self._rivals = self._agri._rivals  # type: ignore[attr-defined]
+        self._rival_history = self._agri._rival_history  # type: ignore[attr-defined]
+
+    @property
+    def state(self) -> GameState:
+        return self._state
+
+    @property
+    def history(self) -> tuple[TurnResolution, ...]:
+        return tuple(self._history)
+
+    @property
+    def is_complete(self) -> bool:
+        return len(self._history) >= self.turn_limit or self._state.turn >= self.turn_limit
+
+    @property
+    def current_turn(self) -> int:
+        return self._state.turn
+
+    @property
+    def legacies(self) -> tuple[str, ...]:
+        return self._legacies
+
+    def _ensure_epilogue_start(self) -> None:
+        if self._epilogue_started:
+            return
+        if len(self._history) < 5:
+            return
+        # Derive legacies at 5-turn boundary if not disabled
+        if not self._disable_legacies:
+            summary = self._agri.summary()
+            self._legacies = derive_legacies(summary)
+        else:
+            self._legacies = ()
+        # If Control C, add disable flag
+        leg = list(self._legacies)
+        if self._disable_demand_shift and "disable_demand_shift" not in leg:
+            leg.append("disable_demand_shift")
+        self._legacies = tuple(leg)
+        # Compute starting labour: base 1 for all (legacies affect efficiency/price, not labour count)
+        # Granary gives efficiency, Crisis gives hire discount, River gives price, Land gives grain — none add labour
+        # This keeps labour bottleneck uniform so extra grain from storage/land cannot be converted beyond cap,
+        # making Land Network deliberately weak and preventing storage from dominating via extra labour.
+        base_labour = 1
+        # Apply to state: copy with legacies and labour, and preserve other fields
+        agri_state = self._agri.state
+        new_player = PlayerState(
+            cash=agri_state.player.cash,
+            inventory=InventoryState(
+                grain=agri_state.player.inventory.grain,
+                finished_goods=agri_state.player.inventory.finished_goods,
+            ),
+            farm_capacity=agri_state.player.farm_capacity,
+            storage_capacity=agri_state.player.storage_capacity,
+            skilled_labour=base_labour,
+        )
+        self._state = GameState(
+            turn=agri_state.turn,
+            run_seed=agri_state.run_seed,
+            ruleset_version=agri_state.ruleset_version,
+            player=new_player,
+            market=agri_state.market,
+            river_market=agri_state.river_market,
+            route=agri_state.route,
+            legacies=self._legacies,
+        )
+        self._epilogue_started = True
+
+    def _pressure_for_idx(self, idx: int) -> PressureState:
+        if idx < 5:
+            return pressure_for_turn(idx)
+        # Epilogue: reuse normal pressure but with epilogue signal
+        from app.domain.pressure import PressureState as PS
+
+        # Use a valid PressureState (activation_turn 0..4 constraint) — reuse 4 with modified signal
+        base = pressure_for_turn(4)
+        return PS(
+            pressure_id=base.pressure_id,
+            stage="aftermath",
+            activation_turn=4,
+            world="normal",
+            signal=f"City craft epilogue turn {idx - 4}/3 — urban demand shifts",
+            title=f"Epilogue {idx - 4}",
+        )
+
+    def submit(self, command: PlayerCommand) -> TurnResolution:
+        if self.is_complete:
+            raise ValueError("game complete — no more decisions allowed (exactly 8 turns)")
+        idx = len(self._history)
+        # Delegate agriculture turns to inner FiveTurnGame for first 5
+        if idx < 5:
+            res = self._agri.submit(command)
+            self._state = res.next_state
+            # Keep legacies empty for agriculture turns
+            self._history.append(res)
+            # Sync state legacies (empty during agri)
+            if idx == 4:
+                # Just completed 5th turn, prepare epilogue start on next call
+                self._ensure_epilogue_start()
+            return res
+        # Epilogue turns 5,6,7
+        self._ensure_epilogue_start()
+        # Land Network per-turn grain extra: +15 grain if space (weak vs labour cap)
+        if "land_network" in self._legacies:
+            from app.engine.actor import LAND_NETWORK_EXTRA_GRAIN_PER_TURN
+
+            grain = self._state.player.inventory.grain
+            cap = self._state.player.storage_capacity
+            add = LAND_NETWORK_EXTRA_GRAIN_PER_TURN
+            new_grain = grain + add
+            if new_grain > cap:
+                new_grain = cap
+            if new_grain != grain:
+                new_player = PlayerState(
+                    cash=self._state.player.cash,
+                    inventory=InventoryState(
+                        grain=new_grain, finished_goods=self._state.player.inventory.finished_goods
+                    ),
+                    farm_capacity=self._state.player.farm_capacity,
+                    storage_capacity=self._state.player.storage_capacity,
+                    skilled_labour=self._state.player.skilled_labour,
+                )
+                self._state = GameState(
+                    turn=self._state.turn,
+                    run_seed=self._state.run_seed,
+                    ruleset_version=self._state.ruleset_version,
+                    player=new_player,
+                    market=self._state.market,
+                    river_market=self._state.river_market,
+                    route=self._state.route,
+                    legacies=self._state.legacies,
+                )
+        pressure = self._pressure_for_idx(idx)
+        # Rivals still choose/ settle but with epilogue pressure (normal)
+        # Use same two-phase as FiveTurnGame but without affecting supply (rivals isolated)
+
+        # Build observable manually for epilogue
+        if idx >= 5:
+            # Use last pressure world (normal) and no threat
+            from app.engine.rivals import ObservableContext as OC
+
+            obs = OC(  # type: ignore
+                turn=idx,
+                world_now="normal",
+                next_world_known=None,
+                home_price_pre=self._state.market.current_price,
+                river_price_pre=self._state.river_market.current_price,
+                transport_cost_per_unit=self._state.route.transport_cost_per_unit,
+                route_capacity=self._state.route.capacity,
+                reliability_bps=self._state.route.reliability_bps,
+                home_supply=self._state.market.supply,
+                home_demand=self._state.market.demand,
+                run_seed=self._seed,
+                ruleset_version=self._version,
+            )
+        else:
+            obs = self._agri._observable_for(idx)  # type: ignore
+        mira_before = self._agri._rivals["mira"]  # type: ignore
+        daran_before = self._agri._rivals["daran"]  # type: ignore
+        from app.engine.rivals import DARAN_PROFILE as DP
+        from app.engine.rivals import MIRA_PROFILE as MP
+        from app.engine.rivals import choose_rival_command as crc
+
+        mira_choice = crc(MP, mira_before, obs)
+        daran_choice = crc(DP, daran_before, obs)
+        ctx = self._state.to_turn_context()
+        res = resolve_turn(self._state, command, pressure, ctx)
+        self._history.append(res)
+        self._state = res.next_state
+        # Rival settlement
+        from app.engine.rivals import SettlementContext as SC
+        from app.engine.rivals import apply_rival_command as arc
+
+        settlement = SC(
+            world_now=pressure.world,
+            home_price_pre=obs.home_price_pre,
+            river_price_resolved=res.next_state.river_market.current_price,
+            home_price_resolved=res.next_state.market.current_price,
+            transport_cost_per_unit=obs.transport_cost_per_unit,
+            route_capacity=obs.route_capacity,
+            reliability_bps=obs.reliability_bps,
+        )
+        mira_result = arc(MP, mira_before, mira_choice, settlement)
+        daran_result = arc(DP, daran_before, daran_choice, settlement)
+        self._agri._rivals["mira"] = mira_result.after  # type: ignore
+        self._agri._rivals["daran"] = daran_result.after  # type: ignore
+        self._agri._rival_history.append((mira_result, daran_result))  # type: ignore
+        return res
+
+    def summary(self) -> StrategicSummary:
+        # Reuse FiveTurnGame summary but with 8-turn history
+        init = self._agri._initial_state  # type: ignore
+        cash_vals = (
+            [init.player.cash]
+            + [h.next_state.player.cash for h in self._history]
+            + [self._state.player.cash]
+        )
+        cash_low = min(cash_vals) if cash_vals else self._state.player.cash
+        inv_vals = [init.player.inventory.grain] + [
+            h.next_state.player.inventory.grain for h in self._history
+        ]
+        peak_inventory = max(inv_vals) if inv_vals else 0
+        final_wealth = _wealth(self._state)
+        initial_wealth = _wealth(init)
+        wealth_delta_total = final_wealth - initial_wealth
+        final_rivals = (self._agri._rivals["mira"], self._agri._rivals["daran"])  # type: ignore
+        rival_hist = tuple(self._agri._rival_history)  # type: ignore
+        return StrategicSummary(
+            initial_state=init,
             final_state=self._state,
             history=tuple(self._history),
             final_wealth=final_wealth,

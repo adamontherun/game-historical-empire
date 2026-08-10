@@ -205,7 +205,7 @@
     "semantic_hash": ""
   },
   "BUILD_SPEC.md": {
-    "mtime": 1786389069.905832,
+    "mtime": 1786389358.0383794,
     "ast_hash": "5dda8abf100e4fa1b0d28ee7b75ce9c1",
     "semantic_hash": ""
   },
@@ -215,12 +215,12 @@
     "semantic_hash": ""
   },
   "DECISIONS.md": {
-    "mtime": 1786389317.908723,
+    "mtime": 1786389358.0392087,
     "ast_hash": "ced0ee10be66ee6099e47f872e32136b",
     "semantic_hash": ""
   },
   "STATE.md": {
-    "mtime": 1786389079.7472775,
+    "mtime": 1786389358.039548,
     "ast_hash": "228558f7660b8fa1af86eb6fac9b2005",
     "semantic_hash": ""
   },
@@ -455,7 +455,7 @@
     "semantic_hash": ""
   },
   "frontend/e2e/critical.spec.ts": {
-    "mtime": 1786388968.1159265,
+    "mtime": 1786389358.0408337,
     "ast_hash": "f4892ac0c39b13cd754588f60ff59ba2",
     "semantic_hash": ""
   },
@@ -475,7 +475,7 @@
     "semantic_hash": ""
   },
   "frontend/src/App.tsx": {
-    "mtime": 1786389235.1907256,
+    "mtime": 1786389358.0428193,
     "ast_hash": "789c79fa3066452b69dc0fd7b52a56f4",
     "semantic_hash": ""
   },
@@ -525,7 +525,7 @@
     "semantic_hash": ""
   },
   "frontend/src/components/CompletionSummary.tsx": {
-    "mtime": 1786388955.4785855,
+    "mtime": 1786389358.043388,
     "ast_hash": "1799e8a8b884e5353426331a62eb3d7e",
     "semantic_hash": ""
   },
@@ -645,7 +645,7 @@
     "semantic_hash": ""
   },
   "frontend/e2e/screenshots/drought-reveal.png": {
-    "mtime": 1786389261.4809105,
+    "mtime": 1786389358.041665,
     "ast_hash": "5d040d08cef13256b8f028fe3ae7c6f6",
     "semantic_hash": ""
   },
@@ -655,7 +655,7 @@
     "semantic_hash": ""
   },
   "frontend/e2e/screenshots/final-summary.png": {
-    "mtime": 1786389264.0960138,
+    "mtime": 1786389358.042306,
     "ast_hash": "5f66ea314c47dc4e2f6db5c6acb13944",
     "semantic_hash": ""
   },
@@ -665,23 +665,38 @@
     "semantic_hash": ""
   },
   "frontend/src/__tests__/runRecord.test.tsx": {
-    "mtime": 1786389220.382715,
+    "mtime": 1786389358.0431268,
     "ast_hash": "2e673408ce5be5d4b63e6aa5007f9529",
     "semantic_hash": ""
   },
   "frontend/src/lib/runRecord.ts": {
-    "mtime": 1786388942.1102278,
+    "mtime": 1786389358.043636,
     "ast_hash": "cb13ba82e6fb4f77e308b7cc95ed7df7",
     "semantic_hash": ""
   },
   "docs/plans/2026-08-10-section-12-playtest-gate.md": {
-    "mtime": 1786388938.1585417,
+    "mtime": 1786389358.040009,
     "ast_hash": "04f62b8021f2065e90858a603772a0be",
     "semantic_hash": ""
   },
   "docs/playtest/section-12-playtest-script.md": {
-    "mtime": 1786388929.876625,
+    "mtime": 1786389358.0403647,
     "ast_hash": "1120df3eda968c227ce26afa4c9789b7",
+    "semantic_hash": ""
+  },
+  "docs/plans/2026-08-10-section-13-design-direction.md": {
+    "mtime": 1786389439.8799644,
+    "ast_hash": "309b794795a3ce4b5ae2794a6f7f3a4c",
+    "semantic_hash": ""
+  },
+  "docs/plans/2026-08-10-section-13-city-craft-epilogue.md": {
+    "mtime": 1786389603.084525,
+    "ast_hash": "6745395097d0dca75b7e7c66eda5a06a",
+    "semantic_hash": ""
+  },
+  "docs/plans/2026-08-10-section-13-review-round-1.md": {
+    "mtime": 1786389724.0859592,
+    "ast_hash": "674c6935b97424e1be26be6c31c48624",
     "semantic_hash": ""
   }
 }

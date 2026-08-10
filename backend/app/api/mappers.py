@@ -7,6 +7,7 @@ from app.api.schemas import (
     CompletionSummaryView,
     EmpireSummary,
     GameView,
+    LegacyView,
     MarketView,
     OutcomeView,
     PlayerSummary,
@@ -48,6 +49,7 @@ def choices_for(session: GameSession) -> tuple[ChoiceView, ...]:
 
     Two quantities per verb (partial+full, ~6-8 total).
     Harness policies never influence this — measuring instrument, not rules.
+    Section 13 adds craft/hire/sell_finished when turn>=5.
     """
     s = session.game.state
     out: list[ChoiceView] = []
@@ -128,7 +130,11 @@ def choices_for(session: GameSession) -> tuple[ChoiceView, ...]:
         # B2: pre-ship inventory includes harvest that lands before shipment
         # Estimate respects drought via compute_farm_output, not raw YIELD_PER_CAPACITY
         # world for this turn (decision time) — pressure derived
-        curr_pressure = session.game.current_pressure
+        # For epilogue turns, current_pressure may be None (beyond 5), fallback to normal
+        try:
+            curr_pressure = session.game.current_pressure  # type: ignore[attr-defined]
+        except Exception:
+            curr_pressure = None
         world_for_est = curr_pressure.world if curr_pressure is not None else "normal"
         farm_output_est, _, _ = compute_farm_output(s.player.farm_capacity, world_for_est)
         pre_ship = s.player.inventory.grain + farm_output_est
@@ -148,6 +154,52 @@ def choices_for(session: GameSession) -> tuple[ChoiceView, ...]:
                         cost=None,
                     )
                 )
+    # Section 13 — epilogue: craft / sell_finished / hire_labour
+    if s.turn >= 5:
+        # craft_goods: capped by labour*10 and grain
+        from app.engine.actor import GRAIN_PER_LABOUR, HIRE_LABOUR_COST, HIRE_LABOUR_COST_REPUTATION
+
+        labour = s.player.skilled_labour
+        max_craft = min(s.player.inventory.grain, labour * GRAIN_PER_LABOUR) if labour > 0 else 0
+        if max_craft > 0:
+            qtys_c = {max_craft, max(1, max_craft // 2)}
+            for qty in sorted(qtys_c):
+                out.append(
+                    ChoiceView(
+                        id=f"craft_goods:{qty}",
+                        label=f"Craft {qty} grain → finished goods",
+                        kind="craft_goods",
+                        quantity=qty,
+                        cost=None,
+                    )
+                )
+        # sell_finished_goods: if finished>0
+        if s.player.inventory.finished_goods > 0:
+            n = s.player.inventory.finished_goods
+            qtys_f = {n, max(1, n // 2)}
+            for qty in sorted(qtys_f):
+                out.append(
+                    ChoiceView(
+                        id=f"sell_finished_goods:{qty}",
+                        label=f"Sell {qty} finished goods",
+                        kind="sell_finished_goods",
+                        quantity=qty,
+                        cost=None,
+                    )
+                )
+        # hire_labour: if affordable, consumes turn (mutually exclusive via choice)
+        has_rep = "crisis_reputation" in getattr(s, "legacies", ())
+        hire_cost = HIRE_LABOUR_COST_REPUTATION if has_rep else HIRE_LABOUR_COST
+        if s.player.cash >= hire_cost:
+            out.append(
+                ChoiceView(
+                    id="hire_labour",
+                    label=f"Hire skilled labour — {hire_cost} cash → +1 hands",
+                    kind="hire_labour",
+                    quantity=None,
+                    cost=hire_cost,
+                )
+            )
     return tuple(out)
 
 
@@ -157,7 +209,15 @@ def _outcome_view(session: GameSession) -> OutcomeView | None:
         return None
     idx = len(game.history) - 1
     res = game.history[idx]
-    pressure = PRESSURE_ARC[idx]
+    # Epilogue idx >=5 uses epilogue title, else PRESSURE_ARC
+    if idx < len(PRESSURE_ARC):
+        pressure = PRESSURE_ARC[idx]
+    else:
+        # Epilogue: construct ephemeral pressure via game method if available
+        try:
+            pressure = game._pressure_for_idx(idx)  # type: ignore[attr-defined]
+        except Exception:
+            pressure = PRESSURE_ARC[-1]
     title = pressure.title
     # Use stored command from session.commands — not trace label parsing (C4)
     if session.commands and idx < len(session.commands):
@@ -271,7 +331,7 @@ def to_game_view(session: GameSession) -> GameView:
     else:
         available = choices_for(session)
 
-    # Wealth
+    # Wealth — Section 13 includes finished goods
     wealth = _wealth(state)
 
     # Route next_margin via engine helper (B6), even when negative (B1) — S0a reliability-aware
@@ -282,13 +342,49 @@ def to_game_view(session: GameSession) -> GameView:
         state.route.reliability_bps,
     )
 
+    # Section 13 additive fields
+    from app.engine.actor import FINISHED_GOODS_PRICE, FINISHED_GOODS_PRICE_RIVER_EXTRA
+
+    legacies_raw = getattr(state, "legacies", ())
+    legacy_views = None
+    if legacies_raw:
+        # Map legacy ids to LegacyView
+        _legacy_labels = {
+            "granary_expertise": ("Granary Expertise", "Workshop +33% efficiency"),
+            "river_contracts": ("River Contracts", "Finished price +800"),
+            "land_network": ("Land Network", "+15 grain/turn — weak vs labour×10"),
+            "crisis_reputation": ("Crisis Reputation", "Hire cost 200 vs 400"),
+        }
+        legacy_views = tuple(
+            LegacyView(
+                id=lid,
+                label=_legacy_labels.get(lid, (lid, ""))[0],
+                effect=_legacy_labels.get(lid, (lid, ""))[1],
+            )
+            for lid in legacies_raw
+            if lid != "disable_demand_shift"
+        )
+        if not legacy_views:
+            legacy_views = None
+    is_epilogue = state.turn >= 5
+    epilogue_turn = (
+        (state.turn - 5 + 1)
+        if is_epilogue and not game.is_complete
+        else (3 if game.is_complete and state.turn >= 8 else None)
+    )
+    # turn_limit dynamic: 8 for EightTurnGame else 5
+    turn_limit = getattr(game, "turn_limit", TURN_LIMIT)
+    finished_price = FINISHED_GOODS_PRICE + (
+        FINISHED_GOODS_PRICE_RIVER_EXTRA if "river_contracts" in legacies_raw else 0
+    )
+
     return GameView(
         game_id=session.game_id,
         run_seed=session.run_seed,
         ruleset_version=state.ruleset_version,
         revision=session.revision,
         turn=state.turn,
-        turn_limit=TURN_LIMIT,
+        turn_limit=turn_limit,
         signal=signal,
         pressure_stage=pressure_stage,
         world=world,
@@ -317,6 +413,12 @@ def to_game_view(session: GameSession) -> GameView:
         available_choices=available,
         latest_outcome=_outcome_view(session),
         completion_summary=_completion_summary(session),
+        skilled_labour=state.player.skilled_labour,
+        finished_goods=state.player.inventory.finished_goods,
+        finished_goods_price=finished_price,
+        legacies=legacy_views,
+        is_epilogue=is_epilogue if is_epilogue else None,
+        epilogue_turn=epilogue_turn,
     )
 
 

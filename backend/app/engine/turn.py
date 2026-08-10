@@ -194,6 +194,10 @@ def resolve_turn(
     storage_capacity = before_storage
     inventory = before_inventory
     route_established = route_established_before
+    before_finished = state.player.inventory.finished_goods
+    before_labour = state.player.skilled_labour
+    finished_inventory = before_finished
+    skilled_labour = before_labour
 
     # Ship tracking
     ship_requested: int | None = None
@@ -620,6 +624,261 @@ def resolve_turn(
             )
         )
 
+    elif command.type == "craft_goods":
+        requested = command.quantity if command.quantity is not None else 10
+        requested = int(requested)
+        # Determine efficiency — Granary Expertise extra yield if in legacies or storage>=180
+        has_granary = "granary_expertise" in state.legacies or before_storage >= 180
+        eff_num = 4 if has_granary else 3
+        eff_den = 10
+        # Use shared primitive
+        from app.engine.actor import resolve_craft as _resolve_craft
+
+        grain_after_tmp, _fin_prod, actual_grain, finished_out, cmd_reason = _resolve_craft(
+            grain_inventory=inventory,
+            skilled_labour=skilled_labour,
+            requested=requested,
+            efficiency_num=eff_num,
+            efficiency_den=eff_den,
+        )
+        # finished_out already computed; update working copies
+        d_grain = grain_after_tmp - inventory
+        inventory = grain_after_tmp
+        finished_inventory = before_finished + finished_out
+        nodes.append(
+            CausalNode(
+                id="command",
+                label=f"Craft goods requested={requested} actual={actual_grain} finished={finished_out}",
+                kind="command",
+                before=before_inventory,
+                after=inventory,
+                delta=-actual_grain,
+                reason_code=cmd_reason,
+                parent_ids=(),
+            )
+        )
+        nodes.append(
+            CausalNode(
+                id="cash_after_command",
+                label="Cash after craft (no cash cost)",
+                kind="cash",
+                before=before_cash,
+                after=cash,
+                delta=0,
+                reason_code=cmd_reason,
+                parent_ids=("command",),
+            )
+        )
+        nodes.append(
+            CausalNode(
+                id="labour_capacity",
+                label=f"Labour capacity {skilled_labour}×10={skilled_labour * 10}",
+                kind="labour",
+                before=before_labour,
+                after=skilled_labour,
+                delta=0,
+                reason_code="labour_capacity_unchanged"
+                if cmd_reason != "no_skilled_labour"
+                else "no_skilled_labour",
+                parent_ids=(),
+            )
+        )
+        nodes.append(
+            CausalNode(
+                id="craft_conversion",
+                label=f"Craft {actual_grain} grain → {finished_out} finished",
+                kind="craft",
+                before=before_inventory,
+                after=inventory,
+                delta=-actual_grain,
+                reason_code=cmd_reason,
+                parent_ids=("command", "labour_capacity"),
+            )
+        )
+        nodes.append(
+            CausalNode(
+                id="finished_inventory",
+                label=f"Finished inventory {before_finished} → {finished_inventory}",
+                kind="finished_inventory",
+                before=before_finished,
+                after=finished_inventory,
+                delta=finished_out,
+                reason_code=cmd_reason,
+                parent_ids=("craft_conversion",),
+            )
+        )
+        effects.append(
+            DomainEffect(
+                metric="grain_inventory",
+                before=before_inventory,
+                after=inventory,
+                delta=d_grain,
+                reason_code=cmd_reason,
+            )
+        )
+        effects.append(
+            DomainEffect(
+                metric="finished_goods",
+                before=before_finished,
+                after=finished_inventory,
+                delta=finished_out,
+                reason_code=cmd_reason,
+            )
+        )
+
+    elif command.type == "sell_finished_goods":
+        requested = command.quantity if command.quantity is not None else 10
+        requested = int(requested)
+        has_river = "river_contracts" in state.legacies
+        from app.engine.actor import (
+            FINISHED_GOODS_PRICE,
+            FINISHED_GOODS_PRICE_RIVER_EXTRA,
+            resolve_sell_finished,
+        )
+
+        price = FINISHED_GOODS_PRICE + (FINISHED_GOODS_PRICE_RIVER_EXTRA if has_river else 0)
+        cash_after, finished_after, actual, revenue, cmd_reason = resolve_sell_finished(
+            cash=cash, finished_inventory=finished_inventory, price_milli=price, requested=requested
+        )
+        d_cash = cash_after - cash
+        cash = cash_after
+        finished_inventory = finished_after
+        nodes.append(
+            CausalNode(
+                id="command",
+                label=f"Sell finished requested={requested} actual={actual}",
+                kind="command",
+                before=before_finished,
+                after=finished_inventory,
+                delta=-actual,
+                reason_code=cmd_reason,
+                parent_ids=(),
+            )
+        )
+        nodes.append(
+            CausalNode(
+                id="cash_after_command",
+                label="Cash after sell finished",
+                kind="cash",
+                before=before_cash,
+                after=cash,
+                delta=d_cash,
+                reason_code=cmd_reason,
+                parent_ids=("command",),
+            )
+        )
+        nodes.append(
+            CausalNode(
+                id="finished_price",
+                label=f"Finished price {price}",
+                kind="finished_price",
+                before=price,
+                after=price,
+                delta=0,
+                reason_code="finished_price_river_extra" if has_river else "finished_price_stable",
+                parent_ids=(),
+            )
+        )
+        nodes.append(
+            CausalNode(
+                id="finished_inventory",
+                label=f"Finished inventory {before_finished} → {finished_inventory}",
+                kind="finished_inventory",
+                before=before_finished,
+                after=finished_inventory,
+                delta=-actual,
+                reason_code=cmd_reason,
+                parent_ids=("command", "finished_price"),
+            )
+        )
+        effects.append(
+            DomainEffect(
+                metric="cash", before=before_cash, after=cash, delta=d_cash, reason_code=cmd_reason
+            )
+        )
+        effects.append(
+            DomainEffect(
+                metric="finished_goods",
+                before=before_finished,
+                after=finished_inventory,
+                delta=-actual,
+                reason_code=cmd_reason,
+            )
+        )
+
+    elif command.type == "hire_labour":
+        has_reputation = "crisis_reputation" in state.legacies
+        from app.engine.actor import resolve_hire_labour
+
+        cash_after, labour_after, d_labour, cmd_reason = resolve_hire_labour(
+            cash=cash, skilled_labour=skilled_labour, has_reputation=has_reputation
+        )
+        d_cash = cash_after - cash
+        cash = cash_after
+        skilled_labour = labour_after
+        nodes.append(
+            CausalNode(
+                id="command",
+                label="Hire labour",
+                kind="command",
+                before=before_labour,
+                after=skilled_labour,
+                delta=d_labour,
+                reason_code=cmd_reason,
+                parent_ids=(),
+            )
+        )
+        nodes.append(
+            CausalNode(
+                id="cash_after_command",
+                label="Cash after hire",
+                kind="cash",
+                before=before_cash,
+                after=cash,
+                delta=d_cash,
+                reason_code=cmd_reason,
+                parent_ids=("command",),
+            )
+        )
+        nodes.append(
+            CausalNode(
+                id="hire_labour",
+                label=f"Hire labour {before_labour} → {skilled_labour}",
+                kind="labour",
+                before=before_labour,
+                after=skilled_labour,
+                delta=d_labour,
+                reason_code=cmd_reason,
+                parent_ids=("command",),
+            )
+        )
+        nodes.append(
+            CausalNode(
+                id="labour_capacity",
+                label=f"Labour capacity {skilled_labour}×10={skilled_labour * 10}",
+                kind="labour",
+                before=before_labour,
+                after=skilled_labour,
+                delta=d_labour,
+                reason_code=cmd_reason,
+                parent_ids=("hire_labour",),
+            )
+        )
+        effects.append(
+            DomainEffect(
+                metric="cash", before=before_cash, after=cash, delta=d_cash, reason_code=cmd_reason
+            )
+        )
+        effects.append(
+            DomainEffect(
+                metric="skilled_labour",
+                before=before_labour,
+                after=skilled_labour,
+                delta=d_labour,
+                reason_code=cmd_reason,
+            )
+        )
+
     else:  # hold
         cmd_reason = "hold"
         nodes.append(
@@ -763,6 +1022,56 @@ def resolve_turn(
             parent_ids=(),
         )
     )
+    # Section 13 — epilogue demand shift: raw demand falls, urban demand for finished goods emerges
+    # Determine effective demand for supply calc — prototype may have already mutated state's demand,
+    # but also support legacy disable flag via GameState.legacies containing "disable_demand_shift"
+    effective_demand = before_demand
+    demand_shift_reason = "demand_stable"
+    if state.turn >= 5:
+        # Check if demand shift is disabled via legacy flag (Control C)
+        if "disable_demand_shift" not in state.legacies:
+            from app.engine.actor import EPILOGUE_RAW_DEMAND
+
+            idx = state.turn - 5
+            if 0 <= idx < len(EPILOGUE_RAW_DEMAND):
+                effective_demand = EPILOGUE_RAW_DEMAND[idx]
+                demand_shift_reason = "epilogue_demand_shift"
+        # Emit urban demand node (finished goods buyer) — every epilogue turn
+        from app.engine.actor import FINISHED_GOODS_PRICE
+
+        finished_price_node = FINISHED_GOODS_PRICE + (
+            800 if "river_contracts" in state.legacies else 0
+        )
+        nodes.append(
+            CausalNode(
+                id="urban_demand",
+                label=f"Urban demand for finished goods — price {finished_price_node}",
+                kind="urban_demand",
+                before=410,
+                after=effective_demand,
+                delta=effective_demand - 410
+                if demand_shift_reason == "epilogue_demand_shift"
+                else 0,
+                reason_code="urban_demand_high"
+                if demand_shift_reason == "epilogue_demand_shift"
+                else "demand_stable",
+                parent_ids=("pressure_stage",),
+            )
+        )
+        # Raw demand shift node — explains why grain sells badly
+        if demand_shift_reason == "epilogue_demand_shift":
+            nodes.append(
+                CausalNode(
+                    id="raw_demand_shift",
+                    label=f"Raw grain demand falls {before_demand}→{effective_demand}",
+                    kind="demand",
+                    before=before_demand,
+                    after=effective_demand,
+                    delta=effective_demand - before_demand,
+                    reason_code="urbanization_reduces_grain_demand",
+                    parent_ids=("urban_demand",),
+                )
+            )
 
     # 2. Production — farm output via shared primitive
     farm_output, base_output, prod_reason = compute_farm_output(farm_capacity, world)
@@ -816,9 +1125,15 @@ def resolve_turn(
 
     # 3. Home Supply — availability signal drained by demand (Section 9: includes regional)
     # signal_next = max(0, signal + regional_after + farm_output - demand)
+    # For epilogue turns, demand may have shifted via effective_demand
     supply_before_harvest = before_supply
+    # effective_demand is defined above for epilogue; fallback to before_demand for earlier turns
+    try:
+        _eff_demand = effective_demand  # type: ignore[possibly-undefined]
+    except NameError:
+        _eff_demand = before_demand
     next_supply = clamp_non_negative(
-        supply_before_harvest + regional_after + farm_output - before_demand
+        supply_before_harvest + regional_after + farm_output - _eff_demand
     )
     supply_delta = next_supply - before_supply
     # Reason reflects whether signal grew (surplus) or shrank (shortage)
@@ -900,12 +1215,17 @@ def resolve_turn(
     )
 
     # 4. Home Price — target then bounded
-    target = _target_price(base_price, next_supply, before_demand, responsiveness)
+    # For epilogue, use effective demand (urban shift) for price pressure
+    try:
+        _price_demand = _eff_demand  # type: ignore[name-defined]
+    except NameError:
+        _price_demand = before_demand
+    target = _target_price(base_price, next_supply, _price_demand, responsiveness)
     new_price = _bounded_price(before_price, target, max_movement_bps)
     price_delta = new_price - before_price
     pressure_bps = (
         div_round_half_up(
-            (before_demand - next_supply) * 10_000, next_supply if next_supply > 0 else 1
+            (_price_demand - next_supply) * 10_000, next_supply if next_supply > 0 else 1
         )
         * responsiveness
         // 10_000
@@ -1505,21 +1825,28 @@ def resolve_turn(
         )
         overall_inventory_delta = inventory_final - before_inventory
 
-    # 6. Valuation — exact decomposition of wealth (now with ship)
-    # wealth_before = cash_before + value(inv_before, price_before_home)
-    # purchase_quantity_value = value(inv_after_buy, price_before) - value(inv_before, price_before)
-    # harvest_quantity_value  = value(inv_after_harvest, price_before) - value(inv_after_buy, price_before)
-    # ship_quantity_value     = value(inv_final, price_before) - value(inv_after_harvest, price_before)
-    # price_value_effect      = value(inv_final, price_after_home)  - value(inv_final, price_before_home)
-    # cash_effect             = cash_after - cash_before
-    # wealth_delta            = cash_effect + purchase + harvest + ship + price
+    # 6. Valuation — exact decomposition of wealth (now with ship + Section 13 finished goods)
+    # wealth_before = cash_before + value_grain_before + value_finished_before
+    # where finished valued at FINISHED_GOODS_PRICE (urban buyer, stable)
+    # Section 13 adds craft/sell_finished/hire that change finished_inventory / labour
+    from app.engine.actor import FINISHED_GOODS_PRICE, FINISHED_GOODS_PRICE_RIVER_EXTRA
+
+    finished_price = FINISHED_GOODS_PRICE + (
+        FINISHED_GOODS_PRICE_RIVER_EXTRA if "river_contracts" in state.legacies else 0
+    )
+    # grain valuation at home price
     value_before = _value(before_inventory, before_price)
     value_after_buy = _value(inventory_before_settlement, before_price)
     value_after_harvest = _value(inventory_final_pre_ship, before_price)
     value_after_ship = _value(inventory_final, before_price)
     value_after = _value(inventory_final, new_price)
-    wealth_before = before_cash + value_before
-    wealth_after = cash + value_after
+    # finished goods valuation at finished_price (stable)
+    finished_before_val = _value(before_finished, finished_price)
+    finished_after_val = _value(finished_inventory, finished_price)
+    finished_quantity_value = finished_after_val - finished_before_val
+    finished_price_effect = 0  # price stable, no revaluation for finished
+    wealth_before = before_cash + value_before + finished_before_val
+    wealth_after = cash + value_after + finished_after_val
     purchase_quantity_value = value_after_buy - value_before
     harvest_quantity_value = value_after_harvest - value_after_buy
     ship_quantity_value = value_after_ship - value_after_harvest
@@ -1528,20 +1855,21 @@ def resolve_turn(
     assert ship_quantity_value == ship_quantity_value_pre, (
         f"ship mismatch {ship_quantity_value} vs {ship_quantity_value_pre}"
     )
-    quantity_value_effect = purchase_quantity_value + harvest_quantity_value + ship_quantity_value
-    price_value_effect = value_after - value_after_ship
-    cash_effect = cash - before_cash
-    wealth_delta = (
-        cash_effect
-        + purchase_quantity_value
+    quantity_value_effect = (
+        purchase_quantity_value
         + harvest_quantity_value
         + ship_quantity_value
-        + price_value_effect
+        + finished_quantity_value
     )
+    price_value_effect = value_after - value_after_ship + finished_price_effect
+    cash_effect = cash - before_cash
+    wealth_delta = cash_effect + quantity_value_effect + price_value_effect
     # Sanity: wealth_after - wealth_before must equal wealth_delta
-    assert wealth_after - wealth_before == wealth_delta
-    # For backward compat when ship==0, quantity_value_effect == purchase+harvest
-    if ship_quantity_value == 0:
+    assert wealth_after - wealth_before == wealth_delta, (
+        f"wealth delta mismatch {wealth_after - wealth_before} vs {wealth_delta} (wealth {wealth_before}->{wealth_after})"
+    )
+    # For backward compat when ship==0 and no finished, quantity_value_effect == purchase+harvest
+    if ship_quantity_value == 0 and finished_quantity_value == 0:
         assert quantity_value_effect == purchase_quantity_value + harvest_quantity_value
 
     # Purchase/sell quantity — value of bought/sold grain at old price
@@ -1592,26 +1920,81 @@ def resolve_turn(
             parent_ids=("farm_output", "storage_capacity", "inventory"),
         )
     )
-    # Ship quantity value node already emitted as trade node above, but we need a valuation-style duplicate?
-    # The earlier "ship_quantity_value" with kind trade already serves as valuation node. For consistency with other valuation nodes,
-    # ensure a node with id "ship_quantity_value" is already in trace. We emitted it at route settlement with kind trade.
-    # No need to emit again.
-    # Combined quantity value — sum of purchase, harvest, ship, for wealth decomposition and backward compat
-    if ship_quantity_value != 0:
-        quantity_parents: tuple[str, ...] = (
+    # Ship quantity value node already emitted as trade node above
+    # Section 13 — finished goods valuation nodes
+    if finished_quantity_value != 0 or before_finished != 0 or finished_inventory != 0:
+        # Emit finished quantity value node if there is movement or holding
+        # Use finished_inventory change at finished_price
+        # Determine parents: craft or sell_finished
+        if command.type in ("craft_goods", "sell_finished_goods"):
+            finished_parents: tuple[str, ...] = (
+                ("finished_inventory", "craft_conversion")
+                if command.type == "craft_goods"
+                else ("finished_inventory", "finished_price")
+            )
+            finished_reason = "finished_quantity_value"
+        else:
+            finished_parents = ("finished_inventory",)
+            finished_reason = (
+                "finished_quantity_value_noop"
+                if finished_quantity_value == 0
+                else "finished_quantity_value"
+            )
+        nodes.append(
+            CausalNode(
+                id="finished_quantity_value",
+                label=f"Finished quantity value {finished_before_val} → {finished_after_val} (delta {finished_quantity_value:+})",
+                kind="finished_inventory",
+                before=finished_before_val,
+                after=finished_after_val,
+                delta=finished_quantity_value,
+                reason_code=finished_reason,
+                parent_ids=finished_parents,
+            )
+        )
+        # Also emit finished price node if not already (for non-sell_finished cases)
+        if not any(n.id == "finished_price" for n in nodes):
+            nodes.append(
+                CausalNode(
+                    id="finished_price",
+                    label=f"Finished price {finished_price}",
+                    kind="finished_price",
+                    before=finished_price,
+                    after=finished_price,
+                    delta=0,
+                    reason_code="finished_price_stable",
+                    parent_ids=(),
+                )
+            )
+    # Combined quantity value — sum of purchase, harvest, ship, finished
+    if ship_quantity_value != 0 and finished_quantity_value != 0:
+        quantity_parents = (
             "purchase_quantity_value",
             "harvest_quantity_value",
             "ship_quantity_value",
+            "finished_quantity_value",
+        )
+    elif ship_quantity_value != 0:
+        quantity_parents = (
+            "purchase_quantity_value",
+            "harvest_quantity_value",
+            "ship_quantity_value",
+        )
+    elif finished_quantity_value != 0:
+        quantity_parents = (
+            "purchase_quantity_value",
+            "harvest_quantity_value",
+            "finished_quantity_value",
         )
     else:
         quantity_parents = ("purchase_quantity_value", "harvest_quantity_value")
     nodes.append(
         CausalNode(
             id="quantity_value_effect",
-            label=f"Quantity value {value_before} → {value_after_ship} (delta {quantity_value_effect:+})",
+            label=f"Quantity value {value_before + finished_before_val} → {value_after_ship + finished_after_val} (delta {quantity_value_effect:+})",
             kind="quantity_value_effect",
-            before=value_before,
-            after=value_after_ship,
+            before=value_before + finished_before_val,
+            after=value_after_ship + finished_after_val,
             delta=quantity_value_effect,
             reason_code="quantity_value_effect",
             parent_ids=quantity_parents,
@@ -1686,8 +2069,8 @@ def resolve_turn(
     effects.append(
         DomainEffect(
             metric="quantity_value_effect",
-            before=value_before,
-            after=value_after_ship,
+            before=value_before + finished_before_val,
+            after=value_after_ship + finished_after_val,
             delta=quantity_value_effect,
             reason_code="quantity_value_effect",
         )
@@ -1695,8 +2078,8 @@ def resolve_turn(
     effects.append(
         DomainEffect(
             metric="price_value_effect",
-            before=value_after_ship,
-            after=value_after,
+            before=value_after_ship + finished_after_val,
+            after=value_after + finished_after_val,
             delta=price_value_effect,
             reason_code="price_value_effect",
         )
@@ -1720,16 +2103,22 @@ def resolve_turn(
         )
     )
 
-    # Next player state
+    # Next player state — include finished goods and skilled labour (Section 13)
     next_player = PlayerState(
         cash=cash,
-        inventory=InventoryState(grain=inventory_final),
+        inventory=InventoryState(grain=inventory_final, finished_goods=finished_inventory),
         farm_capacity=farm_capacity,
         storage_capacity=storage_capacity,
+        skilled_labour=skilled_labour,
     )
+    # Demand for next state's market persists effective demand if epilogue (so next turn's before_demand reflects shift)
+    try:
+        next_market_demand = _eff_demand  # type: ignore[name-defined]
+    except NameError:
+        next_market_demand = before_demand
     next_market = MarketState(
         supply=next_supply,
-        demand=before_demand,
+        demand=next_market_demand,
         base_price=base_price,
         current_price=new_price,
         responsiveness=responsiveness,
@@ -1763,6 +2152,7 @@ def resolve_turn(
         market=next_market,
         river_market=next_river_market,
         route=next_route,
+        legacies=state.legacies,
     )
 
     # Build story drivers — exact partitions of wealth_delta, filtered, ranked by wealth-bps

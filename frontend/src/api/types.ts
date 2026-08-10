@@ -107,6 +107,12 @@ export type CompletionSummaryView = {
   final_rival_headlines: RivalHeadlines | null;
 };
 
+export type LegacyView = {
+  id: string;
+  label: string;
+  effect: string;
+};
+
 export type GameView = {
   game_id: string;
   run_seed: string;
@@ -126,4 +132,10 @@ export type GameView = {
   available_choices: ChoiceView[];
   latest_outcome: OutcomeView | null;
   completion_summary: CompletionSummaryView | null;
+  skilled_labour?: number | null;
+  finished_goods?: number | null;
+  finished_goods_price?: number | null;
+  legacies?: LegacyView[] | null;
+  is_epilogue?: boolean | null;
+  epilogue_turn?: number | null;
 };

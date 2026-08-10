@@ -11,6 +11,7 @@ import { DecisionBlock } from "./components/DecisionBlock";
 import { OutcomeReveal } from "./components/OutcomeReveal";
 import { CompletionSummary } from "./components/CompletionSummary";
 import { FooterDebug } from "./components/FooterDebug";
+import { LegacyStrip } from "./components/LegacyStrip";
 
 type Phase = "start" | "decision" | "reveal" | "completion";
 
@@ -165,12 +166,17 @@ export default function App() {
   }
 
   // decision phase
+  const empireWithLabour = {
+    ...game.empire_summary,
+    skilled_labour: game.skilled_labour ?? undefined,
+  };
   return (
     <div data-pressure={displayPressure} className="shell">
       <HeaderBar turn={game.turn} turnLimit={game.turn_limit} cash={game.player_summary.cash} />
       <WorldBand signal={game.signal} pressureStage={game.pressure_stage} />
       <div className="stack">
-        <EmpireTableau empire={game.empire_summary} />
+        <EmpireTableau empire={empireWithLabour} />
+        {game.legacies && game.legacies.length > 0 ? <LegacyStrip legacies={game.legacies} /> : null}
         <MarketPulse home={game.home_valley_market} river={game.river_town_market} route={game.route_status} />
         <RivalsStrip headlines={game.rival_headlines} />
         <DecisionBlock

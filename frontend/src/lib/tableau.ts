@@ -9,6 +9,7 @@ export type Empire = {
   farm_capacity: number;
   storage_capacity: number;
   route_established: boolean;
+  skilled_labour?: number | null;
 };
 
 export type Tier = {
@@ -19,7 +20,7 @@ export type Tier = {
 };
 
 export function tableau(empire: Empire): Tier[] {
-  return [
+  const rows: Tier[] = [
     {
       id: "estate",
       label: "Estate",
@@ -45,4 +46,15 @@ export function tableau(empire: Empire): Tier[] {
       reached: empire.route_established,
     },
   ];
+  // Section 13 — workshop row (visible when skilled_labour present, even if 0, to show bottleneck)
+  if (empire.skilled_labour !== undefined && empire.skilled_labour !== null) {
+    const labour = empire.skilled_labour;
+    rows.push({
+      id: "workshop",
+      label: "Workshop",
+      detail: labour > 0 ? `Skilled hands ${labour} · can craft ${labour * 10} grain/turn` : "No skilled hands",
+      reached: labour > 0,
+    });
+  }
+  return rows;
 }

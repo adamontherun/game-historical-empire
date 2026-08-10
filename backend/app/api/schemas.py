@@ -132,6 +132,13 @@ class CompletionSummaryView(BaseModel):
     final_rival_headlines: RivalHeadlines | None = None
 
 
+class LegacyView(BaseModel):
+    model_config = ConfigDict(frozen=True)
+    id: str
+    label: str
+    effect: str
+
+
 class GameView(BaseModel):
     model_config = ConfigDict(frozen=True)
 
@@ -155,3 +162,10 @@ class GameView(BaseModel):
         None  # C4: carries its own resolved context + unconditional causal_trace (B2/C2)
     )
     completion_summary: CompletionSummaryView | None = None  # C3: API-owned, not StrategicSummary
+    # Section 13 — epilogue additive fields (optional for backward compat)
+    skilled_labour: int | None = None
+    finished_goods: int | None = None
+    finished_goods_price: int | None = None
+    legacies: tuple[LegacyView, ...] | None = None
+    is_epilogue: bool | None = None
+    epilogue_turn: int | None = None

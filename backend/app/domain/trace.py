@@ -34,6 +34,11 @@ Kind = Literal[
     "trade",
     "river_supply",
     "river_price",
+    "craft",
+    "finished_inventory",
+    "finished_price",
+    "labour",
+    "urban_demand",
 ]
 
 
@@ -110,9 +115,20 @@ class CausalTrace(BaseModel):
                 # Demand signal nodes are stable inputs (like capacity) — allow delta 0 as root
                 if node.kind == "demand" and node.delta == 0:
                     continue
-                # Route nodes with zero delta may be roots (not yet established / no trade)
+                # Route/craft/labour nodes with zero delta may be roots (not yet established / no trade)
                 if (
-                    node.kind in ("route", "trade", "river_supply", "river_price")
+                    node.kind
+                    in (
+                        "route",
+                        "trade",
+                        "river_supply",
+                        "river_price",
+                        "craft",
+                        "finished_inventory",
+                        "finished_price",
+                        "labour",
+                        "urban_demand",
+                    )
                     and node.delta == 0
                 ):
                     continue
@@ -130,6 +146,13 @@ class CausalTrace(BaseModel):
                         "trade_revenue",
                         "transport_cost",
                         "trade_profit",
+                        "labour_capacity",
+                        "craft_conversion",
+                        "finished_inventory",
+                        "finished_price",
+                        "urban_demand",
+                        "raw_demand_shift",
+                        "hire_labour",
                     )
                     and node.delta == 0
                 ):
@@ -156,6 +179,11 @@ class CausalTrace(BaseModel):
                     "trade",
                     "river_supply",
                     "river_price",
+                    "craft",
+                    "finished_inventory",
+                    "finished_price",
+                    "labour",
+                    "urban_demand",
                 ):
                     raise ValueError(f"node {node.id!r} kind {node.kind!r} must have parent_ids")
                 # cash_after_command etc should have parents; but
