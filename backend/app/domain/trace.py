@@ -22,6 +22,7 @@ Kind = Literal[
     "cash",
     "production",
     "supply",
+    "demand",
     "price",
     "inventory",
     "quantity_value_effect",
@@ -111,6 +112,9 @@ class CausalTrace(BaseModel):
                 # Generic unchanged capacity nodes allowed
                 if node.kind == "capacity" and node.delta == 0:
                     continue
+                # Demand signal nodes are stable inputs (like capacity) — allow delta 0 as root
+                if node.kind == "demand" and node.delta == 0:
+                    continue
                 # Route nodes with zero delta may be roots (not yet established / no trade)
                 if (
                     node.kind in ("route", "trade", "river_supply", "river_price")
@@ -145,6 +149,7 @@ class CausalTrace(BaseModel):
                 if node.kind in (
                     "production",
                     "supply",
+                    "demand",
                     "price",
                     "inventory",
                     "quantity_value_effect",

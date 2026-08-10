@@ -1,4 +1,4 @@
-"""One-turn grain market kernel — Sections 4–5.
+"""One-turn grain market kernel — Sections 4–6.
 
 Resolves a single turn with explicit order:
 
@@ -21,6 +21,19 @@ Story drivers are exact partitions of wealth_delta ranked by wealth-bps.
 Section 5 adds: Home Valley (existing market) + River Town (river_market)
 + River Route (route) with transport cost / capacity / reliability.
 Ship trade is settlement after harvest, valued at river price.
+
+Supply semantics (Section 6): MarketState.supply is a regional
+market-availability signal/index at the start of the turn, not a literal
+conserved physical stock. Home Valley signal evolves as
+signal_next = max(0, signal + farm_output - demand), i.e. each turn's
+availability index is adjusted by harvest and drained by regional
+consumption (demand). Price is set on signal_next via _target_price
+with effective_supply guard, so surplus (farm_output > demand) raises the
+signal and depresses price, shortage (drought) lowers the signal and
+raises price. The same farm_output also enters player inventory; for this
+prototype no conservation is implied between the regional signal and
+player inventory (ownership/flow accounting is deferred to Section 14).
+River Town signal remains stable (exogenous) for Section 6.
 
 Spec: drought reduces production/yield, not directly price.
 """
@@ -698,6 +711,33 @@ def resolve_turn(
             )
         )
 
+    # Emit demand signal nodes (stable inputs) — Section 6 causal graph fix
+    # Home demand directly causes availability signal changes and price pressure
+    nodes.append(
+        CausalNode(
+            id="demand",
+            label=f"Home demand {before_demand}",
+            kind="demand",
+            before=before_demand,
+            after=before_demand,
+            delta=0,
+            reason_code="demand_stable",
+            parent_ids=(),
+        )
+    )
+    nodes.append(
+        CausalNode(
+            id="home_demand",
+            label=f"Home Valley demand {before_demand}",
+            kind="demand",
+            before=before_demand,
+            after=before_demand,
+            delta=0,
+            reason_code="demand_stable",
+            parent_ids=(),
+        )
+    )
+
     # 2. Production — farm output depends on post-command farm_capacity + world
     base_output = farm_capacity * YIELD_PER_CAPACITY
     if world == "drought":
@@ -729,37 +769,43 @@ def resolve_turn(
         )
     )
 
-    # 3. Home Supply — add farm_output to supply, clamped
+    # 3. Home Supply — availability signal drained by demand (Section 6 semantics)
+    # MarketState.supply is an availability signal/index at start; next signal = max(0, signal + farm_output - demand)
     supply_before_harvest = before_supply
-    next_supply = clamp_non_negative(supply_before_harvest + farm_output)
+    next_supply = clamp_non_negative(supply_before_harvest + farm_output - before_demand)
     supply_delta = next_supply - before_supply
+    # Reason reflects whether signal grew (surplus) or shrank (shortage)
+    if next_supply > before_supply:
+        supply_reason = "harvest_added_to_availability"
+    elif next_supply < before_supply:
+        supply_reason = "availability_drained_by_demand"
+    else:
+        supply_reason = "availability_unchanged"
+    if world == "drought" and next_supply < before_supply:
+        supply_reason = "drought_reduced_availability"
     nodes.append(
         CausalNode(
             id="supply",
-            label=f"Regional supply {before_supply} → {next_supply}",
+            label=f"Regional availability {before_supply}+{farm_output}-{before_demand}→{next_supply}",
             kind="supply",
             before=before_supply,
             after=next_supply,
             delta=supply_delta,
-            reason_code="harvest_added_to_supply"
-            if world == "normal"
-            else "lower_output_reduced_supply",
-            parent_ids=("farm_output",),
+            reason_code=supply_reason,
+            parent_ids=("farm_output", "demand"),
         )
     )
     # Also emit alias home_supply for clarity
     nodes.append(
         CausalNode(
             id="home_supply",
-            label=f"Home Valley supply {before_supply} → {next_supply}",
+            label=f"Home Valley availability {before_supply}+{farm_output}-{before_demand}→{next_supply}",
             kind="supply",
             before=before_supply,
             after=next_supply,
             delta=supply_delta,
-            reason_code="harvest_added_to_supply"
-            if world == "normal"
-            else "lower_output_reduced_supply",
-            parent_ids=("farm_output",),
+            reason_code=supply_reason,
+            parent_ids=("farm_output", "home_demand"),
         )
     )
     effects.append(
@@ -829,7 +875,7 @@ def resolve_turn(
             reason_code="supply_below_demand"
             if before_demand > next_supply
             else "supply_above_demand",
-            parent_ids=("supply",),
+            parent_ids=("supply", "demand"),
         )
     )
     nodes.append(
@@ -868,7 +914,7 @@ def resolve_turn(
             reason_code="supply_below_demand"
             if before_demand > next_supply
             else "supply_above_demand",
-            parent_ids=("home_supply",),
+            parent_ids=("home_supply", "home_demand"),
         )
     )
     nodes.append(
