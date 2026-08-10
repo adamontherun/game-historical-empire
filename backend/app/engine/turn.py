@@ -122,7 +122,7 @@ def _bounded_price(
 def resolve_turn(
     state: GameState,
     command: PlayerCommand,
-    pressure: PressureState | str,
+    pressure: PressureState,
     rng_context: TurnContext,
 ) -> TurnResolution:
     """Resolve one deterministic turn.
@@ -133,10 +133,6 @@ def resolve_turn(
         state: Canonical before state (includes home market, river market, route).
         command: Single player major action (now includes secure_route/ship_grain).
         pressure: Pressure state for this turn (world derived as pressure.world).
-            For backward compat with pre-Section 8 tests, a bare WorldCondition
-            string ("normal"/"drought") is still accepted and synthesized to a
-            minimal PressureState (stage matching world) so existing call sites
-            do not need mechanical editing before the gate.
         rng_context: Turn identity for deterministic substreams — must equal state context.
 
     Returns:
@@ -214,31 +210,24 @@ def resolve_turn(
     effects: list[DomainEffect] = []
 
     # Pressure stage — single source of truth (F3): reason_code is causal_source_id directly
-    # Backward compat: allow bare world string from pre-Section 8 call sites
-    if isinstance(pressure, str):
-        _world_str: str = pressure
-        # Synthesize minimal pressure for trace (activation_turn 0, stage matching world)
-        from app.domain.pressure import PressureState as _PS  # local import to avoid cycle
-
-        _stage = "drought" if _world_str == "drought" else "normal"
-        pressure = _PS(
-            pressure_id="legacy",
-            stage=_stage,  # type: ignore[arg-type]
-            activation_turn=0,
-            world=_world_str,  # type: ignore[arg-type]
-            signal="legacy",
-            title="Drought" if _world_str == "drought" else "Normal",
-        )
-    world = pressure.world  # type: ignore[union-attr]
+    # Label is stage-derived causal description, not presentation title (G5)
+    _STAGE_LABEL: dict[str, str] = {
+        "normal": "Normal conditions",
+        "early_dry": "Early dry conditions",
+        "worsening_dry": "Worsening dry conditions",
+        "drought": "Drought conditions",
+        "aftermath": "Aftermath conditions",
+    }
+    world = pressure.world
     nodes.append(
         CausalNode(
             id="pressure_stage",
-            label=pressure.title,  # type: ignore[union-attr]
+            label=_STAGE_LABEL.get(pressure.stage, pressure.stage),
             kind="pressure",
             before=None,
             after=None,
             delta=None,
-            reason_code=pressure.causal_source_id,  # type: ignore[union-attr]
+            reason_code=pressure.causal_source_id,
             parent_ids=(),
         )
     )

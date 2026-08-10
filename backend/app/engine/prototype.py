@@ -158,17 +158,19 @@ class StrategicSummary(BaseModel):
         lines.append(
             f"  river price: {self.initial_state.river_market.current_price} → {self.final_state.river_market.current_price}"
         )
-        # per-turn highlights
+        # per-turn highlights — include pressure stage per G2
         for i, res in enumerate(self.history):
             spec = TURN_SPECS[i] if i < len(TURN_SPECS) else None
             title = spec.title if spec else f"Turn {i + 1}"
+            pressure = PRESSURE_ARC[i] if i < len(PRESSURE_ARC) else None
+            stage = f" [{pressure.stage}]" if pressure else ""
             drivers = (
                 ", ".join(d.label for d in res.player_outcome.drivers)
                 if res.player_outcome.drivers
                 else "no material drivers"
             )
             lines.append(
-                f"  T{i + 1} {title}: wealth {res.player_outcome.wealth_delta:+} — {drivers}"
+                f"  T{i + 1} {title}{stage}: wealth {res.player_outcome.wealth_delta:+} — {drivers}"
             )
         # Rival per-turn headlines (derived)
         if self.rival_history is not None:

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from app.domain.types import GameState, InventoryState, MarketState, PlayerCommand, PlayerState
+from app.engine.pressure import PRESSURE_DROUGHT, PRESSURE_NORMAL, pressure_for_world
 from app.engine.turn import TURN_ORDER, resolve_turn
 
 
@@ -39,13 +40,13 @@ def test_determinism_same_inputs_same_result() -> None:
     state = _base_state()
     cmd = PlayerCommand(type="hold")
     ctx = state.to_turn_context()
-    r1 = resolve_turn(state, cmd, "drought", ctx)
-    r2 = resolve_turn(state, cmd, "drought", ctx)
+    r1 = resolve_turn(state, cmd, PRESSURE_DROUGHT, ctx)
+    r2 = resolve_turn(state, cmd, PRESSURE_DROUGHT, ctx)
     assert r1 == r2
     # also different command same seed but deterministic per command
     cmd2 = PlayerCommand(type="expand_farm")
-    r3 = resolve_turn(state, cmd2, "normal", ctx)
-    r4 = resolve_turn(state, cmd2, "normal", ctx)
+    r3 = resolve_turn(state, cmd2, PRESSURE_NORMAL, ctx)
+    r4 = resolve_turn(state, cmd2, PRESSURE_NORMAL, ctx)
     assert r3 == r4
     assert r1 != r3  # different command yields different result
 
@@ -56,15 +57,15 @@ def test_determinism_seed_matters_only_via_context() -> None:
     s1 = _base_state(seed="seed-A")
     s2 = _base_state(seed="seed-B")
     cmd = PlayerCommand(type="hold")
-    r1 = resolve_turn(s1, cmd, "normal", s1.to_turn_context())
-    r2 = resolve_turn(s2, cmd, "normal", s2.to_turn_context())
+    r1 = resolve_turn(s1, cmd, PRESSURE_NORMAL, s1.to_turn_context())
+    r2 = resolve_turn(s2, cmd, PRESSURE_NORMAL, s2.to_turn_context())
     # With same supply/demand/price, results may be equal;
     # In our impl core price is not RNG-driven, so seeds same next_state.
     # But we still prove determinism per seed: repeating same seed gives same.
-    r1b = resolve_turn(s1, cmd, "normal", s1.to_turn_context())
+    r1b = resolve_turn(s1, cmd, PRESSURE_NORMAL, s1.to_turn_context())
     assert r1 == r1b
     # r1 and r2 may be equal because RNG not affecting price; that's okay.
-    assert r2 == resolve_turn(s2, cmd, "normal", s2.to_turn_context())
+    assert r2 == resolve_turn(s2, cmd, PRESSURE_NORMAL, s2.to_turn_context())
 
 
 def test_turn_increments_and_no_negatives() -> None:
@@ -73,7 +74,7 @@ def test_turn_increments_and_no_negatives() -> None:
             state = _base_state()
             qty = 10 if cmd_type == "buy_grain" else None
             cmd = PlayerCommand(type=cmd_type, quantity=qty)  # type: ignore[arg-type]
-            res = resolve_turn(state, cmd, world, state.to_turn_context())  # type: ignore[arg-type]
+            res = resolve_turn(state, cmd, pressure_for_world(world), state.to_turn_context())
             ns = res.next_state
             assert ns.turn == state.turn + 1
             assert ns.player.cash >= 0
@@ -92,8 +93,8 @@ def test_turn_increments_and_no_negatives() -> None:
 def test_drought_reduces_farm_output_and_supply_not_direct_price() -> None:
     state = _base_state(farm=10, supply=100, demand=120)
     cmd = PlayerCommand(type="hold")
-    normal = resolve_turn(state, cmd, "normal", state.to_turn_context())
-    drought = resolve_turn(state, cmd, "drought", state.to_turn_context())
+    normal = resolve_turn(state, cmd, PRESSURE_NORMAL, state.to_turn_context())
+    drought = resolve_turn(state, cmd, PRESSURE_DROUGHT, state.to_turn_context())
 
     # Find farm_output nodes
     def farm_output(trace):  # type: ignore[no-untyped-def]
@@ -153,7 +154,7 @@ def test_farm_output_parents_are_world_and_farm_capacity_not_command() -> None:
         state = _base_state(farm=10, supply=100, demand=120)
         qty = 5 if cmd_type == "buy_grain" else None
         cmd = PlayerCommand(type=cmd_type, quantity=qty)  # type: ignore[arg-type]
-        res = resolve_turn(state, cmd, "normal", state.to_turn_context())  # type: ignore[arg-type]
+        res = resolve_turn(state, cmd, PRESSURE_NORMAL, state.to_turn_context())
         # Every turn must have a stable farm_capacity node
         assert any(n.id == "farm_capacity" for n in res.causal_trace.nodes), (
             f"missing farm_capacity for {cmd_type}"
@@ -181,7 +182,7 @@ def test_buy_beyond_cash_is_clamped() -> None:
     # Farm 10 gives output 100, storage 100 caps total to 100.
     state = _base_state(cash=100, grain=0, storage=100, current_price=5000)
     cmd = PlayerCommand(type="buy_grain", quantity=50)  # request 50, can only afford 20
-    res = resolve_turn(state, cmd, "normal", state.to_turn_context())
+    res = resolve_turn(state, cmd, PRESSURE_NORMAL, state.to_turn_context())
     # Buy itself is clamped to 20 — verify via inventory_after_buy node
     buy_node = next(n for n in res.causal_trace.nodes if n.id == "inventory_after_buy")
     assert buy_node.delta == 20
@@ -205,7 +206,7 @@ def test_buy_beyond_storage_is_clamped() -> None:
     )
     # farm 0 => no harvest to confuse; inventory after should be exactly capped
     cmd = PlayerCommand(type="buy_grain", quantity=20)
-    res = resolve_turn(state, cmd, "normal", state.to_turn_context())
+    res = resolve_turn(state, cmd, PRESSURE_NORMAL, state.to_turn_context())
     # With farm 0, farm_output 0, so inventory final = 25 + min(20,5)=30
     assert res.next_state.player.inventory.grain == 30
     # Check reason
@@ -220,7 +221,7 @@ def test_every_major_change_has_trace_entry() -> None:
     # Expand farm should have farm_capacity, cash, farm_output, supply, price nodes
     state = _base_state()
     cmd = PlayerCommand(type="expand_farm")
-    res = resolve_turn(state, cmd, "normal", state.to_turn_context())
+    res = resolve_turn(state, cmd, PRESSURE_NORMAL, state.to_turn_context())
     ids = {n.id for n in res.causal_trace.nodes}
     assert "command" in ids
     assert "farm_capacity" in ids
@@ -238,7 +239,7 @@ def test_every_major_change_has_trace_entry() -> None:
 def test_hold_does_not_change_capacities() -> None:
     state = _base_state(cash=500, farm=5, storage=50)
     cmd = PlayerCommand(type="hold")
-    res = resolve_turn(state, cmd, "normal", state.to_turn_context())
+    res = resolve_turn(state, cmd, PRESSURE_NORMAL, state.to_turn_context())
     assert res.next_state.player.farm_capacity == 5
     assert res.next_state.player.storage_capacity == 50
     # Cash unchanged by hold (except maybe? hold costs 0)
@@ -248,11 +249,13 @@ def test_hold_does_not_change_capacities() -> None:
 def test_expand_farm_consumes_cash_and_increases_capacity() -> None:
     state = _base_state(cash=1000, farm=10, storage=50)
     cmd = PlayerCommand(type="expand_farm")
-    res = resolve_turn(state, cmd, "normal", state.to_turn_context())
+    res = resolve_turn(state, cmd, PRESSURE_NORMAL, state.to_turn_context())
     assert res.next_state.player.cash == 500
     assert res.next_state.player.farm_capacity == 20
     # With higher farm, output should be higher than hold
-    hold_res = resolve_turn(state, PlayerCommand(type="hold"), "normal", state.to_turn_context())
+    hold_res = resolve_turn(
+        state, PlayerCommand(type="hold"), PRESSURE_NORMAL, state.to_turn_context()
+    )
     assert (
         res.next_state.player.inventory.grain > hold_res.next_state.player.inventory.grain
         or res.next_state.market.supply > hold_res.next_state.market.supply
@@ -262,7 +265,7 @@ def test_expand_farm_consumes_cash_and_increases_capacity() -> None:
 def test_build_granary_increases_storage() -> None:
     state = _base_state(cash=1000, storage=50)
     cmd = PlayerCommand(type="build_granary")
-    res = resolve_turn(state, cmd, "normal", state.to_turn_context())
+    res = resolve_turn(state, cmd, PRESSURE_NORMAL, state.to_turn_context())
     assert res.next_state.player.storage_capacity == 100
     assert res.next_state.player.cash == 700
 
@@ -271,12 +274,12 @@ def test_price_bounded_movement() -> None:
     # Create extreme scarcity to try to push price far, but max_movement caps it
     state = _base_state(supply=10, demand=1000, base_price=5000, current_price=5000)
     cmd = PlayerCommand(type="hold")
-    res = resolve_turn(state, cmd, "normal", state.to_turn_context())
+    res = resolve_turn(state, cmd, PRESSURE_NORMAL, state.to_turn_context())
     # max_movement 2000 bps =20% => max delta 1000
     assert abs(res.next_state.market.current_price - 5000) <= 1000
     # Also check that price stays positive even when supply huge
     state2 = _base_state(supply=10000, demand=10, base_price=5000, current_price=5000)
-    res2 = resolve_turn(state2, cmd, "normal", state2.to_turn_context())
+    res2 = resolve_turn(state2, cmd, PRESSURE_NORMAL, state2.to_turn_context())
     assert res2.next_state.market.current_price >= 1
     assert res2.next_state.market.current_price < 5000  # downward pressure
 
@@ -292,7 +295,7 @@ def test_player_outcome_drivers_deterministic_and_bounded() -> None:
     state = _base_state()
     cmd = PlayerCommand(type="expand_farm")
     ctx = state.to_turn_context()
-    r1 = resolve_turn(state, cmd, "drought", ctx)
-    r2 = resolve_turn(state, cmd, "drought", ctx)
+    r1 = resolve_turn(state, cmd, PRESSURE_DROUGHT, ctx)
+    r2 = resolve_turn(state, cmd, PRESSURE_DROUGHT, ctx)
     assert r1.player_outcome.top_drivers == r2.player_outcome.top_drivers
     assert len(r1.player_outcome.top_drivers) <= 3

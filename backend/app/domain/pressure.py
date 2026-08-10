@@ -38,6 +38,19 @@ class PressureState(BaseModel):
         description="Trace causal_source_id — defaults to f'pressure:{pressure_id}:{stage}'",
     )
 
+    @model_validator(mode="before")
+    @classmethod
+    def _populate_causal_source_id(cls, data: object) -> object:
+        # Populate default causal_source_id before validation (G6: avoid frozen mutation)
+        if isinstance(data, dict):
+            cid = data.get("causal_source_id")
+            if not cid:
+                pid = data.get("pressure_id")
+                stage = data.get("stage")
+                if pid and stage:
+                    data["causal_source_id"] = f"pressure:{pid}:{stage}"
+        return data
+
     @model_validator(mode="after")
     def _validate(self) -> PressureState:
         # Biconditional: stage == "drought" <=> world == "drought" (F2)
@@ -48,12 +61,9 @@ class PressureState(BaseModel):
                 f"stage {self.stage!r} and world {self.world!r} mismatch: "
                 f"stage == 'drought' must iff world == 'drought'"
             )
-        # causal_source_id single source (F3)
+        # causal_source_id single source (F3) — must match formula if explicitly set
         expected = f"pressure:{self.pressure_id}:{self.stage}"
-        if not self.causal_source_id:
-            # Fill default via object.__setattr__ since frozen
-            object.__setattr__(self, "causal_source_id", expected)  # type: ignore[attr-defined]
-        elif self.causal_source_id != expected:
+        if self.causal_source_id != expected:
             raise ValueError(
                 f"causal_source_id {self.causal_source_id!r} != expected {expected!r} "
                 f"(must equal f'pressure:{{pressure_id}}:{{stage}}')"

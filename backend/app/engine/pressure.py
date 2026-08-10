@@ -60,6 +60,38 @@ for _idx, _p in enumerate(PRESSURE_ARC):
         )
 
 
+# Reusable constants for tests / headless callers that need a normal/drought pressure
+# without referencing a turn index. These are the mechanical replacement for the
+# former bare "normal"/"drought" strings (G1).
+PRESSURE_NORMAL: PressureState = PressureState(
+    pressure_id="test",
+    stage="normal",
+    activation_turn=0,
+    world="normal",
+    signal="test normal",
+    title="Normal",
+)
+
+PRESSURE_DROUGHT: PressureState = PressureState(
+    pressure_id="test",
+    stage="drought",
+    activation_turn=3,
+    world="drought",
+    signal="test drought",
+    title="Drought",
+)
+
+PRESSURE_BY_WORLD: dict[str, PressureState] = {
+    "normal": PRESSURE_NORMAL,
+    "drought": PRESSURE_DROUGHT,
+}
+
+
+def pressure_for_world(world: WorldCondition) -> PressureState:
+    """Return canonical test pressure for a WorldCondition (G1 helper)."""
+    return PRESSURE_BY_WORLD[world]
+
+
 def pressure_for_turn(idx: int) -> PressureState:
     """Return PressureState for turn idx (0..4), else raise."""
     if not 0 <= idx < len(PRESSURE_ARC):

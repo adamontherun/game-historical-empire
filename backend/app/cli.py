@@ -14,6 +14,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from app.domain.types import PlayerCommand
+from app.engine.pressure import PRESSURE_ARC
 from app.engine.prototype import TURN_SPECS, FiveTurnGame
 
 # Map user tokens to PlayerCommand
@@ -154,9 +155,12 @@ def main(argv: list[str] | None = None) -> int:
         print(f"  ROUTE {format_route_state(game)}")
         for i, cmd in enumerate(choices):
             spec = TURN_SPECS[i]
-            print(f"\n--- TURN {i + 1}/5 — {spec.title} ---")
+            pressure = PRESSURE_ARC[i]
+            print(f"\n--- TURN {i + 1}/5 — {spec.title} [{pressure.stage}] ---")
             print(f"Signal: {spec.signal}")
-            print(f"World: {spec.world}  Player: {format_player_state(game)}")
+            print(
+                f"World: {spec.world}  Pressure: {pressure.stage}  Player: {format_player_state(game)}"
+            )
             print(
                 f"HOME  {format_market_pulse('Home', game.state.market.supply, game.state.market.demand, game.state.market.base_price, game.state.market.current_price)}"
             )
@@ -232,10 +236,14 @@ def main(argv: list[str] | None = None) -> int:
     while not game.is_complete:
         spec = game.current_spec()
         assert spec is not None
+        pressure = game.current_pressure
+        assert pressure is not None
         turn_idx = len(game.history)  # 0-based
-        print(f"\n--- TURN {turn_idx + 1}/5 — {spec.title} ---")
+        print(f"\n--- TURN {turn_idx + 1}/5 — {spec.title} [{pressure.stage}] ---")
         print(f"Signal: {spec.signal}")
-        print(f"World will be: {spec.world} (resolved after your choice)")
+        print(
+            f"World will be: {spec.world}  Pressure: {pressure.stage} (resolved after your choice)"
+        )
         print(f"Player: {format_player_state(game)}")
         print(
             f"HOME  {format_market_pulse('Home', game.state.market.supply, game.state.market.demand, game.state.market.base_price, game.state.market.current_price)}"
