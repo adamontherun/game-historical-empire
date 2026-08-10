@@ -211,7 +211,19 @@ OpenAPI at `/docs` (FastAPI default).
 - Frontend: Vite static build, `VITE_API_URL` pointing to backend.
 - Keep `render.yaml` minimal — don't introduce Docker unless Section 16 requires it.
 
-## 13. What Not To Do
+## 13. Knowledge Graph (Graphify)
+
+Project has a deterministic knowledge graph at `graphify-out/` (tree-sitter AST, local-first, no LLM for code). Prefer the graph over raw grep for codebase questions.
+
+Rules:
+
+- If `graphify-out/graph.json` exists: start with `graphify query "<question>"` (BFS, ~2k token budget). Use `graphify path "<A>" "<B>"` to trace two concepts and `graphify explain "<concept>"` for one node. Try `graphify god-nodes --top 10` for hubs; raise budget with `--budget 4000` if truncated.
+- Only read `graphify-out/GRAPH_REPORT.md` for broad architecture; load `graphify-out/graph.json` / `graph.html` directly only if query/path/explain was insufficient. If `graphify-out/wiki/index.md` exists, use it for broad navigation.
+- After touching `backend/` or `docs/`: run `graphify update .` (code-only, no API cost). A `post-commit` hook also rebuilds automatically; full LLM re-extraction is `graphify extract .` (needs `ANTHROPIC_API_KEY`/`OPENAI_API_KEY`/`GEMINI_API_KEY`) and `graphify extract . --code-only` for code alone.
+- Visual: `open graphify-out/graph.html` (force-directed, click/filter/search).
+- Skills are at `.claude/skills/graphify/SKILL.md` + `.agents/skills/graphify/SKILL.md`; Muse hook guard is in `.claude/settings.json` — this `AGENTS.md` section is the binding for Muse.
+
+## 14. What Not To Do
 
 - Don't implement future Sections early (8 ages, spoilage, credit, brands, automation, generic content DSL, LLMs for rival decisions) — `BUILD_SPEC.md` forbids it.
 - Don't put executable formulas in content JSON — Python owns formulas, content supplies parameters.
