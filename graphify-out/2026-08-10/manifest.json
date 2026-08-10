@@ -220,8 +220,8 @@
     "semantic_hash": ""
   },
   "STATE.md": {
-    "mtime": 1786386864.3475747,
-    "ast_hash": "e573e860e754236aa51427a265dcdd8e",
+    "mtime": 1786387968.1196992,
+    "ast_hash": "cbbd1357d8e46e0ad237f7b9f47b9ca7",
     "semantic_hash": ""
   },
   "backend/AGENTS.md": {
@@ -470,8 +470,8 @@
     "semantic_hash": ""
   },
   "frontend/e2e/critical.spec.ts": {
-    "mtime": 1786386722.561225,
-    "ast_hash": "676dc1ac286a56b45f7121f0fe8115b5",
+    "mtime": 1786387764.1945846,
+    "ast_hash": "4c8168766cebb0ad4f440b0320290efd",
     "semantic_hash": ""
   },
   "frontend/eslint.config.js": {
@@ -490,18 +490,18 @@
     "semantic_hash": ""
   },
   "frontend/src/App.tsx": {
-    "mtime": 1786387157.76478,
-    "ast_hash": "4baa8e2b5d4a25b8ec32c83c8bf2fda2",
+    "mtime": 1786387866.5646334,
+    "ast_hash": "465415699ffd0e84555b7ec76d8edc66",
     "semantic_hash": ""
   },
   "frontend/src/__tests__/commit.test.tsx": {
-    "mtime": 1786386385.6586728,
-    "ast_hash": "7257c777fead18677dc2728f00281226",
+    "mtime": 1786387555.3323514,
+    "ast_hash": "915f49092b3f4ef0025e187e34383691",
     "semantic_hash": ""
   },
   "frontend/src/__tests__/decisionBlock.test.tsx": {
-    "mtime": 1786386382.4349928,
-    "ast_hash": "2e8327a8d7de929e49846dcdd7223b0e",
+    "mtime": 1786387589.5651512,
+    "ast_hash": "046a095dd87316ecb568ad05bb1d3381",
     "semantic_hash": ""
   },
   "frontend/src/__tests__/format.test.ts": {
@@ -510,8 +510,8 @@
     "semantic_hash": ""
   },
   "frontend/src/__tests__/outcomeReveal.test.tsx": {
-    "mtime": 1786386475.5537329,
-    "ast_hash": "a51b0f2f9ead77461ff73fa4eb8fc5b0",
+    "mtime": 1786387565.3063457,
+    "ast_hash": "71aaed88a44ed4776e427411fb45c932",
     "semantic_hash": ""
   },
   "frontend/src/__tests__/setup.ts": {
@@ -540,13 +540,13 @@
     "semantic_hash": ""
   },
   "frontend/src/components/CompletionSummary.tsx": {
-    "mtime": 1786386359.229397,
-    "ast_hash": "cfcbd6d2484bf1123296b33f5c4f2ebb",
+    "mtime": 1786387514.963773,
+    "ast_hash": "e84e2bd38a5f03e9553a2a0c60a3940c",
     "semantic_hash": ""
   },
   "frontend/src/components/DecisionBlock.tsx": {
-    "mtime": 1786386351.3693423,
-    "ast_hash": "6ed91174ba9cf56c9f756107c10a0f9f",
+    "mtime": 1786387530.223847,
+    "ast_hash": "9ad8b5ab020d339a580603ce5fe3a5d1",
     "semantic_hash": ""
   },
   "frontend/src/components/EmpireTableau.tsx": {
@@ -575,13 +575,13 @@
     "semantic_hash": ""
   },
   "frontend/src/components/OutcomeReveal.tsx": {
-    "mtime": 1786386356.6702063,
-    "ast_hash": "abc8c994da799dd072644114784bad2c",
+    "mtime": 1786387620.4247012,
+    "ast_hash": "82f7e792d1dc2e73dd04a0a155c2703a",
     "semantic_hash": ""
   },
   "frontend/src/components/RivalsStrip.tsx": {
-    "mtime": 1786386347.145026,
-    "ast_hash": "326b341d23e8d8b4a9e2394dcdd4ab41",
+    "mtime": 1786387509.685782,
+    "ast_hash": "7c13578e4e4b992481f3c78555f882c8",
     "semantic_hash": ""
   },
   "frontend/src/components/RouteLine.tsx": {
@@ -640,23 +640,23 @@
     "semantic_hash": ""
   },
   "frontend/e2e/screenshots/drought-reveal.png": {
-    "mtime": 1786387122.436092,
-    "ast_hash": "31823545677dbb9af49fbb20e237cd0a",
+    "mtime": 1786387937.5879369,
+    "ast_hash": "09b15c54bc77047444dddab2dd6f9cf6",
     "semantic_hash": ""
   },
   "frontend/e2e/screenshots/drought-warning.png": {
-    "mtime": 1786387117.3849092,
-    "ast_hash": "88ad79441c4b07bc3ab99aceee645209",
+    "mtime": 1786387932.633346,
+    "ast_hash": "336431886627471602a25ebd6455d9eb",
     "semantic_hash": ""
   },
   "frontend/e2e/screenshots/final-summary.png": {
-    "mtime": 1786387125.0320988,
-    "ast_hash": "2307f247c3ce099f342c4f23a1b5fc52",
+    "mtime": 1786387940.1510558,
+    "ast_hash": "f79b3a4164574759ae9830e9445ba7e0",
     "semantic_hash": ""
   },
   "frontend/e2e/screenshots/first-decision.png": {
-    "mtime": 1786387112.2365937,
-    "ast_hash": "24bc11d78b04ab7509b4dae68fc79541",
+    "mtime": 1786387927.6301765,
+    "ast_hash": "2d7b5cde1d48f7880dd5496158ac4e88",
     "semantic_hash": ""
   },
   "docs/plans/2026-08-10-section-11-review-round-2.md": {
