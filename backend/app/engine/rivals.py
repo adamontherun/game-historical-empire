@@ -540,9 +540,20 @@ def choose_rival_command(
 def _headline_for(
     profile: RivalProfile,
     reason_code: str,
+    *,
+    buy_actual: int = 0,
+    ship_effective: int = 0,
 ) -> str:
-    """Derive truthful headline from reason_code, not bool success."""
+    """Derive truthful headline from reason_code and actual quantities.
+
+    Partial buys/shipments (insufficient_cash but >0 actually moved) must
+    not claim nothing was bought/shipped — select the success wording instead.
+    """
     pid = profile.id
+    if reason_code == "insufficient_cash" and buy_actual > 0:
+        return HEADLINES_BY_REASON[pid].get("buy_grain", "Rival acted.")
+    if reason_code == "insufficient_cash_for_transport" and ship_effective > 0:
+        return HEADLINES_BY_REASON[pid].get("ship_grain", "Rival acted.")
     return HEADLINES_BY_REASON[pid].get(
         reason_code, HEADLINES_BY_REASON[pid].get("hold", "Rival acted.")
     )
@@ -709,10 +720,15 @@ def apply_rival_command(
 
     inventory_delta = after.inventory.grain - before.inventory.grain
 
-    # Headline — truthful from resolved reason_code, not bool success
-    # For ship commands the reason is ship_reason, otherwise cmd_reason
+    # Headline — truthful from resolved reason_code and actual quantities
+    # Partial buys/shipments must not claim nothing moved when some did
     final_reason = ship_reason if cmd_type == "ship_grain" else cmd_reason
-    headline = _headline_for(profile, final_reason)
+    headline = _headline_for(
+        profile,
+        final_reason,
+        buy_actual=buy_actual,
+        ship_effective=ship_effective,
+    )
 
     return RivalTurnResult(
         rival_id=profile.id,

@@ -1,10 +1,10 @@
 {
-  "0": "PlayerCommand",
-  "1": "InventoryState",
+  "0": "resolve_turn",
+  "1": "GameState",
   "2": "test_determinism.py",
   "3": "FiveTurnGame",
   "4": "What You Must Do When Invoked",
-  "5": "rivals.py",
+  "5": "test_deterministic_rivals.py",
   "6": "Plan — Section 1: Repository Contract and Walking Skeleton",
   "7": "What You Must Do When Invoked",
   "8": "Section 5 — Two Markets and One Trade Route — Plan",
@@ -66,8 +66,15 @@
   "64": "SECTION 4 — Causal Explanation and Outcome Model",
   "65": "Part VIII — Agent Guardrails",
   "66": "SECTION 8 — Pressure-Driven Event Arc",
-  "67": "SECTION 9 — Headless Strategy and Balance Harness",
+  "67": "rivals.py",
   "68": "SECTION 20 — Visual Asset System and Polish",
+  "69": "prototype.py",
   "70": "Section 7 — Deterministic Rivals — Plan (Rev 2)",
-  "79": "Part I — Product North Star"
+  "71": "apply_rival_command",
+  "72": "RivalProfile",
+  "73": "test_canonical_run_has_three_diffs",
+  "74": "test_no_float_in_rival_scoring",
+  "75": "test_rival_state_has_no_headline",
+  "76": "BaseModel",
+  "77": "WorldCondition"
 }

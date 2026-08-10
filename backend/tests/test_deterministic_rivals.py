@@ -547,3 +547,112 @@ def test_integer_scoring_exact_tie_rng() -> None:
     m1 = choose_rival_command(MIRA_PROFILE, poor, obs)
     m2 = choose_rival_command(MIRA_PROFILE, poor, obs)
     assert m1.type == m2.type
+
+
+def test_partial_buy_insufficient_cash_headline_truthful() -> None:
+    """Partial buy (cash limits 10→4) must not say 'could not buy' — headline reflects actual quantity."""
+    # Isolate buy by using farm 0 (no harvest) so inventory delta is purely buy
+    before = RivalState(
+        cash=22,
+        inventory=InventoryState(grain=10),
+        farm_capacity=0,
+        storage_capacity=200,
+        route_established=False,
+    )
+    settlement = SettlementContext(
+        world_now="normal",
+        home_price_pre=5000,
+        river_price_resolved=5200,
+        home_price_resolved=5000,
+        transport_cost_per_unit=800,
+        route_capacity=20,
+        reliability_bps=10000,
+    )
+    res = apply_rival_command(
+        MIRA_PROFILE, before, PlayerCommand(type="buy_grain", quantity=10), settlement
+    )
+    assert res.reason_code == "insufficient_cash"
+    # affordable at 5000 with cash 22 => 4 units, cost 20
+    assert res.after.cash == 2, f"cash after partial buy should be 2, got {res.after.cash}"
+    assert res.after.inventory.grain == 14, (
+        f"inventory should be 10+4, got {res.after.inventory.grain}"
+    )
+    assert res.cash_delta == -20
+    assert "could not buy" not in res.headline, (
+        f"partial buy headline falsely claims zero: {res.headline}"
+    )
+    assert "accumulated" in res.headline or "stockpiled" in res.headline
+    # Zero-buy counterpart remains false headline
+    poor_before = RivalState(
+        cash=0,
+        inventory=InventoryState(grain=10),
+        farm_capacity=0,
+        storage_capacity=200,
+        route_established=False,
+    )
+    res_zero = apply_rival_command(
+        MIRA_PROFILE, poor_before, PlayerCommand(type="buy_grain", quantity=10), settlement
+    )
+    assert res_zero.reason_code == "insufficient_cash"
+    assert res_zero.after.inventory.grain == 10
+    assert "could not buy" in res_zero.headline
+
+
+def test_partial_ship_insufficient_cash_for_transport_headline_truthful() -> None:
+    """Partial ship (transport cash limits 10→7) must not say 'could not ship'."""
+    before = RivalState(
+        cash=5,
+        inventory=InventoryState(grain=50),
+        farm_capacity=0,
+        storage_capacity=200,
+        route_established=True,
+    )
+    settlement = SettlementContext(
+        world_now="normal",
+        home_price_pre=5000,
+        river_price_resolved=6200,
+        home_price_resolved=5000,
+        transport_cost_per_unit=800,
+        route_capacity=20,
+        reliability_bps=10000,
+    )
+    res = apply_rival_command(
+        DARAN_PROFILE, before, PlayerCommand(type="ship_grain", quantity=10), settlement
+    )
+    assert res.reason_code == "insufficient_cash_for_transport"
+    # affordable transport at 800 with cash 5 => 7 units
+    assert res.after.inventory.grain == 43, f"50 -7 shipped =43, got {res.after.inventory.grain}"
+    # revenue 7*6200//1000=43, cost 7*800//1000=5, trade +38, cash 5+38=43
+    assert res.after.cash == 43
+    assert "could not ship" not in res.headline, (
+        f"partial ship headline falsely claims zero: {res.headline}"
+    )
+    assert "shipped" in res.headline.lower()
+    # Zero-ship counterpart remains — need high transport to force affordable 0
+    poor_settlement = SettlementContext(
+        world_now="normal",
+        home_price_pre=5000,
+        river_price_resolved=6200,
+        home_price_resolved=5000,
+        transport_cost_per_unit=5000,
+        route_capacity=20,
+        reliability_bps=10000,
+    )
+    poor_before_ship = RivalState(
+        cash=0,
+        inventory=InventoryState(grain=50),
+        farm_capacity=0,
+        storage_capacity=200,
+        route_established=True,
+    )
+    res_zero = apply_rival_command(
+        DARAN_PROFILE,
+        poor_before_ship,
+        PlayerCommand(type="ship_grain", quantity=10),
+        poor_settlement,
+    )
+    assert res_zero.reason_code == "insufficient_cash_for_transport"
+    assert res_zero.after.inventory.grain == 50
+    assert (
+        "could not ship" in res_zero.headline or "short of cash for transport" in res_zero.headline
+    )
