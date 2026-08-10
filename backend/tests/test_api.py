@@ -125,18 +125,12 @@ def test_no_history_in_gameview(client: TestClient) -> None:
         choice_id = _get_game(client, game_id)["available_choices"][0]["id"]
         gv = _choose(client, game_id, choice_id, rev).json()
         rev += 1
-    # serialized json must not contain history or nested TurnResolution beyond latest_outcome
     import json
 
     raw = json.dumps(gv)
-    # "history" should not appear as a top-level key or in completion_summary
-    assert (
-        '"history"' not in raw or raw.count('"history"') == 0
-    )  # if trace contains word history? check keys
-    # more precise: check dict keys
+    assert '"history"' not in raw
     assert "history" not in gv
     assert "history" not in (gv.get("completion_summary") or {})
-    # completion_summary must not have initial_state/final_state
     cs = gv["completion_summary"]
     assert cs is not None
     assert "initial_state" not in cs
@@ -285,76 +279,75 @@ def test_gameview_internal_consistency(client: TestClient) -> None:
     assert wealth == cash + grain * price // 1000
 
 
-# B1 — turn invariant: choices depend on state, not turn index
+# B1 — turn invariant: choices depend on state, not turn index (D1: sweep every turn, D2: no protected poke)
 def test_available_choices_turn_invariant() -> None:
     from app.api.mappers import choices_for
     from app.api.sessions import GameSession
-    from app.domain.types import GameState, InventoryState, MarketState, PlayerState, RouteState
-    from app.engine.prototype import FiveTurnGame
+    from app.domain.types import (
+        GameState,
+        InventoryState,
+        MarketState,
+        PlayerCommand,
+        PlayerState,
+        RouteState,
+    )
+    from app.engine.prototype import TURN_LIMIT, FiveTurnGame
 
-    # same cash/inventory/route state across fake turn indices
-    base = GameState(
+    # Contrived state where real submits do not move cash/inventory/route:
+    # farm 0 => no harvest, 0 movement => price stable, hold keeps everything identical.
+    contrived = GameState(
         turn=0,
         run_seed="inv-seed",
         ruleset_version="1.0",
         player=PlayerState(
-            cash=1000, inventory=InventoryState(grain=20), farm_capacity=5, storage_capacity=130
+            cash=10000, inventory=InventoryState(grain=0), farm_capacity=0, storage_capacity=1000
         ),
         market=MarketState(
             supply=280,
             demand=410,
             base_price=5000,
             current_price=5000,
-            responsiveness=4000,
-            max_movement_bps=2000,
-            regional_output=360,
+            responsiveness=0,
+            max_movement_bps=0,
+            regional_output=0,
         ),
         river_market=MarketState(
             supply=80,
             demand=130,
             base_price=5200,
             current_price=5200,
-            responsiveness=5000,
-            max_movement_bps=2000,
+            responsiveness=0,
+            max_movement_bps=0,
         ),
         route=RouteState(
             transport_cost_per_unit=300,
             capacity=20,
             reliability_bps=10000,
-            established=True,
+            established=False,
             delay_turns=0,
         ),
     )
-    # create sessions with different history lengths but same state
+    game = FiveTurnGame(seed="inv-seed", version="1.0", start_state=contrived)
     import asyncio
 
-    def make_session_with_len(n: int) -> GameSession:
-        g = FiveTurnGame(seed="inv-seed", version="1.0", start_state=base)
-        # fake history length by appending dummy history entries via protected attribute
-        # We don't have real TurnResolutions; instead we just set _history length by calling submit with holds
-        # For invariance we want same state but different turn — so we manually set _history to length n with same state
-        # Instead of faking TurnResolutions, we just call submit n times on a copy that preserves cash? That changes state.
-        # So directly manipulate _history with placeholder None? But choices_for only uses state, not history length for legality.
-        # So we can just set _history to a list of None of length n for test purpose — but then game.state unchanged.
-        # choices_for ignores history length (B1 fix), so it will be identical.
-        g._history = [None] * n  # type: ignore[attr-defined]
-        return GameSession(
+    seen: list[set[str]] = []
+    for n in range(TURN_LIMIT):
+        sess = GameSession(
             game_id="x",
             run_seed="inv-seed",
             revision=n,
-            game=g,
+            game=game,
             created_at="now",
             lock=asyncio.Lock(),
         )
-
-    s0 = make_session_with_len(0)
-    s3 = make_session_with_len(3)
-    ids0 = {c.id for c in choices_for(s0)}
-    ids3 = {c.id for c in choices_for(s3)}
-    # With same state (including route established), choices must be identical
-    assert ids0 == ids3, (
-        f"turn invariant violated: {ids0} vs {ids3} — API would be gating on turn index"
-    )
+        seen.append({c.id for c in choices_for(sess)})
+        if n < TURN_LIMIT - 1:
+            game.submit(PlayerCommand(type="hold"))  # type: ignore[arg-type]
+    first = seen[0]
+    for idx, ids in enumerate(seen[1:], start=1):
+        assert ids == first, (
+            f"turn invariant violated at {idx}: {first} vs {ids} — API would be gating on turn index"
+        )
 
 
 def test_available_choices_include_two_quantities(client: TestClient) -> None:
