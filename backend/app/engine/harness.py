@@ -43,19 +43,27 @@ def _can_afford(cash: int, cost: int) -> bool:
 def policy_production_heavy(
     state: GameState, turn_idx: int, seed: str, version: str
 ) -> PlayerCommand:
-    """Production: expand farm aggressively early, sell only at peak.
+    """Production: expand farm aggressively early, sell surplus that won't fit.
 
-    Strategy: invest cash into capacity when affordable; once expanded, hold
-    the extra grain through drought and sell at the price peak (turn 4) rather
-    than early at depressed prices (own output suppresses price).
+    Strategy: invest cash into capacity when affordable; after expanding, sell
+    each turn the amount that would overflow storage after the next harvest
+    rather than hoarding into a cap and dumping at the end. This avoids
+    harvest waste (capped_by_storage) while still carrying profitable grain.
     """
+    from app.engine.actor import YIELD_PER_CAPACITY
+
     if turn_idx < 2 and _can_afford(state.player.cash, EXPAND_FARM_COST + 50):
         return PlayerCommand(type="expand_farm")  # type: ignore[arg-type]
     if turn_idx == 2 and _can_afford(state.player.cash, EXPAND_FARM_COST + 50):
         return PlayerCommand(type="expand_farm")  # type: ignore[arg-type]
-    if turn_idx == 4 and state.player.inventory.grain > 10:
-        qty = min(state.player.inventory.grain // 2 + 20, state.player.inventory.grain)
-        qty = min(qty, 150)
+    # After expansion, sell surplus that will not fit after next harvest.
+    # Use normal yield as predictor (drought only reduces output, so this is
+    # conservative — we never sell more than would overflow on a normal turn).
+    predicted_output = state.player.farm_capacity * YIELD_PER_CAPACITY
+    predicted_after_harvest = state.player.inventory.grain + predicted_output
+    if predicted_after_harvest > state.player.storage_capacity and state.player.inventory.grain > 0:
+        surplus = predicted_after_harvest - state.player.storage_capacity
+        qty = min(surplus, state.player.inventory.grain)
         if qty > 0:
             return PlayerCommand(type="sell_grain", quantity=qty)  # type: ignore[arg-type]
     return PlayerCommand(type="hold")  # type: ignore[arg-type]
@@ -90,11 +98,14 @@ def policy_storage_heavy(state: GameState, turn_idx: int, seed: str, version: st
 
 
 def policy_trade_heavy(state: GameState, turn_idx: int, seed: str, version: str) -> PlayerCommand:
-    """Trade: secure route early, buy scaled pre-drought, ship/sell at peak.
+    """Trade: secure route early, ship every profitable turn, stop when not.
 
-    Strategy: pay route cost early, then buy as much as cash/headroom allow,
-    hold through drought, then ship at peak (river arbitrage) and sell remainder
-    at Home peak. Only monetize at turn 4 peak.
+    Strategy: pay route cost early, then each turn evaluate ship margin
+    (river_price - transport_cost - home_price). If margin >0 and inventory
+    exists, ship up to capacity/inventory/cash. Otherwise, deploy cash into
+    grain while space exists (buy scaled pre-drought). At turn 4 when margin
+    is negative (home famine premium), sell remaining inventory at Home peak
+    rather than shipping at a loss.
     """
     if (
         turn_idx == 0
@@ -102,6 +113,28 @@ def policy_trade_heavy(state: GameState, turn_idx: int, seed: str, version: str)
         and _can_afford(state.player.cash, ROUTE_ESTABLISH_COST)
     ):
         return PlayerCommand(type="secure_route")  # type: ignore[arg-type]
+    # For any turn where route is established, consider shipping if profitable.
+    if state.route.established and state.player.inventory.grain > 0:
+        margin = (
+            state.river_market.current_price
+            - state.route.transport_cost_per_unit
+            - state.market.current_price
+        )
+        if margin > 0:
+            # Affordable by transport cost
+            cost_per = state.route.transport_cost_per_unit
+            if cost_per <= 0:
+                affordable_ship = state.player.inventory.grain
+            else:
+                affordable_ship = ((state.player.cash + 1) * 1000 - 1) // cost_per
+            ship_qty = min(
+                state.player.inventory.grain,
+                state.route.capacity,
+                affordable_ship,
+            )
+            if ship_qty > 0:
+                return PlayerCommand(type="ship_grain", quantity=ship_qty)  # type: ignore[arg-type]
+    # Not shipping (margin <=0 or no inventory): buy scaled pre-drought or sell at peak
     if turn_idx in (1, 2):
         price = state.market.current_price
         space = state.player.storage_capacity - state.player.inventory.grain
@@ -113,10 +146,6 @@ def policy_trade_heavy(state: GameState, turn_idx: int, seed: str, version: str)
                 return PlayerCommand(type="buy_grain", quantity=actual)  # type: ignore[arg-type]
         return PlayerCommand(type="hold")  # type: ignore[arg-type]
     if turn_idx == 4 and state.player.inventory.grain > 0:
-        if state.route.established:
-            ship_qty = min(state.player.inventory.grain, state.route.capacity, 30)
-            if ship_qty > 0:
-                return PlayerCommand(type="ship_grain", quantity=ship_qty)  # type: ignore[arg-type]
         qty = min(state.player.inventory.grain, 80)
         if qty > 0:
             return PlayerCommand(type="sell_grain", quantity=qty)  # type: ignore[arg-type]

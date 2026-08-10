@@ -67,15 +67,21 @@ TURN_SPECS: tuple[TurnSpec, ...] = tuple(
 
 
 def default_start_state(seed: str = "seed-001", version: str = "1.0") -> GameState:
-    """Tuned start state — Section 9 regional_output + sell economy, farm lowered.
+    """Tuned start state — Section 9 retuned for binding constraints (storage scarcity, route viability).
 
     Home Valley: regional_output 360 + farm 5*10=50 => total 410, player 12.2%
     (was 21.7% with farm 10, now lower so free baseline does not saturate storage).
     Demand 410 gives signal_next≈signal+0 stable in normal (mild), drought cuts
     regional to 216 + farm 30 = 246 => signal_next≈signal-164 shortage. Supply 280.
     Responsiveness 4000 keeps price within [2000,9000]. River unchanged.
-    Player: cash 1000 grain 20 farm 5 storage 400. Tuned for hold rank ≥3 with
-    competent policies (see harness).
+    Player: cash 1000 grain 20 farm 5 storage 130 (was 400 — makes granary load-bearing;
+    idle accumulates 270 over 5 turns so 400 never binds, 130 does; 130 chosen as
+    widest-margin point in sweep 100-150 where hold rank ≥3 with 8.6% margin,
+    ratio 1.02, price 3876-8535; 100 gave rank2, 115-120 <5%, 125 6.6%, 135 9.1% but
+    130 is rounder and >5% threshold). Route: capacity 60 (was 20 — lets route carry
+    real cargo vs farm 50-150/turn), transport 300 (was 800 — leaves real margin
+    after toll while preserving margin-negative at drought peak). Tuned with
+    competent policies to clear hold rank ≥3 with >5% margin.
     """
     return GameState(
         turn=0,
@@ -85,7 +91,7 @@ def default_start_state(seed: str = "seed-001", version: str = "1.0") -> GameSta
             cash=1000,
             inventory=InventoryState(grain=20),
             farm_capacity=5,
-            storage_capacity=400,
+            storage_capacity=130,
         ),
         market=MarketState(
             supply=280,
@@ -105,8 +111,8 @@ def default_start_state(seed: str = "seed-001", version: str = "1.0") -> GameSta
             max_movement_bps=2000,
         ),
         route=RouteState(
-            transport_cost_per_unit=800,
-            capacity=20,
+            transport_cost_per_unit=300,
+            capacity=60,
             reliability_bps=10000,
             established=False,
             delay_turns=0,

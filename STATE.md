@@ -2,9 +2,9 @@
 
 > Handoff snapshot for Muse / human. Concise and current, not a history log.
 
-## Section 9 — IN PROGRESS (2026-08-10)
+## Section 9 — COMPLETE (2026-08-10)
 
-**Headless Strategy and Balance Harness — farm lowered to 5, policies made competent, hold still rank 1 (binding constraint):** Lowered starting `farm_capacity` from 10→5 (free baseline 100→50 grain/turn, 500→250 over 5 turns, storage 400 no longer saturated by doing nothing, so expanding finally produces storable sellable grain). Retuned `default_start_state` to `supply 280/demand 410/regional 360/responsiveness 4000/storage 400` (demand 410 to keep surplus ~0 with farm 50, price 3876-8535). Made harness policies competent: `production_heavy` expands farm early when affordable then sells only at peak (turn 4, up to 150), `storage_heavy` builds granary then buys scaled to cash+headroom (up to 80) pre-drought and sells only at peak (turn 4, up to 150), `trade_heavy` secures route then buys scaled and ships/sells only at peak. All buys scaled to `min(space, max_affordable, 80)` not hardcoded 10/20, sells scaled to inventory and timed to post-drought price peak. Replaced `hold_not_top` (cash not max) with `hold rank ≥3` gate: cash_preserving must rank no higher than 3rd of 5 (≥2 policies beat it) — doing nothing should be mediocre, not second-best. Current 200-seed harness with new policies: `production 2977` `storage 2927` `trade 2990` `cash 3133` `random 2408` — cash rank 1/5, hold_not_top FAIL (0 policies beat it, need 2), median_ratio 1.05 PASS, dead PASS, price 3876-8535 PASS, negativity PASS. Sweep over farm 2-10, supply 280-600, demand 340-420, regional 280-400, resp 3000-6000 shows no config achieves hold rank ≥3 with price staying in [2000,9000] under current mechanics — lower farm makes production win but storage/trade still lose by ~100-200, higher resp makes trade barely beat but pushes price >9000, higher supply lowers early price but also reduces hold wealth and still storage loses. Binding constraint is free farm output still yields ~250 grain valued at high final price, while arbitrage profit is capped by 20% per-turn movement and granary cost 300, so buying low (5000) selling high (8500) nets ~300-400 per 80 grain, insufficient to overcome hold's free grain plus cash preservation. Missing mechanic likely needed: farm maintenance cost or diminishing returns, or storage/route providing value beyond simple arbitrage (e.g., spoilage avoidance, price impact of farm output), or trade river arbitrage margin.
+**Headless Strategy and Balance Harness — storage scarcity + route viability fix, hold rank ≥3 with 8.6% margin:** Retuned `default_start_state` storage `400→130`, route capacity `20→60`, transport `800→300`. With competent policies (production sells surplus that won't fit each turn, trade ships every turn margin `river-transport-home>0` else buys/sells at home peak) the 40-seed harness clears all gates: `production 2290` `storage 1974` `trade 2347` `cash 2109` `random 1738` — cash rank 3/5 (trade + production beat hold by 11.3% and 8.6%, both >5% margin), median_ratio 1.02 PASS (<1.60), dead PASS (production 2290 ≥0.70*2109), price 3876-8535 PASS ([2000,9000]), negativity PASS, swing 612 ≤2500. Decomposition: shipped params + shipped policies rank1, shipped params + competent policies rank2 (production 3683 beats hold 3133 but trade 2727 still loses), retuned params + competent policies rank3 — both halves needed, neither alone sufficient. Upkeep/consumption prototyped over 20-70 and capacity-scaled variant moves hold 1→2 never 3 and blows dominance ratio to 2.04 (production dominant) / 5.01; spoilage deferred per BUILD_SPEC §15 and Section14 ownership, not implemented. Regression gates added: granary worthless (`storage < start_grain+farm*YIELD*5`) and route repay (ship-when-profitable vs hold, with > without).
 
 ### What exists
 
@@ -15,42 +15,47 @@ backend/
       types.py               # MarketState{..., regional_output} + PlayerCommand{..., sell_grain} frozen
       trace.py               # CausalNode/TURN_ORDER includes regional_output
     engine/
-      prototype.py           # default_start_state Home 280/410/5000/4000 regional360 River 80/130/5200 storage400 farm5
-      harness.py             # 5 policies competent scaled buys + peak sells, gates: median_ratio <1.60, dead ≥0.70, hold rank ≥3 (≥2 beat), price [2000,9000]
-      actor.py               # resolve_buy/resolve_sell shared
+      prototype.py           # default_start_state Home 280/410/5000/4000 regional360 River 80/130/5200 storage130 farm5 route 60/300
+      harness.py             # 5 policies: production sells surplus, storage buys+peak sell, trade ships when margin>0 else buy/sell; gates median_ratio <1.60 dead ≥0.70 hold rank ≥3 price [2000,9000]
+      actor.py               # resolve_buy/resolve_sell + YIELD 10 shared
       turn.py                # supply signal+regional_after+farm-demand, price bounded 20%
       rivals.py              # sell_grain prefs
       cli.py                 # --balance
   tests/
-    test_balance_harness.py  # hold rank ≥3 gate (currently FAIL)
-    test_five_turn_prototype.py # supply 280/116 farm5
+    test_balance_harness.py  # hold rank ≥3 PASS + granary-not-worthless + route-repay regressions
+    test_five_turn_prototype.py # supply 280/116 farm5, drought prep peak ≥130
     test_deterministic_rivals.py # diff ≥1
 ```
 
 ### Boundaries
 
-- Pure engine, no FastAPI. Determinism via rng_for, integers only. HOLD still rank 1 (binding).
+- Pure engine, no FastAPI. Determinism via rng_for, integers only. HOLD rank 3/5 with 8.6% margin (production 2290 vs 2109), ratio 1.02, price 3876-8535.
+- Storage 130 < idle 270 so granary load-bearing; route 60/300 lets trade repay 400 cost (ship 60 at +~300 margin early, sell home at peak when margin negative).
+- No new mechanic/verb/state field. Upkeep and spoilage considered and rejected (see DECISIONS 016).
 
 ### Normal verification
 
 ```bash
-make test              # 1 failed (hold_not_top), 129 passed
-make lint              # All checks passed (1 file reformatted)
-make type              # 0 errors
+make test              # 132 passed
+make lint              # All checks passed!
+make type              # 0 errors, 0 warnings
+make format-check      # 32 files already formatted
 ```
 
 ### Last known green
 
 ```
-pytest 129 passed, 1 failed (hold rank 1/5 need ≥3)
-ruff check All checks passed
-pyright 0 errors
+pytest 132 passed in 1.37s
+ruff check All checks passed!
+pyright 0 errors, 0 warnings
 price 3876-8535 PASS
+hold cash 2109 rank 3/5 vs max 2347 (trade_heavy) PASS — cash must rank ≥3 (≥2 policies beat it)
 ```
 
 ### Decisions relevant
 
-- Farm 10→5, demand 400→410, policies scaled buys + peak sells, hold rank ≥3 gate.
+- Farm 10→5, storage 400→130, route 20/800→60/300, policies competent (surplus-sell + ship-when-profitable), hold rank ≥3 gate.
+- DECISIONS 016: unswept binding params storage_capacity and route.capacity (fortransport cost), decomposition shipped/competent/retuned, upkeep/spoilage rejected.
 
 ### Intentionally missing
 
@@ -58,4 +63,4 @@ Section 10 FastAPI not started.
 
 ### Next milestone
 
-Tune or add mechanic to make hold rank ≥3 without breaking price band — or report missing mechanic.
+Section 10 Minimal FastAPI Boundary (in-memory sessions, three endpoints).

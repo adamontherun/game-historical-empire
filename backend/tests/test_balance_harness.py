@@ -178,3 +178,80 @@ def test_regional_output_chain_truthful() -> None:
         assert "farm_output" in hs.parent_ids
     # TURN_ORDER includes regional_output
     assert "regional_output" in TURN_ORDER
+
+
+def test_build_granary_not_worthless() -> None:
+    """Regression: starting storage must be scarce enough that granary matters.
+
+    Idle player accumulates start_grain + farm*YIELD*5 over the game. If starting
+    storage already exceeds that, build_granary (+50 cap for 300 cash) is a pure
+    cash burn with zero marginal value — storage_heavy's defining move is
+    worthless and hold will dominate. This invariant silently broke at 400.
+    """
+    from app.engine.actor import YIELD_PER_CAPACITY
+
+    state = default_start_state(seed="granary-test", version="1.0")
+    start_grain = state.player.inventory.grain
+    farm_cap = state.player.farm_capacity
+    storage = state.player.storage_capacity
+    max_idle = start_grain + farm_cap * YIELD_PER_CAPACITY * 5
+    assert storage < max_idle, (
+        f"storage {storage} >= idle accumulation {max_idle} "
+        f"(start {start_grain} + farm {farm_cap}*{YIELD_PER_CAPACITY}*5) — "
+        "granary worthless, storage strategy dead by construction"
+    )
+
+
+def test_route_can_repay_establishment_cost() -> None:
+    """Regression: route must be able to repay its 400 establishment cost.
+
+    A ship-every-profitable-turn policy must finish ahead of the same policy
+    that never secures the route, otherwise secure_route is a trap (strictly
+    negative under every line of play). This invariant D2 violated at cap 20 / cost 800.
+    """
+
+    from app.domain.types import PlayerCommand
+    from app.engine.prototype import FiveTurnGame
+
+    def ship_when_profitable(state, turn_idx, seed, version):  # type: ignore[no-untyped-def]
+        from app.engine.actor import ROUTE_ESTABLISH_COST
+
+        if (
+            turn_idx == 0
+            and not state.route.established
+            and state.player.cash >= ROUTE_ESTABLISH_COST
+        ):
+            return PlayerCommand(type="secure_route")
+        if state.route.established and state.player.inventory.grain > 0:
+            margin = (
+                state.river_market.current_price
+                - state.route.transport_cost_per_unit
+                - state.market.current_price
+            )
+            if margin > 0:
+                cost_per = state.route.transport_cost_per_unit
+                affordable = (
+                    ((state.player.cash + 1) * 1000 - 1) // cost_per
+                    if cost_per > 0
+                    else state.player.inventory.grain
+                )
+                ship_qty = min(state.player.inventory.grain, state.route.capacity, affordable)
+                if ship_qty > 0:
+                    return PlayerCommand(type="ship_grain", quantity=ship_qty)
+        return PlayerCommand(type="hold")
+
+    def ship_never(state, turn_idx, seed, version):  # type: ignore[no-untyped-def]
+        return PlayerCommand(type="hold")
+
+    seed = "route-repay-check"
+    g_with = FiveTurnGame(seed=seed, version="1.0")
+    g_without = FiveTurnGame(seed=seed, version="1.0")
+    for idx in range(5):
+        g_with.submit(ship_when_profitable(g_with.state, idx, seed, "1.0"))
+        g_without.submit(ship_never(g_without.state, idx, seed, "1.0"))
+    wealth_with = g_with.summary().final_wealth
+    wealth_without = g_without.summary().final_wealth
+    assert wealth_with > wealth_without, (
+        f"route does not repay: with {wealth_with} <= without {wealth_without} "
+        f"(ship_when_profitable vs hold at seed {seed})"
+    )

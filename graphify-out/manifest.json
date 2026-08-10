@@ -210,8 +210,8 @@
     "semantic_hash": ""
   },
   "BUILD_SPEC.md": {
-    "mtime": 1786345732.7064664,
-    "ast_hash": "913b355b5229eac4b3ec9dee7c51d5c4",
+    "mtime": 1786379470.0916343,
+    "ast_hash": "4ce2839625b07fc32d3c7bce817bca8a",
     "semantic_hash": ""
   },
   "CLAUDE.md": {
@@ -220,13 +220,13 @@
     "semantic_hash": ""
   },
   "DECISIONS.md": {
-    "mtime": 1786346248.547472,
-    "ast_hash": "59583ff1bac6408e3dda35fdd1995538",
+    "mtime": 1786379466.052405,
+    "ast_hash": "6b26dfcdbe58248ca811585f7ea11012",
     "semantic_hash": ""
   },
   "STATE.md": {
-    "mtime": 1786346103.6120753,
-    "ast_hash": "1235ef943b8ac608cdb2838da2000a83",
+    "mtime": 1786379455.5712025,
+    "ast_hash": "fcb4d04268001424bc9a47ff7510cb07",
     "semantic_hash": ""
   },
   "backend/AGENTS.md": {
@@ -270,13 +270,13 @@
     "semantic_hash": ""
   },
   "backend/app/engine/prototype.py": {
-    "mtime": 1786345747.9631927,
-    "ast_hash": "5106c039fac07fa6c9a2019433c2f801",
+    "mtime": 1786379383.729487,
+    "ast_hash": "6090d93b4e13471c15327373b0c1cda1",
     "semantic_hash": ""
   },
   "backend/tests/test_five_turn_prototype.py": {
-    "mtime": 1786346090.027032,
-    "ast_hash": "1467d04561b4939c6c3841e4200741eb",
+    "mtime": 1786379427.831417,
+    "ast_hash": "5fd0d8fd463c1f29254cd56abfc89a35",
     "semantic_hash": ""
   },
   "docs/plans/2026-08-09-section-6-five-turn-prototype.md": {
@@ -350,18 +350,28 @@
     "semantic_hash": ""
   },
   "backend/app/engine/harness.py": {
-    "mtime": 1786346082.861133,
-    "ast_hash": "4891a2d767407d4bc582de19cae84417",
+    "mtime": 1786379046.1103616,
+    "ast_hash": "b42ca27817faf959b73ff1c7010bc85e",
     "semantic_hash": ""
   },
   "backend/tests/test_balance_harness.py": {
-    "mtime": 1786345401.6550565,
-    "ast_hash": "e74a6f944c5324d2955f70f5a44ab83a",
+    "mtime": 1786379440.3458965,
+    "ast_hash": "c75ee091f1d17f80d9588911bf140f15",
     "semantic_hash": ""
   },
   "docs/ORCHESTRATION.md": {
     "mtime": 1786378313.2021542,
     "ast_hash": "1bc5c43bf0a71456a72163a6b48a187c",
+    "semantic_hash": ""
+  },
+  "docs/plans/2026-08-10-section-9-review-round-2.md": {
+    "mtime": 1786378924.4143639,
+    "ast_hash": "fbabeb0b280f9f32c47bea4e0b746c9f",
+    "semantic_hash": ""
+  },
+  "docs/plans/2026-08-10-section-9-review-round-3.md": {
+    "mtime": 1786379460.0099223,
+    "ast_hash": "0772f51fcd2a2b8760e3d7c7c22a6d5c",
     "semantic_hash": ""
   }
 }
