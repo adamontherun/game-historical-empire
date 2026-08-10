@@ -217,10 +217,11 @@ button {
   grid-column: 1 / -1;
   display: block;
   text-align: center;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  padding: 6px 8px;
+  /* wrap rather than truncate — clipping the unit off the spread ("/ g…") loses
+     the meaning of the number the player uses to judge shipping */
+  white-space: normal;
+  text-wrap: balance;
+  padding: 6px 10px;
   border-radius: 999px;
   border: 1px dashed var(--market-river);
   background: #f3fffe;
