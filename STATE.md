@@ -59,7 +59,7 @@ granary median +54
 ### Decisions relevant
 
 - Farm 10→5, storage 400→130, transport 800→300, route 20 kept, policies competent (surplus-sell + overflow-build/headroom-buy + ship-margin>0), hold rank 4/4 intentional ≥2×5% beats.
-- DECISIONS 016: matched-control technique, granary policy bug not economy bug (+56 vs -21), route capacity reverted (transport whole fix), River rescale retracted, price-taking boundary, trade weakest at +6%.
+- DECISIONS 016: matched-control technique, granary policy bug not economy bug (+54 vs -21), route capacity reverted (transport whole fix), River rescale retracted, price-taking boundary, trade weakest at +6%.
 
 ### Intentionally missing
 
