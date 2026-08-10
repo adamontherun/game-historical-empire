@@ -1,16 +1,17 @@
-"""Canonical economic types for Sections 2-4.
+"""Canonical economic types for Sections 2-5.
 
 Integer-only canonical state per BUILD_SPEC §12. Validation via Pydantic v2
 Annotated constraints — invalid negatives rejected at construction.
 All models are frozen for determinism.
 
-Covers 10 required concepts:
+Covers Section 5 two-market + route extension:
 - cash, grain inventory, farm capacity, storage capacity,
-  regional supply/demand, grain price, turn, run_seed, ruleset_version
+  home + river market supply/demand, grain price, turn, run_seed, ruleset_version,
+  River Route with transport cost / capacity / reliability / delay / event exposure
 
-Models: GameState, PlayerState, MarketState, OperationState,
-InventoryState, TurnContext plus Money/Quantity/BasisPoints/PriceMilliunits.
-WorldCondition and PlayerCommand added in Section 3.
+Models: GameState (now two markets + route), PlayerState, MarketState,
+RouteState, OperationState, InventoryState, TurnContext plus Money/Quantity/BasisPoints/PriceMilliunits.
+WorldCondition and PlayerCommand (now with secure_route/ship_grain) for Section 5.
 """
 
 from __future__ import annotations
@@ -113,21 +114,64 @@ class TurnContext(BaseModel):
 WorldCondition = Literal["normal", "drought"]
 
 
-class PlayerCommand(BaseModel):
-    """Player turn command — one major action per turn (Section 3)."""
+class RouteState(BaseModel):
+    """River Route — single route between Home Valley and River Town (Section 5).
+
+    Carries the four required route properties plus optional delay/event exposure.
+    All fields are canonical integer/bool (frozen). Transport cost is per grain
+    unit in PriceMilliunits (milli-Money) so profit arithmetic uses
+    qty*price_milli//1000 and stays comparable to grain price (~5000 milli).
+    """
 
     model_config = ConfigDict(frozen=True)
 
-    type: Literal["expand_farm", "build_granary", "buy_grain", "hold"] = Field(
-        description="Command type"
+    transport_cost_per_unit: PriceMilliunits = Field(
+        default=800, description="Transport cost per grain unit in milliunits (≥0)"
     )
+    capacity: Quantity = Field(
+        default=20, description="Carrying capacity per turn in grain units (≥0)"
+    )
+    reliability_bps: BasisPoints = Field(
+        default=10000,
+        description="Reliability 0..10_000 (10_000=100% delivers all)",
+        strict=True,
+        ge=0,
+        le=10_000,
+    )
+    established: bool = Field(default=False, description="Whether trade access has been secured")
+    delay_turns: int = Field(
+        default=0,
+        ge=0,
+        le=0,
+        description="Optional settlement delay in turns (must be 0 until delayed settlement exists)",
+    )
+    event_exposure: str = Field(
+        default="river_risk", description="Event exposure tag for future pressure arc"
+    )
+
+
+class PlayerCommand(BaseModel):
+    """Player turn command — one major action per turn (Sections 3–5)."""
+
+    model_config = ConfigDict(frozen=True)
+
+    type: Literal[
+        "expand_farm", "build_granary", "buy_grain", "hold", "secure_route", "ship_grain"
+    ] = Field(description="Command type")
     quantity: Quantity | None = Field(
-        default=None, description="Grain quantity for buy_grain (ignored otherwise)"
+        default=None,
+        description="Grain quantity for buy_grain / ship_grain (ignored otherwise)",
     )
 
 
 class GameState(BaseModel):
-    """Top-level canonical game state for Sections 2-4."""
+    """Top-level canonical game state for Sections 2-5.
+
+    For backward compatibility, `market` remains the Home Valley market alias
+    (existing tests construct `GameState(market=...)`). `river_market` is the
+    River Town market and `route` is the River Route. Together they satisfy
+    Section 5's two-market + route requirement without renaming churn.
+    """
 
     model_config = ConfigDict(frozen=True)
 
@@ -135,7 +179,14 @@ class GameState(BaseModel):
     run_seed: str = Field(description="Opaque run seed")
     ruleset_version: str = Field(description="Ruleset version")
     player: PlayerState = Field(description="Player state")
-    market: MarketState = Field(description="Regional market state")
+    market: MarketState = Field(description="Home Valley market state (alias)")
+    river_market: MarketState = Field(
+        default_factory=lambda: MarketState(
+            supply=80, demand=130, base_price=5200, current_price=5200
+        ),
+        description="River Town market state",
+    )
+    route: RouteState = Field(default_factory=RouteState, description="River Route state")
 
     def to_turn_context(self) -> TurnContext:
         """Derive TurnContext for RNG calls."""

@@ -43,12 +43,15 @@ Protocol for every Section:
 5. Approve / Request changes — single gate (revise until approved). If the draft has scope creep, missing tests, or premature abstraction, surface it as open questions in the plan itself — no separate `/grill` skill required. **Do not start implementation until the plan is approved.**
 6. Implement only the approved Section
 7. Run every acceptance check in that Section
-8. Push the feature branch to GitHub `adamontherun` (`git push -u origin section/<n>-<slug>`)
-9. Stop — do not auto-advance. Report files changed, commands, tests, risks, and the pushed branch URL.
+8. **Update `STATE.md` (and `DECISIONS.md` if new durable decision) to current reality in the same commit as the Section — see §15 Freshness Contract. Copy actual `make test`/`make lint`/`make type`/`make format-check` output, file tree under `What exists`, and `Boundaries` into `STATE.md`. Never leave `BUILD_SPEC.md` marked `COMPLETE` while `STATE.md` still reflects the previous Section.**
+9. Push the feature branch to GitHub `adamontherun` (`git push -u origin section/<n>-<slug>`)
+10. Stop — do not auto-advance. Report files changed, commands, tests, risks, and the pushed branch URL. The report's `Last known green` must match the just-pushed commit's gates.
 
 Only the `Status` line of a Section may be updated after all gates pass.
 
 > **Hard gate:** No source edits (`backend/`, `frontend/`, `STATE.md`, `DECISIONS.md` beyond the branch itself) before steps 4–5 are complete. If you catch yourself about to code after step 3, stop and produce the plan first.
+
+> **Freshness gate:** Do not push a Section branch while `STATE.md` is stale (test counts, file list, `Boundaries`, `Last known green`, or `BUILD_SPEC.md Status` mismatch reality). If you discover staleness at any point in the session, fix `STATE.md` immediately in the next commit — even if the current task is not a Section.
 
 ## 4. Autonomy
 
@@ -211,9 +214,46 @@ OpenAPI at `/docs` (FastAPI default).
 - Frontend: Vite static build, `VITE_API_URL` pointing to backend.
 - Keep `render.yaml` minimal — don't introduce Docker unless Section 16 requires it.
 
-## 13. What Not To Do
+## 13. Knowledge Graph (Graphify)
+
+Project has a deterministic knowledge graph at `graphify-out/` (tree-sitter AST, local-first, no LLM for code). Prefer the graph over raw grep for codebase questions.
+
+Rules:
+
+- If `graphify-out/graph.json` exists: start with `graphify query "<question>"` (BFS, ~2k token budget). Use `graphify path "<A>" "<B>"` to trace two concepts and `graphify explain "<concept>"` for one node. Try `graphify god-nodes --top 10` for hubs; raise budget with `--budget 4000` if truncated.
+- Only read `graphify-out/GRAPH_REPORT.md` for broad architecture; load `graphify-out/graph.json` / `graph.html` directly only if query/path/explain was insufficient. If `graphify-out/wiki/index.md` exists, use it for broad navigation.
+- After touching `backend/` or `docs/`: run `graphify update .` (code-only, no API cost). A `post-commit` hook also rebuilds automatically; full LLM re-extraction is `graphify extract .` (needs `ANTHROPIC_API_KEY`/`OPENAI_API_KEY`/`GEMINI_API_KEY`) and `graphify extract . --code-only` for code alone.
+- Visual: `open graphify-out/graph.html` (force-directed, click/filter/search).
+- Skills are at `.claude/skills/graphify/SKILL.md` + `.agents/skills/graphify/SKILL.md`; Muse hook guard is in `.claude/settings.json` — this `AGENTS.md` section is the binding for Muse.
+
+## 14. What Not To Do
 
 - Don't implement future Sections early (8 ages, spoilage, credit, brands, automation, generic content DSL, LLMs for rival decisions) — `BUILD_SPEC.md` forbids it.
 - Don't put executable formulas in content JSON — Python owns formulas, content supplies parameters.
 - Don't chase repo-wide 100% coverage.
 - Don't let LLMs determine rival money/investments/state — deterministic scoring functions only.
+
+## 15. STATE.md Freshness Contract
+
+`STATE.md` is the live handoff, not a historical log. It must describe the **current** commit, not the previous Section.
+
+**When to update (same commit as the code change):**
+
+- Every Section completion — `STATE.md` header `Section N — COMPLETE`, `What exists` file tree, `Boundaries` (reliability `10000` vs `9000`, `delay_turns` constraint, `cash_after_trade`/`inventory_after_trade`, `price_value_effect` parents, arbitrage `arbitrage_margin` vs `before_price`), `Normal verification` / `Last known green` gate results, and `BUILD_SPEC.md Status` line must be updated together. Never commit `BUILD_SPEC.md: Status COMPLETE` without updating `STATE.md` in the same commit.
+- Any fix that changes gate results (test count, `Boundaries`, file list) — update `STATE.md` in that same fix commit, even if the task description says "do not otherwise change Section 5 behavior".
+- Any session where you touch `backend/app/domain`, `backend/app/engine`, `backend/tests`, `BUILD_SPEC.md`, or `DECISIONS.md` — re-read `STATE.md` before finishing and sync it.
+
+**What counts as stale (fix immediately, do not push stale):**
+
+- `Last known green` test count / file count / `ruff`/`pyright` output does not match the just-run `make test` / `make lint` / `make type` / `make format-check` output.
+- `What exists` tree omits a new file (e.g. `test_two_markets_route.py`, `RouteState`, `TURN_ORDER` extension) or still lists a removed one.
+- `Boundaries` still describes the old `reliability_bps=9000` / `delivered==effective unless <9000` / `delay_turns=0` unconstrained / `price_value_effect parents inventory+price` / `shipment parents route_capacity,inventory` / `trade_arbitrage net only` after those were fixed to `10000` / `delivered = effective * reliability_bps //10000` / `delay_turns le=0` / `inventory_after_trade+price` / `cash_after_trade` / `arbitrage_margin at resolved prices`.
+- `BUILD_SPEC.md Status` says `COMPLETE` while `STATE.md` header still says `Section N-1`.
+
+**How to keep it fresh:**
+
+- After `make test` / `make lint` / `make type` / `make format-check` pass, copy the **actual** observed output into `STATE.md` (`79 passed`, `21 files already formatted`, `0 errors`, etc.) — do not reuse the previous Section's numbers.
+- After any `cargo`/`uv` / file-tree change, regenerate the `What exists` tree from `ls`.
+- Verify before push: `git diff --cached --stat` must include `STATE.md` whenever `BUILD_SPEC.md`, `backend/app/domain/types.py`, `backend/app/engine/turn.py`, `backend/app/domain/trace.py`, or any `backend/tests/*.py` is in the same push.
+
+If you discover `STATE.md` is stale mid-session (including after a `fix:` commit that only updated code), treat it as a blocking defect: update `STATE.md` in the next commit and push before stopping.

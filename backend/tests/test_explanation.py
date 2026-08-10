@@ -83,7 +83,7 @@ def test_drought_to_wealth_structural_chain_exact() -> None:
 
     price_val = next(n for n in drought.causal_trace.nodes if n.id == "price_value_effect")
     assert "price" in price_val.parent_ids
-    assert "inventory" in price_val.parent_ids
+    assert "inventory_after_trade" in price_val.parent_ids
 
     wealth_node = next(n for n in drought.causal_trace.nodes if n.id == "wealth")
     assert "quantity_value_effect" in wealth_node.parent_ids

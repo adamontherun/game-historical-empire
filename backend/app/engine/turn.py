@@ -1,22 +1,26 @@
-"""One-turn grain market kernel — Section 4.
+"""One-turn grain market kernel — Sections 4–5.
 
 Resolves a single turn with explicit order:
 
-    Command -> Production -> Supply -> Price -> Settlement -> Valuation
+    Command -> Production -> HomeSupply -> RiverSupply -> HomePrice -> RiverPrice -> Settlement -> RouteSettlement -> Valuation
 
 All canonical state is integer; rounding via helpers; deterministic RNG
 substream is consumed but core price remains deterministic to preserve
 monotonicity. Causal trace is emitted structurally during resolution.
 Wealth is now part of the causal graph via exact decomposition:
 
-    wealth_before = cash_before + value(inv_before, price_before)
-    quantity_value_effect = value(inv_after, price_before) - value(inv_before, price_before)
-    price_value_effect    = value(inv_after, price_after)  - value(inv_after, price_before)
+    wealth_before = cash_before + value(inv_before, price_before_home)
+    quantity_value_effect = value(inv_after, price_before_home) - value(inv_before, price_before_home)
+                          = purchase + harvest + ship
+    price_value_effect    = value(inv_after, price_after_home)  - value(inv_after, price_before_home)
     cash_effect           = cash_after - cash_before
     wealth_delta          = cash_effect + quantity_value_effect + price_value_effect
 
 where value(qty, price_milli) = qty * price_milli // 1000.
 Story drivers are exact partitions of wealth_delta ranked by wealth-bps.
+Section 5 adds: Home Valley (existing market) + River Town (river_market)
++ River Route (route) with transport cost / capacity / reliability.
+Ship trade is settlement after harvest, valued at river price.
 
 Spec: drought reduces production/yield, not directly price.
 """
@@ -50,9 +54,10 @@ EXPAND_FARM_COST: int = 500
 EXPAND_FARM_DELTA: int = 10
 BUILD_GRANARY_COST: int = 300
 BUILD_GRANARY_DELTA: int = 50
+ROUTE_ESTABLISH_COST: int = 400
 
 # Public for tests to assert order.
-TURN_ORDER: str = "command -> production -> supply -> price -> settlement -> valuation"
+TURN_ORDER: str = "command -> production -> home_supply -> river_supply -> home_price -> river_price -> settlement -> route_settlement -> valuation"
 
 
 def _cost_for_quantity(quantity: int, price_milli: int) -> int:
@@ -126,11 +131,11 @@ def resolve_turn(
 ) -> TurnResolution:
     """Resolve one deterministic turn.
 
-    Order is explicit: command -> production -> supply -> price -> settlement -> valuation.
+    Order is explicit: command -> production -> home_supply -> river_supply -> home_price -> river_price -> settlement -> route_settlement -> valuation.
 
     Args:
-        state: Canonical before state.
-        command: Single player major action.
+        state: Canonical before state (includes home market, river market, route).
+        command: Single player major action (now includes secure_route/ship_grain).
         world: World condition for this turn (normal/drought).
         rng_context: Turn identity for deterministic substreams — must equal state context.
 
@@ -151,6 +156,16 @@ def resolve_turn(
         0,
     )
     _ = rng.random()  # consume deterministically; do not drive core price
+    # Also consume route substream deterministically
+    rng_route = rng_for(
+        expected.run_seed,
+        expected.ruleset_version,
+        expected.turn,
+        "route",
+        "river_route",
+        0,
+    )
+    _ = rng_route.random()
 
     before_cash = state.player.cash
     before_farm = state.player.farm_capacity
@@ -163,10 +178,37 @@ def resolve_turn(
     responsiveness = state.market.responsiveness
     max_movement_bps = state.market.max_movement_bps
 
+    # River market before
+    before_river_supply = state.river_market.supply
+    before_river_demand = state.river_market.demand
+    before_river_price = state.river_market.current_price
+    river_base_price = state.river_market.base_price
+    river_responsiveness = state.river_market.responsiveness
+    river_max_movement_bps = state.river_market.max_movement_bps
+
+    # Route before
+    before_route = state.route
+    route_capacity = before_route.capacity
+    route_reliability_bps = before_route.reliability_bps
+    transport_cost_per_unit = before_route.transport_cost_per_unit
+    route_established_before = before_route.established
+
+    # Mutable working copies
     cash = before_cash
     farm_capacity = before_farm
     storage_capacity = before_storage
     inventory = before_inventory
+    route_established = route_established_before
+
+    # Ship tracking
+    ship_requested: int | None = None
+    ship_effective: int = 0
+    ship_delivered: int = 0
+    ship_revenue: int = 0
+    ship_cost: int = 0
+    ship_reason: str = ""
+    trade_cash: int = 0  # part of cash_effect from ship
+    arbitrage_margin: int = 0  # resolved-price arbitrage: river - transport - new_home
 
     nodes: list[CausalNode] = []
     effects: list[DomainEffect] = []
@@ -413,6 +455,132 @@ def resolve_turn(
         cash = cash_after
         inventory = inventory_after
 
+    elif command.type == "secure_route":
+        if route_established_before:
+            cmd_reason = "already_established"
+            d_cash = 0
+            # route_established stays True
+        else:
+            if cash >= ROUTE_ESTABLISH_COST:
+                cash -= ROUTE_ESTABLISH_COST
+                route_established = True
+                cmd_reason = "secure_route"
+                d_cash = -ROUTE_ESTABLISH_COST
+            else:
+                cmd_reason = "insufficient_cash_for_route"
+                d_cash = 0
+        nodes.append(
+            CausalNode(
+                id="command",
+                label="Secure river route",
+                kind="command",
+                before=1 if route_established_before else 0,
+                after=1 if route_established else 0,
+                delta=1 if route_established and not route_established_before else 0,
+                reason_code=cmd_reason,
+                parent_ids=(),
+            )
+        )
+        nodes.append(
+            CausalNode(
+                id="cash_after_command",
+                label="Cash after secure route",
+                kind="cash",
+                before=before_cash,
+                after=cash,
+                delta=d_cash,
+                reason_code=cmd_reason,
+                parent_ids=("command",),
+            )
+        )
+        # Also emit a route establishment node for trace clarity
+        nodes.append(
+            CausalNode(
+                id="route_established",
+                label="Route established" if route_established else "Route not established",
+                kind="route",
+                before=1 if route_established_before else 0,
+                after=1 if route_established else 0,
+                delta=1 if route_established and not route_established_before else 0,
+                reason_code=cmd_reason,
+                parent_ids=("command",),
+            )
+        )
+        effects.append(
+            DomainEffect(
+                metric="cash", before=before_cash, after=cash, delta=d_cash, reason_code=cmd_reason
+            )
+        )
+        effects.append(
+            DomainEffect(
+                metric="route_established",
+                before=1 if route_established_before else 0,
+                after=1 if route_established else 0,
+                delta=1 if route_established and not route_established_before else 0,
+                reason_code=cmd_reason,
+            )
+        )
+
+    elif command.type == "ship_grain":
+        requested = command.quantity if command.quantity is not None else 10
+        requested = int(requested)
+        ship_requested = requested
+        if not route_established_before:
+            cmd_reason = "no_route_access"
+            ship_reason = "no_route_access"
+            ship_effective = 0
+            ship_delivered = 0
+            ship_revenue = 0
+            ship_cost = 0
+        else:
+            # Defer full clamping until settlement when harvest known;
+            # For command node, just record requested.
+            cmd_reason = "ship_grain_planned"
+            ship_reason = "ship_grain_planned"
+            # Keep effective 0 for now; will compute at settlement.
+            ship_effective = 0
+        nodes.append(
+            CausalNode(
+                id="command",
+                label=f"Ship grain requested={requested} route={'established' if route_established_before else 'not_established'}",
+                kind="command",
+                before=before_inventory,
+                after=before_inventory,  # inventory not yet moved
+                delta=0,
+                reason_code=cmd_reason,
+                parent_ids=(),
+            )
+        )
+        nodes.append(
+            CausalNode(
+                id="cash_after_command",
+                label="Cash after ship command (deferred)",
+                kind="cash",
+                before=before_cash,
+                after=cash,  # unchanged at command phase
+                delta=0,
+                reason_code=cmd_reason,
+                parent_ids=("command",),
+            )
+        )
+        # Emit a placeholder shipment node with 0 delta; real settlement will add the effective node later.
+        # For now, keep effects with 0 delta; settlement will add real effects.
+        effects.append(
+            DomainEffect(
+                metric="cash", before=before_cash, after=cash, delta=0, reason_code=cmd_reason
+            )
+        )
+        # Keep inventory effect 0 at command phase
+        effects.append(
+            DomainEffect(
+                metric="shipment_requested",
+                before=0,
+                after=requested,
+                delta=requested,
+                reason_code=cmd_reason,
+            )
+        )
+
     else:  # hold
         cmd_reason = "hold"
         nodes.append(
@@ -475,6 +643,60 @@ def resolve_turn(
                 parent_ids=(),
             )
         )
+    # Emit stable route nodes every turn for observability
+    if not any(n.id == "route_capacity" for n in nodes):
+        nodes.append(
+            CausalNode(
+                id="route_capacity",
+                label=f"Route capacity {route_capacity}",
+                kind="route",
+                before=route_capacity,
+                after=route_capacity,
+                delta=0,
+                reason_code="route_capacity_unchanged",
+                parent_ids=(),
+            )
+        )
+    if not any(n.id == "route_cost_per_unit" for n in nodes):
+        nodes.append(
+            CausalNode(
+                id="route_cost_per_unit",
+                label=f"Route transport cost {transport_cost_per_unit}",
+                kind="route",
+                before=transport_cost_per_unit,
+                after=transport_cost_per_unit,
+                delta=0,
+                reason_code="route_cost_unchanged",
+                parent_ids=(),
+            )
+        )
+    if not any(n.id == "route_reliability" for n in nodes):
+        nodes.append(
+            CausalNode(
+                id="route_reliability",
+                label=f"Route reliability {route_reliability_bps} bps",
+                kind="route",
+                before=route_reliability_bps,
+                after=route_reliability_bps,
+                delta=0,
+                reason_code="route_reliability_unchanged",
+                parent_ids=(),
+            )
+        )
+    # Also ensure route_established stable node if not already from secure_route
+    if not any(n.id == "route_established" for n in nodes):
+        nodes.append(
+            CausalNode(
+                id="route_established",
+                label="Route established" if route_established else "Route not established",
+                kind="route",
+                before=1 if route_established_before else 0,
+                after=1 if route_established else 0,
+                delta=0,
+                reason_code="route_established_unchanged",
+                parent_ids=(),
+            )
+        )
 
     # 2. Production — farm output depends on post-command farm_capacity + world
     base_output = farm_capacity * YIELD_PER_CAPACITY
@@ -507,7 +729,7 @@ def resolve_turn(
         )
     )
 
-    # 3. Supply — add farm_output to supply, clamped
+    # 3. Home Supply — add farm_output to supply, clamped
     supply_before_harvest = before_supply
     next_supply = clamp_non_negative(supply_before_harvest + farm_output)
     supply_delta = next_supply - before_supply
@@ -515,6 +737,21 @@ def resolve_turn(
         CausalNode(
             id="supply",
             label=f"Regional supply {before_supply} → {next_supply}",
+            kind="supply",
+            before=before_supply,
+            after=next_supply,
+            delta=supply_delta,
+            reason_code="harvest_added_to_supply"
+            if world == "normal"
+            else "lower_output_reduced_supply",
+            parent_ids=("farm_output",),
+        )
+    )
+    # Also emit alias home_supply for clarity
+    nodes.append(
+        CausalNode(
+            id="home_supply",
+            label=f"Home Valley supply {before_supply} → {next_supply}",
             kind="supply",
             before=before_supply,
             after=next_supply,
@@ -534,8 +771,42 @@ def resolve_turn(
             reason_code="supply_change",
         )
     )
+    effects.append(
+        DomainEffect(
+            metric="home_supply",
+            before=before_supply,
+            after=next_supply,
+            delta=supply_delta,
+            reason_code="supply_change",
+        )
+    )
 
-    # 4. Price — target then bounded
+    # 3b. River Supply — stable, not affected by home farm output (River not farm center)
+    river_supply_next = before_river_supply
+    river_supply_delta = 0
+    nodes.append(
+        CausalNode(
+            id="river_supply",
+            label=f"River Town supply {before_river_supply} → {river_supply_next}",
+            kind="river_supply",
+            before=before_river_supply,
+            after=river_supply_next,
+            delta=river_supply_delta,
+            reason_code="river_supply_stable",
+            parent_ids=("world",),
+        )
+    )
+    effects.append(
+        DomainEffect(
+            metric="river_supply",
+            before=before_river_supply,
+            after=river_supply_next,
+            delta=river_supply_delta,
+            reason_code="river_supply_stable",
+        )
+    )
+
+    # 4. Home Price — target then bounded
     target = _target_price(base_price, next_supply, before_demand, responsiveness)
     new_price = _bounded_price(before_price, target, max_movement_bps)
     price_delta = new_price - before_price
@@ -585,6 +856,45 @@ def resolve_turn(
             parent_ids=("target_price",),
         )
     )
+    # Home aliases for clarity
+    nodes.append(
+        CausalNode(
+            id="home_price_pressure",
+            label=f"Home price pressure {pressure_bps} bps",
+            kind="price",
+            before=None,
+            after=pressure_bps,
+            delta=pressure_bps,
+            reason_code="supply_below_demand"
+            if before_demand > next_supply
+            else "supply_above_demand",
+            parent_ids=("home_supply",),
+        )
+    )
+    nodes.append(
+        CausalNode(
+            id="home_target_price",
+            label=f"Home target price {target}",
+            kind="price",
+            before=before_price,
+            after=target,
+            delta=target - before_price,
+            reason_code="target_from_pressure",
+            parent_ids=("home_price_pressure",),
+        )
+    )
+    nodes.append(
+        CausalNode(
+            id="home_price",
+            label=f"Home price {before_price} → {new_price}",
+            kind="price",
+            before=before_price,
+            after=new_price,
+            delta=price_delta,
+            reason_code="bounded_movement_toward_target",
+            parent_ids=("home_target_price",),
+        )
+    )
     effects.append(
         DomainEffect(
             metric="grain_price",
@@ -594,15 +904,86 @@ def resolve_turn(
             reason_code="price_change",
         )
     )
+    effects.append(
+        DomainEffect(
+            metric="home_price",
+            before=before_price,
+            after=new_price,
+            delta=price_delta,
+            reason_code="price_change",
+        )
+    )
+
+    # 4b. River Price — target then bounded using river supply/demand
+    river_target = _target_price(
+        river_base_price, river_supply_next, before_river_demand, river_responsiveness
+    )
+    river_new_price = _bounded_price(before_river_price, river_target, river_max_movement_bps)
+    river_price_delta = river_new_price - before_river_price
+    river_pressure_bps = (
+        div_round_half_up(
+            (before_river_demand - river_supply_next) * 10_000,
+            river_supply_next if river_supply_next > 0 else 1,
+        )
+        * river_responsiveness
+        // 10_000
+    )
+    nodes.append(
+        CausalNode(
+            id="river_price_pressure",
+            label=f"River price pressure {river_pressure_bps} bps",
+            kind="river_price",
+            before=None,
+            after=river_pressure_bps,
+            delta=river_pressure_bps,
+            reason_code="supply_below_demand"
+            if before_river_demand > river_supply_next
+            else "supply_above_demand",
+            parent_ids=("river_supply",),
+        )
+    )
+    nodes.append(
+        CausalNode(
+            id="river_target_price",
+            label=f"River target price {river_target}",
+            kind="river_price",
+            before=before_river_price,
+            after=river_target,
+            delta=river_target - before_river_price,
+            reason_code="target_from_pressure",
+            parent_ids=("river_price_pressure",),
+        )
+    )
+    nodes.append(
+        CausalNode(
+            id="river_price",
+            label=f"River Town price {before_river_price} → {river_new_price}",
+            kind="river_price",
+            before=before_river_price,
+            after=river_new_price,
+            delta=river_price_delta,
+            reason_code="bounded_movement_toward_target",
+            parent_ids=("river_target_price",),
+        )
+    )
+    effects.append(
+        DomainEffect(
+            metric="river_grain_price",
+            before=before_river_price,
+            after=river_new_price,
+            delta=river_price_delta,
+            reason_code="river_price_change",
+        )
+    )
 
     # 5. Settlement — inventory after harvest capped by storage
     inventory_before_settlement = inventory
     inventory_after_harvest = inventory_before_settlement + farm_output
     if inventory_after_harvest > storage_capacity:
         excess = inventory_after_harvest - storage_capacity
-        inventory_final = storage_capacity
+        inventory_final_pre_ship = storage_capacity
         settle_reason = "capped_by_storage"
-        settle_delta = inventory_final - inventory_before_settlement
+        settle_delta = inventory_final_pre_ship - inventory_before_settlement
         if command.type == "buy_grain":
             inv_parents: tuple[str, ...] = (
                 "farm_output",
@@ -614,17 +995,17 @@ def resolve_turn(
         nodes.append(
             CausalNode(
                 id="inventory",
-                label=f"Inventory capped {inventory_before_settlement}+{farm_output} → {inventory_final} (excess {excess})",
+                label=f"Inventory capped {inventory_before_settlement}+{farm_output} → {inventory_final_pre_ship} (excess {excess})",
                 kind="inventory",
                 before=inventory_before_settlement,
-                after=inventory_final,
+                after=inventory_final_pre_ship,
                 delta=settle_delta,
                 reason_code=settle_reason,
                 parent_ids=inv_parents,
             )
         )
     else:
-        inventory_final = inventory_after_harvest
+        inventory_final_pre_ship = inventory_after_harvest
         settle_delta = farm_output
         settle_reason = "harvest_to_inventory"
         if command.type == "buy_grain":
@@ -634,23 +1015,23 @@ def resolve_turn(
         nodes.append(
             CausalNode(
                 id="inventory",
-                label=f"Inventory {inventory_before_settlement} → {inventory_final}",
+                label=f"Inventory {inventory_before_settlement} → {inventory_final_pre_ship}",
                 kind="inventory",
                 before=inventory_before_settlement,
-                after=inventory_final,
+                after=inventory_final_pre_ship,
                 delta=settle_delta,
                 reason_code=settle_reason,
                 parent_ids=inv_parents,
             )
         )
     # Domain effects for settlement
-    overall_inventory_delta = inventory_final - before_inventory
+    overall_inventory_delta_pre_ship = inventory_final_pre_ship - before_inventory
     if command.type == "buy_grain":
         effects.append(
             DomainEffect(
                 metric="inventory_harvest",
                 before=inventory_before_settlement,
-                after=inventory_final,
+                after=inventory_final_pre_ship,
                 delta=settle_delta,
                 reason_code=settle_reason,
             )
@@ -660,38 +1041,447 @@ def resolve_turn(
             DomainEffect(
                 metric="inventory",
                 before=before_inventory,
-                after=inventory_final,
-                delta=overall_inventory_delta,
+                after=inventory_final_pre_ship,
+                delta=overall_inventory_delta_pre_ship,
                 reason_code=settle_reason,
             )
         )
 
-    # 6. Valuation — exact decomposition of wealth
-    # wealth_before = cash_before + value(inv_before, price_before)
+    # 5b. Route settlement — ship execution (if requested)
+    # inventory_final will be mutated if ship succeeds
+    inventory_final = inventory_final_pre_ship
+    # ship_quantity_value placeholder for valuation later; computed after we know effective
+    ship_quantity_value_pre = 0  # will be computed
+    # Track if ship was planned
+    is_ship_command = command.type == "ship_grain"
+    if is_ship_command:
+        requested = ship_requested  # type: ignore[assignment]
+        # ship_requested is set only for ship_grain; but if route not established before, it's blocked
+        if not route_established_before:
+            # Blocked: no movement
+            ship_effective = 0
+            ship_delivered = 0
+            ship_revenue = 0
+            ship_cost = 0
+            ship_reason = "no_route_access"
+            trade_cash = 0
+            arbitrage_margin = 0
+            ship_quantity_value_pre = 0
+            # Emit shipment blocked node
+            nodes.append(
+                CausalNode(
+                    id="shipment",
+                    label="Shipment blocked — no route access",
+                    kind="trade",
+                    before=0,
+                    after=0,
+                    delta=0,
+                    reason_code=ship_reason,
+                    parent_ids=("command", "route_established"),
+                )
+            )
+            nodes.append(
+                CausalNode(
+                    id="trade_revenue",
+                    label="Trade revenue 0 (blocked)",
+                    kind="trade",
+                    before=0,
+                    after=0,
+                    delta=0,
+                    reason_code=ship_reason,
+                    parent_ids=("shipment", "river_price", "route_reliability"),
+                )
+            )
+            nodes.append(
+                CausalNode(
+                    id="transport_cost",
+                    label="Transport cost 0 (blocked)",
+                    kind="trade",
+                    before=0,
+                    after=0,
+                    delta=0,
+                    reason_code=ship_reason,
+                    parent_ids=("shipment", "route_cost_per_unit"),
+                )
+            )
+            nodes.append(
+                CausalNode(
+                    id="ship_quantity_value",
+                    label="Ship quantity value 0 (blocked)",
+                    kind="trade",
+                    before=0,
+                    after=0,
+                    delta=0,
+                    reason_code=ship_reason,
+                    parent_ids=("shipment", "inventory"),
+                )
+            )
+            # Truthful cash/inventory after trade (no movement)
+            nodes.append(
+                CausalNode(
+                    id="cash_after_trade",
+                    label="Cash after trade 0 (blocked)",
+                    kind="cash",
+                    before=cash,
+                    after=cash,
+                    delta=0,
+                    reason_code=ship_reason,
+                    parent_ids=("cash_after_command", "trade_revenue", "transport_cost"),
+                )
+            )
+            nodes.append(
+                CausalNode(
+                    id="inventory_after_trade",
+                    label="Inventory after trade 0 (blocked)",
+                    kind="inventory",
+                    before=inventory_final_pre_ship,
+                    after=inventory_final_pre_ship,
+                    delta=0,
+                    reason_code=ship_reason,
+                    parent_ids=("inventory", "shipment"),
+                )
+            )
+            effects.append(
+                DomainEffect(
+                    metric="shipment",
+                    before=0,
+                    after=0,
+                    delta=0,
+                    reason_code=ship_reason,
+                )
+            )
+        else:
+            # Established: compute effective with clamping
+            assert requested is not None
+            # affordable by transport cost
+            if transport_cost_per_unit <= 0:
+                affordable = requested
+            else:
+                affordable = ((cash + 1) * 1000 - 1) // transport_cost_per_unit
+                if affordable < 0:
+                    affordable = 0
+            available_by_capacity = route_capacity
+            available_by_inventory = inventory_final_pre_ship
+            ship_effective = requested
+            if ship_effective > affordable:
+                ship_effective = affordable
+            if ship_effective > available_by_capacity:
+                ship_effective = available_by_capacity
+            if ship_effective > available_by_inventory:
+                ship_effective = available_by_inventory
+            if ship_effective < 0:
+                ship_effective = 0
+            # Determine limiting reason
+            if ship_effective < requested:
+                if (
+                    affordable < requested
+                    and affordable <= available_by_capacity
+                    and affordable <= available_by_inventory
+                ):
+                    ship_reason = "insufficient_cash_for_transport"
+                elif (
+                    available_by_capacity < requested
+                    and available_by_capacity <= available_by_inventory
+                    and available_by_capacity <= affordable
+                ):
+                    ship_reason = "limited_by_capacity"
+                elif available_by_inventory < requested:
+                    ship_reason = "insufficient_inventory"
+                else:
+                    ship_reason = "ship_limited"
+            else:
+                ship_reason = "ship_grain"
+            # Reliability applied consistently for all values; default 10000 is lossless
+            ship_delivered = ship_effective * route_reliability_bps // 10_000
+            ship_revenue = (ship_delivered * river_new_price) // 1000
+            ship_cost = (ship_effective * transport_cost_per_unit) // 1000
+            trade_cash = ship_revenue - ship_cost
+            # Update cash and inventory — capture before values for truthful trace
+            cash_before_trade = cash
+            cash_after_ship = cash + trade_cash
+            inventory_final = inventory_final_pre_ship - ship_effective
+            if inventory_final < 0:
+                inventory_final = 0
+            # Clamp cash non-negative (should not go negative due to affordable check)
+            if cash_after_ship < 0:
+                cash_after_ship = 0
+            cash = cash_after_ship
+            # Compute ship_quantity_value at home price (old price)
+            value_before_ship = _value(inventory_final_pre_ship, before_price)
+            value_after_ship = _value(inventory_final, before_price)
+            ship_quantity_value_pre = value_after_ship - value_before_ship
+            # Arbitrage margin using resolved prices (for driver decision, not wealth)
+            # river_sale_value - transport_cost - resolved_home_opportunity
+            arbitrage_margin = ship_revenue - ship_cost - (ship_effective * new_price // 1000)
+            # Store for driver reasoning (attach to trace via reason_code later)
+            # Keep for later use in story drivers via closure variable
+            # Use a local to pass to driver section: we store in a variable that survives
+            # We'll stash in a deterministic way: create a node that encodes the margin
+            # (no extra node needed, just keep variable arbitrage_margin for driver)
+            # Emit nodes with truthful parents
+            nodes.append(
+                CausalNode(
+                    id="shipment",
+                    label=f"Shipment {ship_effective}/{requested} (delivered {ship_delivered}, reason {ship_reason})",
+                    kind="trade",
+                    before=inventory_final_pre_ship,
+                    after=inventory_final,
+                    delta=-ship_effective,
+                    reason_code=ship_reason,
+                    parent_ids=(
+                        "command",
+                        "route_established",
+                        "route_capacity",
+                        "inventory",
+                        "route_cost_per_unit",
+                        "cash_after_command",
+                    ),
+                )
+            )
+            nodes.append(
+                CausalNode(
+                    id="trade_revenue",
+                    label=f"Trade revenue {ship_delivered}×{river_new_price} → {ship_revenue}",
+                    kind="trade",
+                    before=0,
+                    after=ship_revenue,
+                    delta=ship_revenue,
+                    reason_code="trade_revenue_at_river_price",
+                    parent_ids=("shipment", "river_price", "route_reliability"),
+                )
+            )
+            nodes.append(
+                CausalNode(
+                    id="transport_cost",
+                    label=f"Transport cost {ship_effective}×{transport_cost_per_unit} → {ship_cost}",
+                    kind="trade",
+                    before=0,
+                    after=-ship_cost,
+                    delta=-ship_cost,
+                    reason_code="transport_cost",
+                    parent_ids=("shipment", "route_cost_per_unit"),
+                )
+            )
+            nodes.append(
+                CausalNode(
+                    id="ship_quantity_value",
+                    label=f"Ship quantity value {value_before_ship} → {value_after_ship} (delta {ship_quantity_value_pre:+})",
+                    kind="trade",
+                    before=value_before_ship,
+                    after=value_after_ship,
+                    delta=ship_quantity_value_pre,
+                    reason_code="ship_quantity_value" if ship_effective > 0 else "no_ship",
+                    parent_ids=("shipment", "inventory"),
+                )
+            )
+            # Cash after trade — truthful parentage for cash_effect
+            nodes.append(
+                CausalNode(
+                    id="cash_after_trade",
+                    label=f"Cash after trade {cash_before_trade} → {cash_after_ship} (revenue {ship_revenue} cost {ship_cost})",
+                    kind="cash",
+                    before=cash_before_trade,
+                    after=cash_after_ship,
+                    delta=trade_cash,
+                    reason_code="cash_after_trade",
+                    parent_ids=("cash_after_command", "trade_revenue", "transport_cost"),
+                )
+            )
+            # Inventory after trade — truthful parent for price revaluation
+            nodes.append(
+                CausalNode(
+                    id="inventory_after_trade",
+                    label=f"Inventory after trade {inventory_final_pre_ship} → {inventory_final}",
+                    kind="inventory",
+                    before=inventory_final_pre_ship,
+                    after=inventory_final,
+                    delta=-ship_effective,
+                    reason_code=ship_reason,
+                    parent_ids=("inventory", "shipment"),
+                )
+            )
+            effects.append(
+                DomainEffect(
+                    metric="shipment",
+                    before=inventory_final_pre_ship,
+                    after=inventory_final,
+                    delta=-ship_effective,
+                    reason_code=ship_reason,
+                )
+            )
+            effects.append(
+                DomainEffect(
+                    metric="trade_revenue",
+                    before=0,
+                    after=ship_revenue,
+                    delta=ship_revenue,
+                    reason_code="trade_revenue",
+                )
+            )
+            effects.append(
+                DomainEffect(
+                    metric="transport_cost",
+                    before=0,
+                    after=-ship_cost,
+                    delta=-ship_cost,
+                    reason_code="transport_cost",
+                )
+            )
+            effects.append(
+                DomainEffect(
+                    metric="ship_quantity_value",
+                    before=value_before_ship,
+                    after=value_after_ship,
+                    delta=ship_quantity_value_pre,
+                    reason_code="ship_quantity_value",
+                )
+            )
+            # Update inventory overall delta after ship
+            overall_inventory_delta = inventory_final - before_inventory
+            # Add/override inventory effect to reflect final after ship
+            # We already have inventory_harvest/inventory effect for pre-ship; add final inventory effect
+            effects.append(
+                DomainEffect(
+                    metric="inventory_after_ship",
+                    before=inventory_final_pre_ship,
+                    after=inventory_final,
+                    delta=-ship_effective,
+                    reason_code=ship_reason,
+                )
+            )
+        # For ship case, overall_inventory_delta is final after ship
+        overall_inventory_delta = inventory_final - before_inventory
+    else:
+        # Not a ship command — emit zero shipment nodes for trace completeness
+        ship_effective = 0
+        ship_delivered = 0
+        ship_revenue = 0
+        ship_cost = 0
+        ship_reason = "no_shipment"
+        trade_cash = 0
+        arbitrage_margin = 0
+        ship_quantity_value_pre = 0
+        nodes.append(
+            CausalNode(
+                id="shipment",
+                label="No shipment",
+                kind="trade",
+                before=0,
+                after=0,
+                delta=0,
+                reason_code=ship_reason,
+                parent_ids=("command",),
+            )
+        )
+        nodes.append(
+            CausalNode(
+                id="trade_revenue",
+                label="Trade revenue 0",
+                kind="trade",
+                before=0,
+                after=0,
+                delta=0,
+                reason_code=ship_reason,
+                parent_ids=("shipment", "river_price", "route_reliability"),
+            )
+        )
+        nodes.append(
+            CausalNode(
+                id="transport_cost",
+                label="Transport cost 0",
+                kind="trade",
+                before=0,
+                after=0,
+                delta=0,
+                reason_code=ship_reason,
+                parent_ids=("shipment", "route_cost_per_unit"),
+            )
+        )
+        nodes.append(
+            CausalNode(
+                id="ship_quantity_value",
+                label="Ship quantity value 0",
+                kind="trade",
+                before=0,
+                after=0,
+                delta=0,
+                reason_code=ship_reason,
+                parent_ids=("shipment", "inventory"),
+            )
+        )
+        nodes.append(
+            CausalNode(
+                id="cash_after_trade",
+                label="Cash after trade 0 (no shipment)",
+                kind="cash",
+                before=cash,
+                after=cash,
+                delta=0,
+                reason_code=ship_reason,
+                parent_ids=("cash_after_command", "trade_revenue", "transport_cost"),
+            )
+        )
+        nodes.append(
+            CausalNode(
+                id="inventory_after_trade",
+                label="Inventory after trade 0 (no shipment)",
+                kind="inventory",
+                before=inventory_final_pre_ship,
+                after=inventory_final,
+                delta=0,
+                reason_code=ship_reason,
+                parent_ids=("inventory", "shipment"),
+            )
+        )
+        effects.append(
+            DomainEffect(
+                metric="shipment",
+                before=0,
+                after=0,
+                delta=0,
+                reason_code=ship_reason,
+            )
+        )
+        overall_inventory_delta = inventory_final - before_inventory
+
+    # 6. Valuation — exact decomposition of wealth (now with ship)
+    # wealth_before = cash_before + value(inv_before, price_before_home)
     # purchase_quantity_value = value(inv_after_buy, price_before) - value(inv_before, price_before)
-    # harvest_quantity_value  = value(inv_final, price_before) - value(inv_after_buy, price_before)
-    # price_value_effect      = value(inv_final, price_after)  - value(inv_final, price_before)
-    # cash_effect             = cash - cash_before
-    # wealth_delta            = cash_effect + purchase + harvest + price
+    # harvest_quantity_value  = value(inv_after_harvest, price_before) - value(inv_after_buy, price_before)
+    # ship_quantity_value     = value(inv_final, price_before) - value(inv_after_harvest, price_before)
+    # price_value_effect      = value(inv_final, price_after_home)  - value(inv_final, price_before_home)
+    # cash_effect             = cash_after - cash_before
+    # wealth_delta            = cash_effect + purchase + harvest + ship + price
     value_before = _value(before_inventory, before_price)
     value_after_buy = _value(inventory_before_settlement, before_price)
-    value_after_quantity = _value(inventory_final, before_price)
+    value_after_harvest = _value(inventory_final_pre_ship, before_price)
+    value_after_ship = _value(inventory_final, before_price)
     value_after = _value(inventory_final, new_price)
     wealth_before = before_cash + value_before
     wealth_after = cash + value_after
     purchase_quantity_value = value_after_buy - value_before
-    harvest_quantity_value = value_after_quantity - value_after_buy
-    quantity_value_effect = (
-        purchase_quantity_value + harvest_quantity_value
-    )  # for backward compat if needed
-    price_value_effect = value_after - value_after_quantity
+    harvest_quantity_value = value_after_harvest - value_after_buy
+    ship_quantity_value = value_after_ship - value_after_harvest
+    # For ship commands, ship_quantity_value should match earlier computed pre value; assert consistency
+    # But for non-ship, it's 0
+    assert ship_quantity_value == ship_quantity_value_pre, (
+        f"ship mismatch {ship_quantity_value} vs {ship_quantity_value_pre}"
+    )
+    quantity_value_effect = purchase_quantity_value + harvest_quantity_value + ship_quantity_value
+    price_value_effect = value_after - value_after_ship
     cash_effect = cash - before_cash
     wealth_delta = (
-        cash_effect + purchase_quantity_value + harvest_quantity_value + price_value_effect
+        cash_effect
+        + purchase_quantity_value
+        + harvest_quantity_value
+        + ship_quantity_value
+        + price_value_effect
     )
     # Sanity: wealth_after - wealth_before must equal wealth_delta
     assert wealth_after - wealth_before == wealth_delta
-    assert quantity_value_effect == purchase_quantity_value + harvest_quantity_value
+    # For backward compat when ship==0, quantity_value_effect == purchase+harvest
+    if ship_quantity_value == 0:
+        assert quantity_value_effect == purchase_quantity_value + harvest_quantity_value
 
     # Purchase quantity — value of bought grain at old price
     if command.type == "buy_grain":
@@ -717,50 +1507,62 @@ def resolve_turn(
     # Harvest quantity — value of harvested grain at old price (storage-constrained)
     if settle_reason == "capped_by_storage":
         harvest_reason = "harvest_quantity_capped_by_storage"
-        harvest_label = f"Harvest quantity value {value_after_buy} → {value_after_quantity} (delta {harvest_quantity_value:+}, capped)"
+        harvest_label = f"Harvest quantity value {value_after_buy} → {value_after_harvest} (delta {harvest_quantity_value:+}, capped)"
     else:
         if world == "drought":
             harvest_reason = "drought_harvest_quantity_value"
-            harvest_label = f"Harvest quantity value {value_after_buy} → {value_after_quantity} (delta {harvest_quantity_value:+})"
+            harvest_label = f"Harvest quantity value {value_after_buy} → {value_after_harvest} (delta {harvest_quantity_value:+})"
         else:
             harvest_reason = "harvest_quantity_value"
-            harvest_label = f"Harvest quantity value {value_after_buy} → {value_after_quantity} (delta {harvest_quantity_value:+})"
+            harvest_label = f"Harvest quantity value {value_after_buy} → {value_after_harvest} (delta {harvest_quantity_value:+})"
     nodes.append(
         CausalNode(
             id="harvest_quantity_value",
             label=harvest_label,
             kind="harvest_quantity_value",
             before=value_after_buy,
-            after=value_after_quantity,
+            after=value_after_harvest,
             delta=harvest_quantity_value,
             reason_code=harvest_reason,
             parent_ids=("farm_output", "storage_capacity", "inventory"),
         )
     )
-    # Combined quantity value — sum of purchase and harvest, for wealth decomposition and backward compat
+    # Ship quantity value node already emitted as trade node above, but we need a valuation-style duplicate?
+    # The earlier "ship_quantity_value" with kind trade already serves as valuation node. For consistency with other valuation nodes,
+    # ensure a node with id "ship_quantity_value" is already in trace. We emitted it at route settlement with kind trade.
+    # No need to emit again.
+    # Combined quantity value — sum of purchase, harvest, ship, for wealth decomposition and backward compat
+    if ship_quantity_value != 0:
+        quantity_parents: tuple[str, ...] = (
+            "purchase_quantity_value",
+            "harvest_quantity_value",
+            "ship_quantity_value",
+        )
+    else:
+        quantity_parents = ("purchase_quantity_value", "harvest_quantity_value")
     nodes.append(
         CausalNode(
             id="quantity_value_effect",
-            label=f"Quantity value {value_before} → {value_after_quantity} (delta {quantity_value_effect:+})",
+            label=f"Quantity value {value_before} → {value_after_ship} (delta {quantity_value_effect:+})",
             kind="quantity_value_effect",
             before=value_before,
-            after=value_after_quantity,
+            after=value_after_ship,
             delta=quantity_value_effect,
             reason_code="quantity_value_effect",
-            parent_ids=("purchase_quantity_value", "harvest_quantity_value"),
+            parent_ids=quantity_parents,
         )
     )
     nodes.append(
         CausalNode(
             id="price_value_effect",
-            label=f"Price revaluation {value_after_quantity} → {value_after} "
+            label=f"Price revaluation {value_after_ship} → {value_after} "
             f"(delta {price_value_effect:+})",
             kind="price_value_effect",
-            before=value_after_quantity,
+            before=value_after_ship,
             after=value_after,
             delta=price_value_effect,
             reason_code="price_revalued_stored_grain",
-            parent_ids=("inventory", "price"),
+            parent_ids=("inventory_after_trade", "price"),
         )
     )
     nodes.append(
@@ -772,7 +1574,7 @@ def resolve_turn(
             after=cash,
             delta=cash_effect,
             reason_code=cmd_reason,
-            parent_ids=("cash_after_command",),
+            parent_ids=("cash_after_trade",),
         )
     )
     nodes.append(
@@ -800,16 +1602,27 @@ def resolve_turn(
         DomainEffect(
             metric="harvest_quantity_value",
             before=value_after_buy,
-            after=value_after_quantity,
+            after=value_after_harvest,
             delta=harvest_quantity_value,
             reason_code="harvest_quantity_value",
         )
     )
+    # Ship quantity value domain effect already added in route settlement for ship case; for non-ship add here
+    if not is_ship_command or ship_effective == 0:
+        effects.append(
+            DomainEffect(
+                metric="ship_quantity_value",
+                before=value_after_harvest,
+                after=value_after_ship,
+                delta=ship_quantity_value,
+                reason_code="ship_quantity_value",
+            )
+        )
     effects.append(
         DomainEffect(
             metric="quantity_value_effect",
             before=value_before,
-            after=value_after_quantity,
+            after=value_after_ship,
             delta=quantity_value_effect,
             reason_code="quantity_value_effect",
         )
@@ -817,7 +1630,7 @@ def resolve_turn(
     effects.append(
         DomainEffect(
             metric="price_value_effect",
-            before=value_after_quantity,
+            before=value_after_ship,
             after=value_after,
             delta=price_value_effect,
             reason_code="price_value_effect",
@@ -857,12 +1670,33 @@ def resolve_turn(
         responsiveness=responsiveness,
         max_movement_bps=max_movement_bps,
     )
+    next_river_market = MarketState(
+        supply=river_supply_next,
+        demand=before_river_demand,
+        base_price=river_base_price,
+        current_price=river_new_price,
+        responsiveness=river_responsiveness,
+        max_movement_bps=river_max_movement_bps,
+    )
+    # Next route state
+    from app.domain.types import RouteState as RouteStateType
+
+    next_route = RouteStateType(
+        transport_cost_per_unit=transport_cost_per_unit,
+        capacity=route_capacity,
+        reliability_bps=route_reliability_bps,
+        established=route_established,
+        delay_turns=before_route.delay_turns,
+        event_exposure=before_route.event_exposure,
+    )
     next_state = GameState(
         turn=state.turn + 1,
         run_seed=state.run_seed,
         ruleset_version=state.ruleset_version,
         player=next_player,
         market=next_market,
+        river_market=next_river_market,
+        route=next_route,
     )
 
     # Build story drivers — exact partitions of wealth_delta, filtered, ranked by wealth-bps
@@ -873,38 +1707,116 @@ def resolve_turn(
 
     candidates: list[OutcomeDriver] = []
 
-    # Candidate 1: command cost (cash_effect) — only if non-zero
-    if cash_effect != 0:
+    # Trade cash split for driver accounting
+    if is_ship_command and ship_effective > 0:
+        trade_cash = ship_revenue - ship_cost
+        command_cash = cash_effect - trade_cash
+    else:
+        trade_cash = 0
+        command_cash = cash_effect
+
+    # Candidate 1: command cost (cash_effect without trade) — only if non-zero
+    if command_cash != 0:
         if command.type == "expand_farm":
-            label = f"Expanding farm cost {abs(cash_effect)}"
+            label = f"Expanding farm cost {abs(command_cash)}"
             reason = "expand_farm_cost"
         elif command.type == "build_granary":
-            label = f"Building granary cost {abs(cash_effect)}"
+            label = f"Building granary cost {abs(command_cash)}"
             reason = "build_granary_cost"
         elif command.type == "buy_grain":
             if cmd_reason == "insufficient_cash":
-                label = f"Buy grain limited by cash (spent {abs(cash_effect)})"
+                label = f"Buy grain limited by cash (spent {abs(command_cash)})"
                 reason = "buy_limited_cash"
             elif cmd_reason == "insufficient_storage":
-                label = f"Buy grain limited by storage (spent {abs(cash_effect)})"
+                label = f"Buy grain limited by storage (spent {abs(command_cash)})"
                 reason = "buy_limited_storage"
             else:
-                label = f"Bought grain for {abs(cash_effect)}"
+                label = f"Bought grain for {abs(command_cash)}"
                 reason = "buy_grain_cost"
+        elif command.type == "secure_route":
+            if cmd_reason == "already_established":
+                label = "Route already secured (no cost)"
+                reason = "already_established"
+            elif cmd_reason == "insufficient_cash_for_route":
+                label = "Could not afford to secure route"
+                reason = "insufficient_cash_for_route"
+            else:
+                label = f"Secured river route for {abs(command_cash)}"
+                reason = "secure_route_cost"
         else:
-            label = f"Cash change {cash_effect:+}"
+            label = f"Cash change {command_cash:+}"
             reason = cmd_reason
         candidates.append(
             OutcomeDriver(
                 id="command_cost",
                 label=label,
                 kind="cash",
-                impact_money=cash_effect,
-                impact_bps=_bps(cash_effect),
+                impact_money=command_cash,
+                impact_bps=_bps(command_cash),
                 reason_code=reason,
                 causal_node_ids=("command", "cash_after_command", "cash_effect"),
             )
         )
+
+    # Candidate ship trade — net wealth impact + arbitrage margin at resolved prices
+    if is_ship_command and ship_effective > 0:
+        net_trade = ship_quantity_value + trade_cash
+        # arbitrage_margin uses resolved home price for opportunity cost
+        # wealth keeps ship_quantity_value at before_price, but decision uses arbitrage_margin
+        # arbitrage_margin already computed; fallback to net_trade calc if not set (should be set)
+        try:
+            margin = arbitrage_margin
+        except NameError:
+            margin = ship_revenue - ship_cost - (ship_effective * new_price // 1000)
+        # Only add if wealth net !=0 (keeps wealth-bps ranking intact); decision based on margin
+        if net_trade != 0:
+            if margin > 0:
+                label = f"Shipped {ship_effective} grain to River Town for profit {net_trade:+} (revenue {ship_revenue} - cost {ship_cost} + quantity {ship_quantity_value:+}, arbitrage {margin:+} at resolved prices)"
+                reason = "profitable_arbitrage"
+            elif margin < 0:
+                label = f"Shipped {ship_effective} grain to River Town (net {net_trade:+}, revenue {ship_revenue} - cost {ship_cost} + quantity {ship_quantity_value:+}, arbitrage {margin:+} at resolved prices)"
+                reason = "unprofitable_shipment"
+            else:
+                label = f"Shipped {ship_effective} grain to River Town break-even (revenue {ship_revenue} = cost + resolved home value)"
+                reason = "break_even_trade"
+            # causal path includes river price divergence and home price opportunity
+            causal_ids = (
+                "command",
+                "shipment",
+                "river_price",
+                "ship_quantity_value",
+                "trade_revenue",
+                "transport_cost",
+                "inventory_after_trade",
+                "price",
+            )
+            candidates.append(
+                OutcomeDriver(
+                    id="trade_arbitrage",
+                    label=label,
+                    kind="trade",
+                    impact_money=net_trade,
+                    impact_bps=_bps(net_trade),
+                    reason_code=reason,
+                    causal_node_ids=causal_ids,
+                )
+            )
+        elif ship_effective > 0 and net_trade == 0:
+            label = f"Shipped {ship_effective} grain to River Town break-even (revenue {ship_revenue} = cost + quantity loss)"
+            reason = "break_even_trade"
+            causal_ids = ("command", "shipment", "river_price", "ship_quantity_value")
+            candidates.append(
+                OutcomeDriver(
+                    id="trade_arbitrage",
+                    label=label,
+                    kind="trade",
+                    impact_money=0,
+                    impact_bps=0,
+                    reason_code=reason,
+                    causal_node_ids=causal_ids,
+                )
+            )
+            candidates.pop()  # filtered zero
 
     # Candidate 2: purchase quantity value — only if purchase actually added value
     if purchase_quantity_value != 0:
@@ -963,7 +1875,7 @@ def resolve_turn(
             )
         )
 
-    # Candidate 3: price revaluation (supply -> price -> valuation)
+    # Candidate 4: price revaluation (home supply -> home price -> valuation)
     if price_value_effect != 0:
         direction = "higher" if price_value_effect > 0 else "lower"
         label = (
@@ -992,7 +1904,7 @@ def resolve_turn(
             )
         )
 
-    # Candidate 4: storage constraint — handled via quantity driver label
+    # Candidate 5: storage constraint — handled via quantity driver label
     # Already covered; no separate driver to avoid double-count
     if settle_reason == "capped_by_storage":
         excess = inventory_before_settlement + farm_output - storage_capacity
@@ -1008,11 +1920,13 @@ def resolve_turn(
             # If quantity driver non-zero but capped, we already
             # have storage info in its label
 
-    # Candidate 5: farm output story as distinct from quantity value (for richer narrative)
+    # Candidate 6: farm output story as distinct from quantity value (for richer narrative)
     # Only add if farm_output driver would be distinct and non-zero wealth impact already covered
     # To avoid double-counting, we do not add a separate farm_output driver beyond quantity_value
     # The quantity_value driver already represents farm_output's wealth impact exactly.
 
+    # Filter zero-impact candidates (already ensured but double-check) and rank
+    candidates = [c for c in candidates if c.impact_money != 0]
     # Rank by impact_bps DESC, id ASC for determinism, keep top 3
     candidates_sorted = sorted(candidates, key=lambda d: (-d.impact_bps, d.id))
     drivers = tuple(candidates_sorted[:3])

@@ -2,9 +2,9 @@
 
 > Handoff snapshot for Muse / human. Concise and current, not a history log.
 
-## Section 4 — COMPLETE (2026-08-09)
+## Section 5 — COMPLETE (2026-08-09)
 
-**Causal explanation and outcome model:** exact wealth decomposition (`cash_effect + purchase_quantity_value + harvest_quantity_value + price_value_effect == wealth_delta`), immutable causal DAG with tuples, story drivers as exact wealth-bps ranked paths (not single nodes), filtered zero-impact stories, valuation subgraph `purchase_quantity_value + harvest_quantity_value → quantity_value_effect → wealth` and `inventory + price → price_value_effect → wealth` with `storage_capacity` explicit, RNG ownership validated, CLI concise/verbose.
+**Two markets + River Route:** Home Valley (`market` alias) + River Town (`river_market`) with independent supply/demand → different prices from same grain, one River Route (`route: RouteState` with `transport_cost_per_unit: PriceMilliunits=800, capacity=20, reliability_bps=10000, established, delay_turns=0 constrained, event_exposure`), commands `secure_route` (cost 400 to establish) and `ship_grain` (quantity, clamped by `min(requested, capacity, inventory, affordable_by_transport)`), deterministic arbitrage (`delivered = effective * reliability_bps // 10000`, classification uses resolved Home+ River prices), transport cost can erase apparent gap, capacity constrains, profit emerges from market conditions not script, Home-only turns still valid, `TURN_ORDER` extended, exact wealth with ship: `cash_effect + purchase+harvest+ship + price == wealth_delta`.
 
 ### What exists
 
@@ -13,25 +13,26 @@ backend/
   app/
     __init__.py
     domain/
-      __init__.py            # re-exports CausalEdge/OutcomeDriver + types
-      types.py               # Money/... + GameState/PlayerState/MarketState+WorldCondition+PlayerCommand (frozen, ge=0)
-      trace.py               # CausalNode(parent_ids:tuple)/CausalTrace(nodes:tuple, edges)/DomainEffect/OutcomeDriver/PlayerOutcome(drivers:tuple, top_drivers computed)/TurnResolution (frozen, validators: unique ids, parents before children, allowed roots world/command, farm_capacity/storage_capacity only when delta==0, delta==after-before, purchase/harvest quantity kinds)
+      __init__.py            # re-exports CausalEdge/OutcomeDriver + types+RouteState
+      types.py               # Money/... + GameState(player, market:Home, river_market, route:RouteState)+RouteState+PlayerCommand(secure_route/ship_grain) (frozen, ge=0)
+      trace.py               # CausalNode(parent_ids:tuple)/CausalTrace(nodes:tuple, edges)/DomainEffect/OutcomeDriver/PlayerOutcome(drivers:tuple, top_drivers computed)/TurnResolution (frozen, validators: unique ids, parents before children, allowed roots world/command, farm_capacity/storage_capacity/route_* only when delta==0, delta==after-before, + river/route/trade kinds, new cash_after_trade/inventory_after_trade)
     engine/
       __init__.py            # re-exports RNG + rounding + resolve_turn/TURN_ORDER
       rng.py                 # derive_seed/make_rng/rng_for — JSON canonical -> blake2b
       rounding.py            # mul_basis_points/apply_basis_points/div_round_half_up/clamp_non_negative
-      turn.py                # resolve_turn — command->production->supply->price->settlement->valuation, drought→farm_output→supply→price, exact valuation (_value: qty*price//1000), wealth nodes (purchase_quantity_value/harvest_quantity_value/quantity_value_effect/price_value_effect/cash_effect/wealth), story drivers (command_cost, purchase_quantity, harvest_quantity, price_revaluation) filtered & ranked by exact wealth-bps, RNG validated, storage_capacity stable node + inventory parents (farm_output, storage_capacity, inventory_after_buy)
-      demo.py                # CLI demo: before/command/world/WHY? (3 story drivers with impact_money/impact_bps/causal_node_ids) + after + contrast; --verbose adds FULL CAUSAL TRACE + DOMAIN EFFECTS + EDGES
+      turn.py                # resolve_turn — command->production->home_supply->river_supply->home_price->river_price->settlement->route_settlement->valuation, two prices via _target_price/_bounded_price, river_supply stable, drought→farm_output→home_supply→home_price only, exact valuation with ship (_value: qty*price//1000), wealth nodes (purchase_quantity_value/harvest_quantity_value/ship_quantity_value/quantity_value_effect/price_value_effect/cash_effect/wealth, route nodes shipment/trade_revenue/transport_cost/cash_after_trade/inventory_after_trade), story drivers (command_cost [split trade_cash], purchase_quantity, harvest_quantity, trade_arbitrage [net ship_quantity+revenue-cost, classification via arbitrage_margin = delivered*river_price - effective*transport - effective*new_home_price], price_revaluation) filtered & ranked by exact wealth-bps, RNG validated (turn + route substreams), storage_capacity + route_capacity stable nodes, inventory parents (farm_output, storage_capacity, inventory_after_buy)
+      demo.py                # CLI demo: before (HOME/RIVER/ROUTE)/command/world/WHY? (≤3 story drivers including trade_arbitrage) + after + contrast; --verbose adds FULL CAUSAL TRACE + DOMAIN EFFECTS + EDGES; --established flag for ship demo
   tests/
     test_sanity.py
     test_engine_purity.py
     test_core_types.py
     test_determinism.py
     test_rounding.py
-    test_turn_kernel.py      # AC #1,3,4,5,6 + blocker 2 + TURN_ORDER->valuation + tuple parents
+    test_turn_kernel.py      # AC #1,3,4,5,6 + blocker 2 + TURN_ORDER->home_supply->river_supply->home_price->river_price->route_settlement->valuation + tuple parents
     test_invariants.py       # monotonic price, no negatives, positive price
     test_causal_trace.py     # exact wealth decomposition, immutable tuples, DAG allowed roots, wealth graph parents, driver determinism & wealth-bps, story paths filtered, RNG mismatch, storage-capped
     test_explanation.py      # drought→wealth structural chain exact, story drivers cover chain, concise≤3 & full trace, normal vs drought
+    test_two_markets_route.py # Section 5 AC1-6: different prices, transport cost erases profit, capacity caps, emergent arbitrage, home-only, determinism, secure_route/ship blocked, wealth exact with ship, TURN_ORDER
   pyproject.toml             # uv project: pytest + ruff + pyright (strict) + pydantic>=2.7
   uv.lock
   .venv/
@@ -40,12 +41,13 @@ Makefile
 .python-version              # 3.12 (root only)
 AGENTS.md / backend/AGENTS.md / frontend/AGENTS.md
 DECISIONS.md (001-009)
-BUILD_SPEC.md Status: Sections 1-4 COMPLETE
+BUILD_SPEC.md Status: Sections 1-5 COMPLETE
 docs/plans/
   2026-08-09-section-1-walking-skeleton.md
   2026-08-09-section-2-core-types.md
   2026-08-09-section-3-grain-market-kernel.md
   2026-08-09-section-4-causal-explanation.md  # exact valuation, tuples, story drivers
+  2026-08-09-section-5-two-markets-route.md  # two markets + route, emergent arbitrage
 frontend/                    # placeholder for Section 11
 docs/
 ```
@@ -54,20 +56,22 @@ docs/
 
 - `backend/app/engine` and `backend/app/domain` are pure: no `fastapi`, `sqlalchemy`, `httpx`, `asyncpg`, `openai`, `clerk`. Enforced by AST rglob test. `pydantic` allowed for validated canonical types. `engine/turn.py` imports only `domain` + `rng`/`rounding`.
 - Canonical state is frozen with immutable tuples: `parent_ids: tuple[str,...]`, `nodes: tuple[CausalNode,...]`, `drivers: tuple[OutcomeDriver,...]`, `causal_node_ids: tuple[str,...]` — no mutable lists inside frozen models, DAG is authoritative.
-- Wealth is structural, not post-hoc math: `value(qty,price)=qty*price//1000`, `wealth_before=cash_before+value(before)`, `purchase_quantity_value=value(after_buy,price_before)-value(before,price_before)`, `harvest_quantity_value=value(final,price_before)-value(after_buy,price_before)`, `quantity_value_effect=purchase+harvest`, `price_value_effect=value(final,price_after)-value(final,price_before)`, `cash_effect=cash_after-cash_before`, `wealth_delta=cash+purchase+harvest+price` exactly, with nodes `purchase_quantity_value` parents `(command,inventory_after_buy)` (no price), `harvest_quantity_value` parents `(farm_output,storage_capacity,inventory)` (no price), `quantity_value_effect` parents `(purchase_quantity_value,harvest_quantity_value)` (no price), `price_value_effect` parents `(inventory,price)` alone carries changed-price causality, `wealth` parents `(cash_effect,quantity_value_effect,price_value_effect)`.
-- Story drivers are exact partitions: candidates `command_cost`/`purchase_quantity`/`harvest_quantity`/`price_revaluation` (`purchase` = buy at old price, `harvest` = farm output at old price storage-constrained) filtered where `impact_money==0`, ranked by `impact_bps=abs(impact_money)*10000//max(wealth_before,1)` desc then `id` asc, `≤3` returned. No double-count, no counterfactual drought-vs-normal, sum of `cash+purchase+harvest+price` == `wealth_delta` exactly, `quantity_value_effect` = `purchase+harvest`.
-- Validator: unique ids, parents before children, no cycles, allowed roots `world`/`command` regardless of delta, `farm_capacity`/`storage_capacity` empty only when `delta==0` (storage is explicit settlement parent: `inventory` parents `farm_output`+`storage_capacity`[+`inventory_after_buy`]), all valuation nodes require parents (`quantity_value_effect`←`purchase`+`harvest`, `purchase`←`command`/`inventory_after_buy` no price, `harvest`←`farm_output`+`storage_capacity`+`inventory` no price, `price_value_effect`←`inventory`+`price`), `delta==after-before` enforced, `edges` derived.
-- Deterministic RNG: `rng_context` validated `== state.to_turn_context()` else `ValueError`; `derive_seed` via JSON array + blake2b, no global random/hash, price remains deterministic.
+- Home market kept as `market` alias for backward compat; `river_market: MarketState` defaults `supply=80, demand=130, base=5200, price=5200`; river supply stable (not incremented by home harvest) so price divergence is emergent from `demand - supply` via same `_target_price/_bounded_price`. `RouteState` carries required properties `transport_cost_per_unit: PriceMilliunits=800, capacity=20, reliability_bps=10000, established=False, delay_turns=0 constrained (le=0), event_exposure="river_risk"`; `secure_route` costs 400 cash to set `established=True`; `ship_grain` is `min(requested, capacity, inventory_final_pre_ship, affordable_by_transport)` with reasons `limited_by_capacity/insufficient_inventory/insufficient_cash_for_transport/no_route_access`, revenue `delivered*river_price//1000`, cost `effective*transport_cost//1000`, `delivered = effective * reliability_bps // 10000` for all values (default lossless).
+- Wealth is structural, not post-hoc math: `value(qty,price)=qty*price//1000`, `wealth_before=cash_before+value(before)`, `purchase_quantity_value=value(after_buy,price_before)-value(before,price_before)`, `harvest_quantity_value=value(after_harvest,price_before)-value(after_buy,price_before)`, `ship_quantity_value=value(final,price_before)-value(after_harvest,price_before)`, `quantity_value_effect=purchase+harvest+ship`, `price_value_effect=value(final,price_after)-value(final,price_before)`, `cash_effect=cash_after-cash_before` (includes `secure_route` cost and `ship_revenue - ship_cost`), `wealth_delta=cash+purchase+harvest+ship+price` exactly, with nodes `purchase_quantity_value` parents `(command,inventory_after_buy)` (no price), `harvest_quantity_value` parents `(farm_output,storage_capacity,inventory)` (no price), `ship_quantity_value` parents `(shipment,inventory)` (no price), `quantity_value_effect` parents `(purchase,harvest[,ship])`, `price_value_effect` parents `(inventory_after_trade,price)` alone carries changed-price (inventory_after_trade parents `inventory+shipment`), `wealth` parents `(cash_effect,quantity_value_effect,price_value_effect)`, route nodes `shipment` parents `(command,route_established,route_capacity,inventory,route_cost_per_unit,cash_after_command)` (reliability not a parent of quantity shipped), `cash_after_trade` parents `(cash_after_command,trade_revenue,transport_cost)` → `cash_effect` parents `(cash_after_trade)`, `trade_revenue` parents `(shipment,river_price,route_reliability)`.
+- Story drivers are exact partitions: candidates `command_cost` (now `cash_effect - trade_cash`), `purchase_quantity`, `harvest_quantity`, `trade_arbitrage` (`ship_quantity_value + trade_cash` net, classification via `arbitrage_margin = delivered*river_price//1000 - effective*transport_cost//1000 - effective*new_home_price//1000` using resolved prices), `price_revaluation` filtered where `impact_money==0`, ranked by `impact_bps=abs(impact_money)*10000//max(wealth_before,1)` desc then `id` asc, `≤3` returned. No double-count, sum of non-zero drivers equals subset of `wealth_delta` but exact decomposition holds via effects; `quantity_value_effect` = `purchase+harvest+ship`. Regression: `old 5.00 → new 6.00, river 6.24, transport 0.80, qty10` old margin +4 vs resolved -6 → correctly `unprofitable_shipment`.
+- Validator: unique ids, parents before children, no cycles, allowed roots `world`/`command` regardless of delta, `farm_capacity`/`storage_capacity`/`route_*` empty only when `delta==0`, river nodes follow same, all valuation nodes require parents, `delta==after-before` enforced, `edges` derived.
+- Deterministic RNG: `rng_context` validated `== state.to_turn_context()` else `ValueError`; `derive_seed` via JSON array + blake2b, no global random/hash, price remains deterministic; route substream `rng_for(..., "route","river_route",0)` consumed.
+- TURN_ORDER now `"command -> production -> home_supply -> river_supply -> home_price -> river_price -> settlement -> route_settlement -> valuation"` — explicit and tested.
 - `backend/pyproject.toml` single project, no `fastapi`/`sqlalchemy` until Section 10. Ruff/pyright scoped to `backend`.
 
 ### Normal verification
 
 ```bash
 uv sync --project backend
-make test              # = uv run --project backend pytest -v  (66 passed)
+make test              # = uv run --project backend pytest -v  (79 passed)
 make lint              # = ruff check backend  (All checks passed)
 make type              # = pyright  (0 errors)
-make format-check      # = ruff format --check backend  (20 already formatted)
+make format-check      # = ruff format --check backend  (21 already formatted)
 make format            # actually formats backend/
 ```
 
@@ -75,12 +79,13 @@ make format            # actually formats backend/
 
 ```
 uv sync --project backend  → Resolved 15 packages, 0 errors
-pytest -v                  → 66 passed (8 core + 7 rounding + 11 determinism + 2 purity/sanity + 15 kernel + 7 invariants + 12 causal_trace + 4 explanation)
+pytest -v                  → 79 passed (8 core + 7 rounding + 11 determinism + 2 purity/sanity + 15 kernel + 7 invariants + 12 causal_trace + 4 explanation + 13 two_markets_route)
 ruff check backend         → All checks passed
-ruff format --check backend→ 20 files already formatted
+ruff format --check backend→ 21 files already formatted
 pyright                    → 0 errors, 0 warnings
-demo                       → uv run --project backend python backend/app/engine/demo.py --world drought --command hold  prints BEFORE/COMMAND/WORLD/PLAYER OUTCOME/WHY? (2 story drivers harvest_quantity + price_revaluation, sum==wealth_delta)/AFTER ; purchase_quantity_value + harvest_quantity_value → quantity_value_effect → wealth; price_value_effect alone carries changed-price; inventory parents farm_output+storage_capacity
-demo verbose               → same --verbose adds FULL CAUSAL TRACE (world→farm_output→supply→price→purchase/harvest→quantity→price revaluation→wealth, storage_capacity explicit) + DOMAIN EFFECTS (purchase_quantity_value, harvest_quantity_value, quantity_value_effect, price_value_effect, cash_effect, wealth) + EDGES
+demo                       → uv run --project backend python backend/app/engine/demo.py --world drought --command hold  prints BEFORE (HOME/RIVER/ROUTE) /COMMAND/WORLD/PLAYER OUTCOME/WHY? (harvest_quantity + price_revaluation)/AFTER (HOME 4000, RIVER 6240 diverging); ship_grain --established shows trade_arbitrage driver (e.g. home 5000→6000 vs river 6240 now correctly unprofitable -6 not +4)
+demo verbose               → same --verbose adds FULL CAUSAL TRACE (world→farm_output→home_supply→river_supply→home_price→river_price→shipment→cash_after_trade/inventory_after_trade→quantity→price revaluation→wealth, route nodes explicit, price_value_effect parents inventory_after_trade+price, cash_effect parents cash_after_trade) + DOMAIN EFFECTS (purchase, harvest, ship, quantity, price, cash, wealth, shipment, trade_revenue, transport_cost, cash_after_trade, inventory_after_trade) + EDGES
+demo secure_route          → uv run --project backend python backend/app/engine/demo.py --command secure_route shows cash -400 and route established True
 ```
 
 Cache provenance fixed in YOLO (`~/.cache/uv/sdists-v9/.git` removed, `uv cache prune`), no `UV_CACHE_DIR` workaround needed. `.git/refs` provenance cleared for branch creation; `.git/objects` provenance remains but does not block Git (refs are authoritative).
@@ -95,18 +100,19 @@ Cache provenance fixed in YOLO (`~/.cache/uv/sdists-v9/.git` removed, `uv cache 
 - Section 2: `pydantic` for validated integer types; JSON canonical encoding for RNG; capacities single-source
 - Section 3: `TURN_ORDER` explicit, drought reduces yield not price, buy clamped, integer price via basis points
 - Section 4: exact wealth decomposition at old vs new price, immutable tuples for causal DAG, allowed roots world/command, story drivers as causal paths ranked by exact wealth-bps, filtered zero stories, RNG ownership validated, concise/verbose CLI
+- Section 5: `market` stays Home alias + `river_market` + `route:RouteState`; `transport_cost_per_unit` in milliunits (800) comparable to price 5000; `TURN_ORDER` extended with `home_supply/river_supply/home_price/river_price/route_settlement`; river supply stable for divergence; `secure_route`/`ship_grain` with capacity/inventory/cash clamping; wealth with ship `purchase+harvest+ship+price+cash` exact; drivers include `trade_arbitrage` net with `arbitrage_margin` at resolved prices (reliability `delivered = effective * reliability_bps //10000`, default 10000, `delay_turns` constrained 0, `cash_after_trade`/`inventory_after_trade` nodes, `price_value_effect` parents `inventory_after_trade+price`); optional staleness deferred; regression: resolved Home price correctly flips arbitrage (5.00→6.00 vs 6.24 gives -6 not +4)
 
 ### Intentionally missing (do not build early)
 
-Two markets + river route (Section 5), headless 5-turn prototype (Section 6), rivals Mira/Daran (Section 7), pressure arc (Section 8), balance harness (Section 9), etc. No FastAPI routes, DB/SQLAlchemy, React UI, content framework, LLMs.
+Headless 5-turn prototype (Section 6), rivals Mira/Daran (Section 7), pressure arc (Section 8), balance harness (Section 9), etc. No FastAPI routes, DB/SQLAlchemy, React UI, content framework, LLMs.
 
 ### Follow-up obligations
 
 Must resolve before **Section 6** (multi-turn prototype):
-- Define `market.supply` semantics: stock vs per-turn flow vs aggregate signal. Current `next_supply = supply + farm_output` is persistent stock while `farm_output` also enters player `inventory` and `buy_grain` does not reduce regional supply — coherent for one turn but will monotonically accumulate over repeated turns. Design stock/flow accounting before headless balance harness (tuning 5000/2000 is fine to defer to that harness).
+- Define `market.supply` semantics: stock vs per-turn flow vs aggregate signal. Current `next_supply = supply + farm_output` is persistent stock while `farm_output` also enters player `inventory` and `buy_grain` does not reduce regional supply — coherent for one turn but will monotonically accumulate over repeated turns. Design stock/flow accounting before headless balance harness (tuning 5000/2000 is fine to defer to that harness). Same for `river_supply` (stable in Section 5, will need pressure-driven updates in Section 8).
 
-Section 4 follow-ups are now resolved: exact wealth decomposition, immutable tuples, story drivers exact wealth-bps, RNG validation.
+Section 5 follow-ups are now resolved: two markets with different prices, transport cost erases arbitrage, capacity constrains, emergent profit, home-only valid, deterministic, trade access via secure_route, exact wealth with ship.
 
 ### Next milestone
 
-**Section 5 — Two Markets and One Trade Route** — Home Valley + River Town + River Route with transport cost/capacity/reliability, trade access, two prices, arbitrage via transport, deterministic.
+**Section 6 — Five-Turn Headless Prototype** — grain only, Home Valley + River Town + River Route, farm/granary/trade/cash, one major action per turn, deterministic world pressures, outcome reveal text, 5 decisions, no DB/LLM.

@@ -282,7 +282,10 @@ def test_price_bounded_movement() -> None:
 
 
 def test_turn_order_constant() -> None:
-    assert TURN_ORDER == "command -> production -> supply -> price -> settlement -> valuation"
+    assert (
+        TURN_ORDER
+        == "command -> production -> home_supply -> river_supply -> home_price -> river_price -> settlement -> route_settlement -> valuation"
+    )
 
 
 def test_player_outcome_drivers_deterministic_and_bounded() -> None:

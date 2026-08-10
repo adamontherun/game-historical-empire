@@ -33,3 +33,6 @@ Thumbs.db
 # Caches
 dist/
 build/
+
+# graphify — cache is regenerated, graph.json is merge-tracked (see .gitattributes)
+graphify-out/cache/

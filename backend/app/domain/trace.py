@@ -1,7 +1,8 @@
-"""Causal trace, domain effects, and player outcome for Section 4.
+"""Causal trace, domain effects, and player outcome for Sections 4–5.
 
 Structural causal graph with exact wealth decomposition and immutable tuples.
 Trace is emitted during resolution, not reconstructed by diffing.
+Section 5 adds river price divergence and route/ship subgraph.
 """
 
 from __future__ import annotations
@@ -28,6 +29,10 @@ Kind = Literal[
     "harvest_quantity_value",
     "price_value_effect",
     "wealth",
+    "route",
+    "trade",
+    "river_supply",
+    "river_price",
 ]
 
 
@@ -106,6 +111,30 @@ class CausalTrace(BaseModel):
                 # Generic unchanged capacity nodes allowed
                 if node.kind == "capacity" and node.delta == 0:
                     continue
+                # Route nodes with zero delta may be roots (not yet established / no trade)
+                if (
+                    node.kind in ("route", "trade", "river_supply", "river_price")
+                    and node.delta == 0
+                ):
+                    continue
+                if (
+                    node.id
+                    in (
+                        "route_capacity",
+                        "route_reliability",
+                        "route_cost_per_unit",
+                        "river_supply",
+                        "river_price_pressure",
+                        "river_target_price",
+                        "river_price",
+                        "shipment",
+                        "trade_revenue",
+                        "transport_cost",
+                        "trade_profit",
+                    )
+                    and node.delta == 0
+                ):
+                    continue
                 # If delta is None (diagnostic like world) already
                 # handled; otherwise require parents
                 # But diagnostic nodes like world have been allowed;
@@ -123,6 +152,10 @@ class CausalTrace(BaseModel):
                     "harvest_quantity_value",
                     "price_value_effect",
                     "wealth",
+                    "route",
+                    "trade",
+                    "river_supply",
+                    "river_price",
                 ):
                     raise ValueError(f"node {node.id!r} kind {node.kind!r} must have parent_ids")
                 # cash_after_command etc should have parents; but

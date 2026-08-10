@@ -20,6 +20,7 @@ from app.domain.types import (
     PlayerState,
     PriceMilliunits,
     Quantity,
+    RouteState,
     TurnContext,
     WorldCondition,
 )
@@ -41,6 +42,7 @@ __all__ = [
     "PlayerOutcome",
     "PriceMilliunits",
     "Quantity",
+    "RouteState",
     "TurnContext",
     "TurnResolution",
     "WorldCondition",

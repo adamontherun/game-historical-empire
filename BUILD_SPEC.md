@@ -920,7 +920,7 @@ Stop when the engine can answer “why did this happen?” structurally without 
 
 # SECTION 5 — Two Markets and One Trade Route
 
-**Status:** NOT STARTED
+**Status:** COMPLETE
 
 ## Goal
 

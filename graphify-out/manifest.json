@@ -1,0 +1,267 @@
+{
+  ".claude/settings.json": {
+    "mtime": 1786322289.5337353,
+    "ast_hash": "4094605e9746c2c8a4a676638729cc07",
+    "semantic_hash": "4094605e9746c2c8a4a676638729cc07"
+  },
+  "backend/app/__init__.py": {
+    "mtime": 1786311036.0,
+    "ast_hash": "d41d8cd98f00b204e9800998ecf8427e",
+    "semantic_hash": "d41d8cd98f00b204e9800998ecf8427e"
+  },
+  "backend/app/domain/__init__.py": {
+    "mtime": 1786321499.7945397,
+    "ast_hash": "395df197885f945e00c252832776aa57",
+    "semantic_hash": "395df197885f945e00c252832776aa57"
+  },
+  "backend/app/domain/trace.py": {
+    "mtime": 1786321653.5527344,
+    "ast_hash": "cf94e158ed7b86179bd48caa7b599add",
+    "semantic_hash": "cf94e158ed7b86179bd48caa7b599add"
+  },
+  "backend/app/domain/types.py": {
+    "mtime": 1786322198.9663486,
+    "ast_hash": "a00b670bdb214eeb381ffb76f03f1826",
+    "semantic_hash": "a00b670bdb214eeb381ffb76f03f1826"
+  },
+  "backend/app/engine/__init__.py": {
+    "mtime": 1786317903.8497875,
+    "ast_hash": "5df322d18868cfde0a116dd8f95c8c4a",
+    "semantic_hash": "5df322d18868cfde0a116dd8f95c8c4a"
+  },
+  "backend/app/engine/demo.py": {
+    "mtime": 1786321691.417833,
+    "ast_hash": "5c4c9ded7bfe4d5e9c692a1984351fb9",
+    "semantic_hash": "5c4c9ded7bfe4d5e9c692a1984351fb9"
+  },
+  "backend/app/engine/rng.py": {
+    "mtime": 1786316004.48672,
+    "ast_hash": "1b031b9d77a75b18f3473b807902c35f",
+    "semantic_hash": "1b031b9d77a75b18f3473b807902c35f"
+  },
+  "backend/app/engine/rounding.py": {
+    "mtime": 1786316004.4874785,
+    "ast_hash": "79fb1a94c42d32e68ee6a881643adb44",
+    "semantic_hash": "79fb1a94c42d32e68ee6a881643adb44"
+  },
+  "backend/app/engine/turn.py": {
+    "mtime": 1786322705.7846203,
+    "ast_hash": "a8ab0f4c61579c0c2489b33608d16094",
+    "semantic_hash": ""
+  },
+  "backend/pyproject.toml": {
+    "mtime": 1786320137.7321334,
+    "ast_hash": "fced7e529224ed1cba0ad6e2b0d1777f",
+    "semantic_hash": "fced7e529224ed1cba0ad6e2b0d1777f"
+  },
+  "backend/tests/__init__.py": {
+    "mtime": 1786311039.0,
+    "ast_hash": "d41d8cd98f00b204e9800998ecf8427e",
+    "semantic_hash": "d41d8cd98f00b204e9800998ecf8427e"
+  },
+  "backend/tests/test_causal_trace.py": {
+    "mtime": 1786322330.2136734,
+    "ast_hash": "1b53203a17e21d8fddc1cfd59e764ca0",
+    "semantic_hash": ""
+  },
+  "backend/tests/test_core_types.py": {
+    "mtime": 1786317903.851008,
+    "ast_hash": "e2014da9642f70f1704c236f1950eb1f",
+    "semantic_hash": "e2014da9642f70f1704c236f1950eb1f"
+  },
+  "backend/tests/test_determinism.py": {
+    "mtime": 1786316004.4883244,
+    "ast_hash": "4b2e8763124085d0e6ce86193a5e6239",
+    "semantic_hash": "4b2e8763124085d0e6ce86193a5e6239"
+  },
+  "backend/tests/test_engine_purity.py": {
+    "mtime": 1786313652.0,
+    "ast_hash": "68b4d1ca27d45e59dc5324b5191b644c",
+    "semantic_hash": "68b4d1ca27d45e59dc5324b5191b644c"
+  },
+  "backend/tests/test_explanation.py": {
+    "mtime": 1786322337.1915627,
+    "ast_hash": "300ed9eb5dca016eac400f4cd0088c1a",
+    "semantic_hash": ""
+  },
+  "backend/tests/test_invariants.py": {
+    "mtime": 1786320137.7339091,
+    "ast_hash": "8bf03463eb348c51069514f4837f09d2",
+    "semantic_hash": "8bf03463eb348c51069514f4837f09d2"
+  },
+  "backend/tests/test_rounding.py": {
+    "mtime": 1786316004.488582,
+    "ast_hash": "99faf0cea1d3d8ae649448899f2e1dea",
+    "semantic_hash": "99faf0cea1d3d8ae649448899f2e1dea"
+  },
+  "backend/tests/test_sanity.py": {
+    "mtime": 1786313650.0,
+    "ast_hash": "81e2f4b128e3532ff831a358f6d1f6c4",
+    "semantic_hash": "81e2f4b128e3532ff831a358f6d1f6c4"
+  },
+  "backend/tests/test_turn_kernel.py": {
+    "mtime": 1786321653.553264,
+    "ast_hash": "1a5f659bb76e99121304dc9703cbc467",
+    "semantic_hash": "1a5f659bb76e99121304dc9703cbc467"
+  },
+  "backend/tests/test_two_markets_route.py": {
+    "mtime": 1786322710.3753948,
+    "ast_hash": "0d1a6add24a69ba7f8518bbacae953b8",
+    "semantic_hash": ""
+  },
+  ".agents/skills/graphify/SKILL.md": {
+    "mtime": 1786322291.2835176,
+    "ast_hash": "4388891114e3af2d60510a23f3dd8069",
+    "semantic_hash": ""
+  },
+  ".agents/skills/graphify/references/add-watch.md": {
+    "mtime": 1785774652.1870668,
+    "ast_hash": "d59d027fe449f06aa03905a01184e779",
+    "semantic_hash": ""
+  },
+  ".agents/skills/graphify/references/exports.md": {
+    "mtime": 1785774652.1872153,
+    "ast_hash": "9da2a2152e60a22f07f05fed5158f287",
+    "semantic_hash": ""
+  },
+  ".agents/skills/graphify/references/extraction-spec.md": {
+    "mtime": 1785774652.1873999,
+    "ast_hash": "42fef56a01698118f7fd722acdadea34",
+    "semantic_hash": ""
+  },
+  ".agents/skills/graphify/references/github-and-merge.md": {
+    "mtime": 1785774652.1875,
+    "ast_hash": "cde13df085e4c492aeb7ba298a996d0d",
+    "semantic_hash": ""
+  },
+  ".agents/skills/graphify/references/hooks.md": {
+    "mtime": 1785774652.1876087,
+    "ast_hash": "aea24fe86e18fe8aeb304403032cfce7",
+    "semantic_hash": ""
+  },
+  ".agents/skills/graphify/references/query.md": {
+    "mtime": 1785774652.1877482,
+    "ast_hash": "3c46f8ad006874260614ed8657d02307",
+    "semantic_hash": ""
+  },
+  ".agents/skills/graphify/references/transcribe.md": {
+    "mtime": 1785774652.1879447,
+    "ast_hash": "67b6a5fa6c0974e18f60db9f8932fbd8",
+    "semantic_hash": ""
+  },
+  ".agents/skills/graphify/references/update.md": {
+    "mtime": 1785774652.1882544,
+    "ast_hash": "9378bd03d56baaf78bd738ab3848f142",
+    "semantic_hash": ""
+  },
+  ".claude/CLAUDE.md": {
+    "mtime": 1786322289.5322855,
+    "ast_hash": "9b31786b637be3c13978bec4c2330752",
+    "semantic_hash": ""
+  },
+  ".claude/skills/graphify/SKILL.md": {
+    "mtime": 1786322289.5314806,
+    "ast_hash": "dfb0a6554c4af62df6effc61c6c7d245",
+    "semantic_hash": ""
+  },
+  ".claude/skills/graphify/references/add-watch.md": {
+    "mtime": 1785774652.1917179,
+    "ast_hash": "d59d027fe449f06aa03905a01184e779",
+    "semantic_hash": ""
+  },
+  ".claude/skills/graphify/references/exports.md": {
+    "mtime": 1785774652.1918664,
+    "ast_hash": "9da2a2152e60a22f07f05fed5158f287",
+    "semantic_hash": ""
+  },
+  ".claude/skills/graphify/references/extraction-spec.md": {
+    "mtime": 1785774652.1921937,
+    "ast_hash": "42fef56a01698118f7fd722acdadea34",
+    "semantic_hash": ""
+  },
+  ".claude/skills/graphify/references/github-and-merge.md": {
+    "mtime": 1785774652.1923816,
+    "ast_hash": "cde13df085e4c492aeb7ba298a996d0d",
+    "semantic_hash": ""
+  },
+  ".claude/skills/graphify/references/hooks.md": {
+    "mtime": 1785774652.1924913,
+    "ast_hash": "3f545db6ce646650bb9de588f5512a27",
+    "semantic_hash": ""
+  },
+  ".claude/skills/graphify/references/query.md": {
+    "mtime": 1785774652.1926837,
+    "ast_hash": "3c46f8ad006874260614ed8657d02307",
+    "semantic_hash": ""
+  },
+  ".claude/skills/graphify/references/transcribe.md": {
+    "mtime": 1785774652.192779,
+    "ast_hash": "67b6a5fa6c0974e18f60db9f8932fbd8",
+    "semantic_hash": ""
+  },
+  ".claude/skills/graphify/references/update.md": {
+    "mtime": 1785774652.1929874,
+    "ast_hash": "9378bd03d56baaf78bd738ab3848f142",
+    "semantic_hash": ""
+  },
+  "AGENTS.md": {
+    "mtime": 1786322594.9367108,
+    "ast_hash": "37b291633d215f5eb89ec4d1e6c96049",
+    "semantic_hash": ""
+  },
+  "BUILD_SPEC.md": {
+    "mtime": 1786321757.0326128,
+    "ast_hash": "ae62bb8bb1e94804bef9fc9368cc7fb8",
+    "semantic_hash": ""
+  },
+  "CLAUDE.md": {
+    "mtime": 1786322289.5330393,
+    "ast_hash": "82efb97a359f5c7290bf2513d14686be",
+    "semantic_hash": ""
+  },
+  "DECISIONS.md": {
+    "mtime": 1786316004.4847121,
+    "ast_hash": "e0490d985ca1988198b9b34c23711e20",
+    "semantic_hash": ""
+  },
+  "STATE.md": {
+    "mtime": 1786322752.6456196,
+    "ast_hash": "2c53c826d46056b38fa4111d14ac69b9",
+    "semantic_hash": ""
+  },
+  "backend/AGENTS.md": {
+    "mtime": 1786310070.0,
+    "ast_hash": "fa77b9e5e7e8981530a0bba658052a4f",
+    "semantic_hash": ""
+  },
+  "docs/plans/2026-08-09-section-1-walking-skeleton.md": {
+    "mtime": 1786313663.0,
+    "ast_hash": "d61a8978a584a593756d9829135fb8ec",
+    "semantic_hash": ""
+  },
+  "docs/plans/2026-08-09-section-2-core-types.md": {
+    "mtime": 1786316004.4892902,
+    "ast_hash": "dc0e7718ed363571bcb42f0c5d1a771b",
+    "semantic_hash": ""
+  },
+  "docs/plans/2026-08-09-section-3-grain-market-kernel.md": {
+    "mtime": 1786317903.8538175,
+    "ast_hash": "e23294c0a1c711ac736f223c167b4c3c",
+    "semantic_hash": ""
+  },
+  "docs/plans/2026-08-09-section-4-causal-explanation.md": {
+    "mtime": 1786320137.7353017,
+    "ast_hash": "a24b37e40f859aa64c585730e3176f69",
+    "semantic_hash": ""
+  },
+  "docs/plans/2026-08-09-section-5-two-markets-route.md": {
+    "mtime": 1786320259.0296962,
+    "ast_hash": "19cb8fd0dc6528addb5fb77d5b5c349d",
+    "semantic_hash": ""
+  },
+  "frontend/AGENTS.md": {
+    "mtime": 1786310073.0,
+    "ast_hash": "e314091f68ded79b8281823a3a7ba084",
+    "semantic_hash": ""
+  }
+}
