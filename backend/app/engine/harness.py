@@ -126,10 +126,12 @@ def policy_trade_heavy(state: GameState, turn_idx: int, seed: str, version: str)
         return PlayerCommand(type="secure_route")  # type: ignore[arg-type]
     # For any turn where route is established, consider shipping if profitable.
     if state.route.established and state.player.inventory.grain > 0:
-        margin = (
-            state.river_market.current_price
-            - state.route.transport_cost_per_unit
-            - state.market.current_price
+        from app.engine.actor import ship_margin
+
+        margin = ship_margin(
+            state.river_market.current_price,
+            state.route.transport_cost_per_unit,
+            state.market.current_price,
         )
         if margin > 0:
             # Affordable by transport cost
