@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import uuid
 from datetime import UTC, datetime
 
@@ -22,7 +23,6 @@ async def create_game(req: CreateGameRequest) -> GameView:
     version = req.ruleset_version if req.ruleset_version is not None else "1.0"
     game_id = uuid.uuid4().hex
     game = FiveTurnGame(seed=run_seed, version=version)
-    import asyncio
 
     session = GameSession(
         game_id=game_id,
@@ -42,6 +42,9 @@ async def get_game(game_id: str) -> GameView:
     if session is None:
         raise HTTPException(status_code=404, detail="game not found")
     async with session.lock:
+        # B3a: yield inside lock so concurrent interleaving is observable;
+        # simulates future DB await and makes lock falsifiable
+        await asyncio.sleep(0)
         return to_game_view(session)
 
 
@@ -56,6 +59,7 @@ async def choose(game_id: str, choice_id: str, expected_revision: int) -> GameVi
                 detail=f"conflict: expected_revision {expected_revision} != current {session.revision}",
                 headers={"X-Current-Revision": str(session.revision)},
             )
+        await asyncio.sleep(0)
         if session.game.is_complete:
             raise HTTPException(status_code=409, detail="game complete")
         cmap = choice_map_for(session)
@@ -63,7 +67,7 @@ async def choose(game_id: str, choice_id: str, expected_revision: int) -> GameVi
         if cmd is None:
             raise HTTPException(status_code=404, detail=f"unknown choice_id {choice_id!r}")
         # Single mutation path — never resolve_turn separately (would double-advance)
-        session.game.submit(cmd)  # type: ignore[arg-type]
-        session.commands.append(cmd)  # type: ignore[arg-type]
+        session.game.submit(cmd)
+        session.commands.append(cmd)
         session.revision += 1
         return to_game_view(session)

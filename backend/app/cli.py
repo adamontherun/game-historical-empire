@@ -76,12 +76,12 @@ def parse_choice(token: str) -> PlayerCommand:
     if cmd_type in ("buy_grain", "sell_grain", "ship_grain"):
         if qty is None:
             qty = 10
-        if qty is not None and qty < 0:
+        if qty < 0:
             raise ValueError("quantity must be >=0")
-        return PlayerCommand(type=cmd_type, quantity=qty)  # type: ignore[arg-type]
+        return PlayerCommand.model_validate({"type": cmd_type, "quantity": qty})
     else:
         # quantity ignored for other types
-        return PlayerCommand(type=cmd_type)  # type: ignore[arg-type]
+        return PlayerCommand.model_validate({"type": cmd_type})
 
 
 def parse_choices_arg(s: str) -> list[PlayerCommand]:

@@ -12,7 +12,7 @@ import json
 from collections import Counter
 from collections.abc import Callable
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from app.domain.types import GameState, PlayerCommand
 from app.engine.actor import (
@@ -60,9 +60,9 @@ def policy_production_heavy(
     from app.engine.actor import YIELD_PER_CAPACITY
 
     if turn_idx < 2 and _can_afford(state.player.cash, EXPAND_FARM_COST + 50):
-        return PlayerCommand(type="expand_farm")  # type: ignore[arg-type]
+        return PlayerCommand.model_validate({"type": "expand_farm"})
     if turn_idx == 2 and _can_afford(state.player.cash, EXPAND_FARM_COST + 50):
-        return PlayerCommand(type="expand_farm")  # type: ignore[arg-type]
+        return PlayerCommand.model_validate({"type": "expand_farm"})
     # After expansion, sell surplus that will not fit after next harvest.
     # Use normal yield as predictor (drought only reduces output, so this is
     # conservative — we never sell more than would overflow on a normal turn).
@@ -72,8 +72,8 @@ def policy_production_heavy(
         surplus = predicted_after_harvest - state.player.storage_capacity
         qty = min(surplus, state.player.inventory.grain)
         if qty > 0:
-            return PlayerCommand(type="sell_grain", quantity=qty)  # type: ignore[arg-type]
-    return PlayerCommand(type="hold")  # type: ignore[arg-type]
+            return PlayerCommand.model_validate({"type": "sell_grain", "quantity": qty})
+    return PlayerCommand.model_validate({"type": "hold"})
 
 
 def policy_storage_heavy(state: GameState, turn_idx: int, seed: str, version: str) -> PlayerCommand:
@@ -91,7 +91,7 @@ def policy_storage_heavy(state: GameState, turn_idx: int, seed: str, version: st
     # Build when harvest would overflow and still turns remain to benefit (turn<4)
     if turn_idx < 4 and state.player.inventory.grain + harvest > state.player.storage_capacity:
         if _can_afford(state.player.cash, BUILD_GRANARY_COST):
-            return PlayerCommand(type="build_granary")  # type: ignore[arg-type]
+            return PlayerCommand.model_validate({"type": "build_granary"})
     # Buy only into headroom harvest will not claim
     headroom = state.player.storage_capacity - (state.player.inventory.grain + harvest)
     if headroom > 0 and turn_idx in (1, 2):
@@ -100,12 +100,12 @@ def policy_storage_heavy(state: GameState, turn_idx: int, seed: str, version: st
         target = min(headroom, max_affordable)
         actual = min(target, 80) if target > 10 else target
         if actual > 0:
-            return PlayerCommand(type="buy_grain", quantity=actual)  # type: ignore[arg-type]
+            return PlayerCommand.model_validate({"type": "buy_grain", "quantity": actual})
     if turn_idx == 4 and state.player.inventory.grain > 0:
         qty = min(state.player.inventory.grain, 150)
         if qty > 0:
-            return PlayerCommand(type="sell_grain", quantity=qty)  # type: ignore[arg-type]
-    return PlayerCommand(type="hold")  # type: ignore[arg-type]
+            return PlayerCommand.model_validate({"type": "sell_grain", "quantity": qty})
+    return PlayerCommand.model_validate({"type": "hold"})
 
 
 def policy_trade_heavy(state: GameState, turn_idx: int, seed: str, version: str) -> PlayerCommand:
@@ -123,7 +123,7 @@ def policy_trade_heavy(state: GameState, turn_idx: int, seed: str, version: str)
         and not state.route.established
         and _can_afford(state.player.cash, ROUTE_ESTABLISH_COST)
     ):
-        return PlayerCommand(type="secure_route")  # type: ignore[arg-type]
+        return PlayerCommand.model_validate({"type": "secure_route"})
     # For any turn where route is established, consider shipping if profitable.
     if state.route.established and state.player.inventory.grain > 0:
         from app.engine.actor import ship_margin
@@ -132,6 +132,7 @@ def policy_trade_heavy(state: GameState, turn_idx: int, seed: str, version: str)
             state.river_market.current_price,
             state.route.transport_cost_per_unit,
             state.market.current_price,
+            state.route.reliability_bps,
         )
         if margin > 0:
             # Affordable by transport cost
@@ -146,7 +147,7 @@ def policy_trade_heavy(state: GameState, turn_idx: int, seed: str, version: str)
                 affordable_ship,
             )
             if ship_qty > 0:
-                return PlayerCommand(type="ship_grain", quantity=ship_qty)  # type: ignore[arg-type]
+                return PlayerCommand.model_validate({"type": "ship_grain", "quantity": ship_qty})
     # Not shipping (margin <=0 or no inventory): buy scaled pre-drought or sell at peak
     if turn_idx in (1, 2):
         price = state.market.current_price
@@ -156,19 +157,19 @@ def policy_trade_heavy(state: GameState, turn_idx: int, seed: str, version: str)
             target = min(space, max_affordable)
             actual = min(target, 80) if target > 10 else target
             if actual > 0:
-                return PlayerCommand(type="buy_grain", quantity=actual)  # type: ignore[arg-type]
-        return PlayerCommand(type="hold")  # type: ignore[arg-type]
+                return PlayerCommand.model_validate({"type": "buy_grain", "quantity": actual})
+        return PlayerCommand.model_validate({"type": "hold"})
     if turn_idx == 4 and state.player.inventory.grain > 0:
         qty = min(state.player.inventory.grain, 80)
         if qty > 0:
-            return PlayerCommand(type="sell_grain", quantity=qty)  # type: ignore[arg-type]
-    return PlayerCommand(type="hold")  # type: ignore[arg-type]
+            return PlayerCommand.model_validate({"type": "sell_grain", "quantity": qty})
+    return PlayerCommand.model_validate({"type": "hold"})
 
 
 def policy_cash_preserving(
     state: GameState, turn_idx: int, seed: str, version: str
 ) -> PlayerCommand:
-    return PlayerCommand(type="hold")  # type: ignore[arg-type]
+    return PlayerCommand.model_validate({"type": "hold"})
 
 
 def policy_random_legal(state: GameState, turn_idx: int, seed: str, version: str) -> PlayerCommand:
@@ -177,13 +178,13 @@ def policy_random_legal(state: GameState, turn_idx: int, seed: str, version: str
     # Build affordable list
     candidates: list[PlayerCommand] = []
     # hold always legal
-    candidates.append(PlayerCommand(type="hold"))  # type: ignore[arg-type]
+    candidates.append(PlayerCommand.model_validate({"type": "hold"}))
     if _can_afford(state.player.cash, EXPAND_FARM_COST):
-        candidates.append(PlayerCommand(type="expand_farm"))  # type: ignore[arg-type]
+        candidates.append(PlayerCommand.model_validate({"type": "expand_farm"}))
     if _can_afford(state.player.cash, BUILD_GRANARY_COST):
-        candidates.append(PlayerCommand(type="build_granary"))  # type: ignore[arg-type]
+        candidates.append(PlayerCommand.model_validate({"type": "build_granary"}))
     if not state.route.established and _can_afford(state.player.cash, ROUTE_ESTABLISH_COST):
-        candidates.append(PlayerCommand(type="secure_route"))  # type: ignore[arg-type]
+        candidates.append(PlayerCommand.model_validate({"type": "secure_route"}))
     # buy_grain if affordable and space
     price = state.market.current_price
     space = state.player.storage_capacity - state.player.inventory.grain
@@ -192,14 +193,14 @@ def policy_random_legal(state: GameState, turn_idx: int, seed: str, version: str
         affordable_qty = min(space, max_affordable)
         if affordable_qty > 0:
             qty = min(10, affordable_qty)
-            candidates.append(PlayerCommand(type="buy_grain", quantity=qty))  # type: ignore[arg-type]
+            candidates.append(PlayerCommand.model_validate({"type": "buy_grain", "quantity": qty}))
     if state.player.inventory.grain > 0:
         qty = min(10, state.player.inventory.grain)
-        candidates.append(PlayerCommand(type="sell_grain", quantity=qty))  # type: ignore[arg-type]
+        candidates.append(PlayerCommand.model_validate({"type": "sell_grain", "quantity": qty}))
     if state.route.established and state.player.inventory.grain > 0:
         qty = min(10, state.player.inventory.grain, state.route.capacity)
         if qty > 0:
-            candidates.append(PlayerCommand(type="ship_grain", quantity=qty))  # type: ignore[arg-type]
+            candidates.append(PlayerCommand.model_validate({"type": "ship_grain", "quantity": qty}))
     # deterministic choice
     idx = int(rng.random() * len(candidates)) if len(candidates) > 1 else 0
     if idx >= len(candidates):
@@ -239,7 +240,7 @@ def _policy_trade_heavy_no_route(
                 affordable_ship,
             )
             if ship_qty > 0:
-                return PlayerCommand(type="ship_grain", quantity=ship_qty)  # type: ignore[arg-type]
+                return PlayerCommand.model_validate({"type": "ship_grain", "quantity": ship_qty})
     if turn_idx in (1, 2):
         price = state.market.current_price
         space = state.player.storage_capacity - state.player.inventory.grain
@@ -248,13 +249,13 @@ def _policy_trade_heavy_no_route(
             target = min(space, max_affordable)
             actual = min(target, 80) if target > 10 else target
             if actual > 0:
-                return PlayerCommand(type="buy_grain", quantity=actual)  # type: ignore[arg-type]
-        return PlayerCommand(type="hold")  # type: ignore[arg-type]
+                return PlayerCommand.model_validate({"type": "buy_grain", "quantity": actual})
+        return PlayerCommand.model_validate({"type": "hold"})
     if turn_idx == 4 and state.player.inventory.grain > 0:
         qty = min(state.player.inventory.grain, 80)
         if qty > 0:
-            return PlayerCommand(type="sell_grain", quantity=qty)  # type: ignore[arg-type]
-    return PlayerCommand(type="hold")  # type: ignore[arg-type]
+            return PlayerCommand.model_validate({"type": "sell_grain", "quantity": qty})
+    return PlayerCommand.model_validate({"type": "hold"})
 
 
 # ---------------------------------------------------------------------------
@@ -264,10 +265,17 @@ def _policy_trade_heavy_no_route(
 
 class BatchConfig(BaseModel):
     model_config = ConfigDict(frozen=True)
-    seed_prefix: str = "harness"
-    n_seeds: int = 200
-    version: str = "1.0"
-    policy_ids: tuple[str, ...] = POLICY_IDS
+    seed_prefix: str = Field(default="harness")
+    n_seeds: int = Field(default=200, ge=1)
+    version: str = Field(default="1.0")
+    policy_ids: tuple[str, ...] = Field(default=POLICY_IDS)
+
+    @model_validator(mode="after")
+    def _validate_policies(self) -> BatchConfig:
+        for pid in self.policy_ids:
+            if pid not in POLICY_FUNCS:
+                raise ValueError(f"unknown policy_id {pid!r}")
+        return self
 
 
 class SeedResult(BaseModel):
@@ -331,10 +339,6 @@ class BatchResult(BaseModel):
     tied_best_count: int
     # Overall median for dead/dominant integer math
     overall_median: int
-
-
-def _wealth(state: GameState) -> int:
-    return state.player.cash + (state.player.inventory.grain * state.market.current_price // 1000)
 
 
 def run_batch(config: BatchConfig) -> BatchResult:
@@ -461,7 +465,7 @@ def run_batch(config: BatchConfig) -> BatchResult:
     # Format ratio deterministically from bps
     ratio_int = median_ratio_bps // 10_000
     ratio_frac = median_ratio_bps % 10_000
-    # Keep two decimal display but from integer
+    # Keep four decimal display but from integer (deterministic, no float)
     dominant_reason = f"median_ratio {ratio_int}.{ratio_frac:04d} ({median_ratio_bps} bps) {'PASS' if dominant_pass else 'FAIL'} (threshold <1.60 = 16000 bps)"
 
     # Dead: overall median of all medians (including random) — integer

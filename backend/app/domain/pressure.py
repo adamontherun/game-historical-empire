@@ -38,18 +38,19 @@ class PressureState(BaseModel):
         description="Trace causal_source_id — defaults to f'pressure:{pressure_id}:{stage}'",
     )
 
-    @model_validator(mode="before")
+    @model_validator(mode="before")  # pyright: ignore[reportUnknownVariableType]
     @classmethod
     def _populate_causal_source_id(cls, data: object) -> object:
         # Populate default causal_source_id before validation (G6: avoid frozen mutation)
         if isinstance(data, dict):
-            cid = data.get("causal_source_id")
+            d = data  # type: ignore[assignment]
+            cid = d.get("causal_source_id")  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
             if not cid:
-                pid = data.get("pressure_id")
-                stage = data.get("stage")
+                pid = d.get("pressure_id")  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
+                stage = d.get("stage")  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
                 if pid and stage:
-                    data["causal_source_id"] = f"pressure:{pid}:{stage}"
-        return data
+                    d["causal_source_id"] = f"pressure:{pid}:{stage}"  # pyright: ignore[reportUnknownMemberType]
+        return data  # pyright: ignore[reportUnknownVariableType]
 
     @model_validator(mode="after")
     def _validate(self) -> PressureState:

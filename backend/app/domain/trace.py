@@ -55,11 +55,6 @@ class CausalNode(BaseModel):
 
     @model_validator(mode="after")
     def _validate_delta(self) -> CausalNode:
-        if self.before is not None and self.after is not None and self.delta is not None:
-            if self.delta != self.after - self.before:
-                # Allow None delta to skip check; otherwise enforce consistency
-                # For nodes where before/after are present, delta must match
-                pass  # keep permissive for now; DomainEffect enforces strictly
         if self.delta is not None and self.before is not None and self.after is not None:
             # Strict check only when all three present and not
             # deliberately capped
@@ -206,8 +201,8 @@ class OutcomeDriver(BaseModel):
     """Player-facing causal story grouping multiple trace nodes.
 
     Represents a distinct economic narrative (e.g. farm output, price move,
-    cash cost) whose wealth impact is exact and sums to wealth_delta across
-    drivers plus discarded zero effects.
+    cash cost) whose wealth impact is exact. Drivers are the top-3 by
+    wealth-bps; residual not represented (Section 11 presentation decision).
     """
 
     model_config = ConfigDict(frozen=True)
@@ -248,7 +243,7 @@ class PlayerOutcome(BaseModel):
     @computed_field  # type: ignore[prop-decorator]
     @property
     def top_drivers(self) -> tuple[str, ...]:
-        """Deprecated string view — derived from drivers for backward compat."""
+        """String view of driver labels (derived from drivers)."""
         return tuple(d.label for d in self.drivers)
 
 

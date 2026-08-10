@@ -233,8 +233,8 @@ def test_drivers_derived_from_trace_not_snapshot() -> None:
     # Storage 30, grain 25 => space 5, request 20 => clamped to 5
     cmd = PlayerCommand(type="buy_grain", quantity=20)
     res = resolve_turn(state, cmd, PRESSURE_NORMAL, state.to_turn_context())
-    # Buy was storage-limited
-    buy_node = next(n for n in res.causal_trace.nodes if n.id == "inventory_after_buy")
+    # Buy was storage-limited — S3 now inventory_after_command
+    buy_node = next(n for n in res.causal_trace.nodes if n.id == "inventory_after_command")
     assert buy_node.reason_code == "insufficient_storage"
     # At least one driver should reference the buy path if cash_effect is non-zero
     # Drivers are exact partitions; buy cost is cash_effect driver
@@ -546,9 +546,9 @@ def test_buy_quantity_split_no_false_harvest_story() -> None:
     # Drivers must include purchase, not harvest
     assert any(d.id == "purchase_quantity" for d in res.player_outcome.drivers)
     assert not any(d.id == "harvest_quantity" for d in res.player_outcome.drivers)
-    # Purchase driver must reference inventory_after_buy, not farm_output
+    # Purchase driver must reference inventory_after_command (S3), not farm_output
     pur_driver = next(d for d in res.player_outcome.drivers if d.id == "purchase_quantity")
-    assert "inventory_after_buy" in pur_driver.causal_node_ids
+    assert "inventory_after_command" in pur_driver.causal_node_ids
     assert "farm_output" not in pur_driver.causal_node_ids
     # No harvest driver, so no false "Harvest added grain" story
     assert not any(
