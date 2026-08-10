@@ -640,23 +640,23 @@
     "semantic_hash": ""
   },
   "frontend/e2e/screenshots/drought-reveal.png": {
-    "mtime": 1786388483.4113097,
-    "ast_hash": "789157d0b9f3f818db8010062571b41e",
+    "mtime": 1786388733.502327,
+    "ast_hash": "76712ef0e1efa29636eaa73354c0565e",
     "semantic_hash": ""
   },
   "frontend/e2e/screenshots/drought-warning.png": {
-    "mtime": 1786388478.5281005,
-    "ast_hash": "db0ada0774a91758b69ca5d5e89186bb",
+    "mtime": 1786388728.6451082,
+    "ast_hash": "576546142559793b6ad29609be591db9",
     "semantic_hash": ""
   },
   "frontend/e2e/screenshots/final-summary.png": {
-    "mtime": 1786388485.9779124,
-    "ast_hash": "cbc5caa2bdb1f664b7f3f2f2b1649741",
+    "mtime": 1786388736.0674925,
+    "ast_hash": "b01552878da9b7e95b070b4e1b18bfbe",
     "semantic_hash": ""
   },
   "frontend/e2e/screenshots/first-decision.png": {
-    "mtime": 1786388473.5487638,
-    "ast_hash": "d71aa75678d743fc784a40cf9e118537",
+    "mtime": 1786388723.6924005,
+    "ast_hash": "d332d5013b0bd1837651c6935cc4dee8",
     "semantic_hash": ""
   },
   "docs/plans/2026-08-10-section-11-review-round-2.md": {
