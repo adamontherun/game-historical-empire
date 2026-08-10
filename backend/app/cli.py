@@ -34,14 +34,16 @@ _ALIAS = {
     "buy": "buy_grain",
     "buy_grain": "buy_grain",
     "4": "buy_grain",
+    "sell": "sell_grain",
+    "sell_grain": "sell_grain",
+    "5": "sell_grain",
     "secure": "secure_route",
     "secure_route": "secure_route",
     "route": "secure_route",
-    "5": "secure_route",
+    "6": "secure_route",
     "ship": "ship_grain",
     "ship_grain": "ship_grain",
-    "sell": "ship_grain",
-    "6": "ship_grain",
+    "7": "ship_grain",
 }
 
 
@@ -68,10 +70,10 @@ def parse_choice(token: str) -> PlayerCommand:
     # Normalize alias
     if typ_token not in _ALIAS:
         raise ValueError(
-            f"unknown command {typ_token!r} — try hold, expand_farm, build_granary, buy_grain, secure_route, ship_grain"
+            f"unknown command {typ_token!r} — try hold, expand_farm, build_granary, buy_grain, sell_grain, secure_route, ship_grain"
         )
     cmd_type = _ALIAS[typ_token]
-    if cmd_type in ("buy_grain", "ship_grain"):
+    if cmd_type in ("buy_grain", "sell_grain", "ship_grain"):
         if qty is None:
             qty = 10
         if qty is not None and qty < 0:
@@ -148,18 +150,21 @@ def main(argv: list[str] | None = None) -> int:
         if args.json_out:
             Path(args.json_out).write_text(to_json(result))
             print(f"\nJSON written to {args.json_out}", file=sys.stderr)
-        # Exit 2 on any gate breach (reported, not hard assert — see plan Rev2)
+        # Exit 2 on any gate breach (reported, now blocking since tuned passes)
         if not (
             result.dominant_gate_pass
             and result.dead_gate_pass
             and result.price_gate_pass
             and result.negativity_gate_pass
+            and result.hold_not_top_gate_pass
         ):
             reasons: list[str] = []
             if not result.dominant_gate_pass:
                 reasons.append(f"dominant {result.dominant_reason}")
             if not result.dead_gate_pass:
                 reasons.append(f"dead {result.dead_reason}")
+            if not result.hold_not_top_gate_pass:
+                reasons.append(f"hold_not_top {result.hold_not_top_reason}")
             if not result.price_gate_pass:
                 reasons.append("price out of bounds")
             if not result.negativity_gate_pass:

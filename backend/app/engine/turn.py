@@ -61,6 +61,7 @@ from app.engine.actor import (
     resolve_buy,
     resolve_expand_farm,
     resolve_secure_route,
+    resolve_sell,
     resolve_shipment,
     resolve_storage_settlement,
 )
@@ -433,6 +434,87 @@ def resolve_turn(
                 before=before_inventory,
                 after=inventory_after,
                 delta=actual,
+                reason_code=cmd_reason,
+            )
+        )
+
+        cash = cash_after
+        inventory = inventory_after
+
+    elif command.type == "sell_grain":
+        requested = command.quantity if command.quantity is not None else 10
+        requested = int(requested)
+        cash_after, inventory_after, actual, revenue, cmd_reason = resolve_sell(
+            cash=cash,
+            price_milli=before_price,
+            inventory=inventory,
+            requested=requested,
+        )
+
+        nodes.append(
+            CausalNode(
+                id="command",
+                label=f"Sell grain requested={requested} actual={actual}",
+                kind="command",
+                before=inventory,
+                after=inventory_after,
+                delta=-actual,
+                reason_code=cmd_reason,
+                parent_ids=(),
+            )
+        )
+        nodes.append(
+            CausalNode(
+                id="cash_after_command",
+                label="Cash after sell",
+                kind="cash",
+                before=before_cash,
+                after=cash_after,
+                delta=revenue,
+                reason_code=cmd_reason,
+                parent_ids=("command",),
+            )
+        )
+        nodes.append(
+            CausalNode(
+                id="inventory_after_sell",
+                label="Inventory after sell",
+                kind="inventory",
+                before=before_inventory,
+                after=inventory_after,
+                delta=-actual,
+                reason_code=cmd_reason,
+                parent_ids=("command",),
+            )
+        )
+        # Also emit inventory_after_buy alias for downstream valuation that expects it
+        nodes.append(
+            CausalNode(
+                id="inventory_after_buy",
+                label="Inventory after sell (alias)",
+                kind="inventory",
+                before=before_inventory,
+                after=inventory_after,
+                delta=-actual,
+                reason_code=cmd_reason,
+                parent_ids=("command",),
+            )
+        )
+        effects.append(
+            DomainEffect(
+                metric="cash",
+                before=before_cash,
+                after=cash_after,
+                delta=revenue,
+                reason_code=cmd_reason,
+            )
+        )
+        effects.append(
+            DomainEffect(
+                metric="inventory",
+                before=before_inventory,
+                after=inventory_after,
+                delta=-actual,
                 reason_code=cmd_reason,
             )
         )
@@ -1019,7 +1101,7 @@ def resolve_turn(
     # Reconstruct label details for trace (excess) while preserving shared math
     if settle_reason == "capped_by_storage":
         excess = inventory_before_settlement + farm_output - storage_capacity
-        if command.type == "buy_grain":
+        if command.type in ("buy_grain", "sell_grain"):
             inv_parents = ("farm_output", "storage_capacity", "inventory_after_buy")
         else:
             inv_parents = ("farm_output", "storage_capacity")
@@ -1037,7 +1119,7 @@ def resolve_turn(
         )
     else:
         # harvest_to_inventory
-        if command.type == "buy_grain":
+        if command.type in ("buy_grain", "sell_grain"):
             inv_parents = ("farm_output", "storage_capacity", "inventory_after_buy")
         else:
             inv_parents = ("farm_output", "storage_capacity")
@@ -1055,7 +1137,7 @@ def resolve_turn(
         )
     # Domain effects for settlement
     overall_inventory_delta_pre_ship = inventory_final_pre_ship - before_inventory
-    if command.type == "buy_grain":
+    if command.type in ("buy_grain", "sell_grain"):
         effects.append(
             DomainEffect(
                 metric="inventory_harvest",
@@ -1483,11 +1565,15 @@ def resolve_turn(
     if ship_quantity_value == 0:
         assert quantity_value_effect == purchase_quantity_value + harvest_quantity_value
 
-    # Purchase quantity — value of bought grain at old price
+    # Purchase/sell quantity — value of bought/sold grain at old price
     if command.type == "buy_grain":
         purchase_parents: tuple[str, ...] = ("command", "inventory_after_buy")
         purchase_reason = "purchase_quantity_value"
         purchase_label = f"Purchase quantity value {value_before} → {value_after_buy} (delta {purchase_quantity_value:+})"
+    elif command.type == "sell_grain":
+        purchase_parents = ("command", "inventory_after_sell")
+        purchase_reason = "sell_quantity_value"
+        purchase_label = f"Sell quantity value {value_before} → {value_after_buy} (delta {purchase_quantity_value:+})"
     else:
         purchase_parents = ("command",)
         purchase_reason = "no_purchase"
@@ -1734,6 +1820,13 @@ def resolve_turn(
             else:
                 label = f"Bought grain for {abs(command_cash)}"
                 reason = "buy_grain_cost"
+        elif command.type == "sell_grain":
+            if cmd_reason == "insufficient_inventory":
+                label = f"Sell grain limited by inventory (gained {abs(command_cash)})"
+                reason = "sell_limited_inventory"
+            else:
+                label = f"Sold grain for {abs(command_cash)}"
+                reason = "sell_grain_revenue"
         elif command.type == "secure_route":
             if cmd_reason == "already_established":
                 label = "Route already secured (no cost)"
@@ -1819,9 +1912,9 @@ def resolve_turn(
             )
             candidates.pop()  # filtered zero
 
-    # Candidate 2: purchase quantity value — only if purchase actually added value
+    # Candidate 2: purchase/sell quantity value — only if actually added value
     if purchase_quantity_value != 0:
-        # This is the value of bought grain at old price; harvest is separate
+        # This is the value of bought/sold grain at old price; harvest is separate
         if command.type == "buy_grain":
             # Use actual purchase amount for label if available
             # inventory_after_buy - before_inventory is purchase qty
@@ -1833,6 +1926,15 @@ def resolve_turn(
                 label = f"Bought {purchase_qty} grain (value {purchase_quantity_value:+})"
                 reason = "purchase_quantity_value"
             causal_ids = ("command", "inventory_after_buy", "purchase_quantity_value")
+        elif command.type == "sell_grain":
+            sold_qty = before_inventory - inventory_before_settlement
+            if cmd_reason == "insufficient_inventory":
+                label = f"Sold {sold_qty} grain (value {purchase_quantity_value:+}, limited by inventory)"
+                reason = "sell_quantity_limited"
+            else:
+                label = f"Sold {sold_qty} grain (value {purchase_quantity_value:+})"
+                reason = "sell_quantity_value"
+            causal_ids = ("command", "inventory_after_sell", "purchase_quantity_value")
         else:
             label = f"Purchase quantity value {purchase_quantity_value:+}"
             reason = "purchase_quantity_value"

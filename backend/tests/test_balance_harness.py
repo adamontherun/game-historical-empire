@@ -32,6 +32,7 @@ def test_harness_runs_hundreds_quickly() -> None:
 def test_no_dominant_or_dead_strategy_by_median_ratio() -> None:
     """AC2: no universally dominant (median_ratio <1.60) and no dead (median ≥0.70*overall).
 
+    Plus hold-not-top: cash_preserving must not have highest median (game rewards action).
     Confound control: same seeds for every policy (paired), deterministic policies
     are seed-invariant so win_rate is 0/1 — median ratio is the honest test.
     Also asserts deterministic policies have no insufficient_* (legal by construction).
@@ -43,6 +44,8 @@ def test_no_dominant_or_dead_strategy_by_median_ratio() -> None:
     assert result.median_ratio < 1.60
     # Dead — every non-random median ≥0.70*overall
     assert result.dead_gate_pass, f"dead failed: {result.dead_reason}"
+    # Hold must not be top median — at least one active strategy beats pure holding
+    assert result.hold_not_top_gate_pass, f"hold_not_top failed: {result.hold_not_top_reason}"
     # Paired and affordable: no insufficient_* in deterministic histories
     # Check a single seed's deterministic policies for insufficient
     for pid in ("production_heavy", "storage_heavy", "trade_heavy", "cash_preserving"):

@@ -380,7 +380,15 @@ def test_turn_specs_length_and_titles() -> None:
 def test_available_commands_include_all_verbs() -> None:
     game = FiveTurnGame()
     cmds = game.available_commands()
-    for verb in ("hold", "expand_farm", "build_granary", "buy_grain", "secure_route", "ship_grain"):
+    for verb in (
+        "hold",
+        "expand_farm",
+        "build_granary",
+        "buy_grain",
+        "sell_grain",
+        "secure_route",
+        "ship_grain",
+    ):
         assert verb in cmds
 
 

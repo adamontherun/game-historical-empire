@@ -20,13 +20,13 @@
     "semantic_hash": ""
   },
   "backend/app/domain/types.py": {
-    "mtime": 1786323097.1437366,
-    "ast_hash": "a00b670bdb214eeb381ffb76f03f1826",
-    "semantic_hash": "a00b670bdb214eeb381ffb76f03f1826"
+    "mtime": 1786344863.8091137,
+    "ast_hash": "2dcc8515c4db99413cec9f6c16c265db",
+    "semantic_hash": ""
   },
   "backend/app/engine/__init__.py": {
-    "mtime": 1786341862.9442282,
-    "ast_hash": "78c46c3b7910fc83af87f110a3bd4b3e",
+    "mtime": 1786344863.762458,
+    "ast_hash": "b58f46dbf3f798a1edaebf133ef014d2",
     "semantic_hash": ""
   },
   "backend/app/engine/demo.py": {
@@ -45,8 +45,8 @@
     "semantic_hash": "79fb1a94c42d32e68ee6a881643adb44"
   },
   "backend/app/engine/turn.py": {
-    "mtime": 1786341862.9461405,
-    "ast_hash": "82adfb48e24672e57881e79e00a45695",
+    "mtime": 1786344863.810841,
+    "ast_hash": "e1cc527e123535d819f5fe4093236367",
     "semantic_hash": ""
   },
   "backend/pyproject.toml": {
@@ -60,8 +60,8 @@
     "semantic_hash": "d41d8cd98f00b204e9800998ecf8427e"
   },
   "backend/tests/test_causal_trace.py": {
-    "mtime": 1786341862.9471676,
-    "ast_hash": "1492414ed829acce4f9099bd4a6afc98",
+    "mtime": 1786344804.8855803,
+    "ast_hash": "48f0d6cd298a76a2583e5a5bba4fefdc",
     "semantic_hash": ""
   },
   "backend/tests/test_core_types.py": {
@@ -100,8 +100,8 @@
     "semantic_hash": "81e2f4b128e3532ff831a358f6d1f6c4"
   },
   "backend/tests/test_turn_kernel.py": {
-    "mtime": 1786341862.9517398,
-    "ast_hash": "e8d163df420b425bcb371843f6a2586d",
+    "mtime": 1786344802.6912146,
+    "ast_hash": "4f27caf60c444f1fc606a152772b3cf6",
     "semantic_hash": ""
   },
   "backend/tests/test_two_markets_route.py": {
@@ -210,8 +210,8 @@
     "semantic_hash": ""
   },
   "BUILD_SPEC.md": {
-    "mtime": 1786341862.9413948,
-    "ast_hash": "ac4acbabf5185843929ae546837c9385",
+    "mtime": 1786344939.4309554,
+    "ast_hash": "4ce2839625b07fc32d3c7bce817bca8a",
     "semantic_hash": ""
   },
   "CLAUDE.md": {
@@ -220,13 +220,13 @@
     "semantic_hash": ""
   },
   "DECISIONS.md": {
-    "mtime": 1786341862.9419377,
-    "ast_hash": "304f0214a2a5d4d3ecbb681d6a5cb628",
+    "mtime": 1786344934.6430357,
+    "ast_hash": "d8788b2d7ee79eaf6411b4468e4b21dc",
     "semantic_hash": ""
   },
   "STATE.md": {
-    "mtime": 1786341862.9423726,
-    "ast_hash": "49ee533957faa90c4bb39689fbec4d5d",
+    "mtime": 1786344917.723677,
+    "ast_hash": "bc5c7561b0619f8738e4f38b75cfe243",
     "semantic_hash": ""
   },
   "backend/AGENTS.md": {
@@ -265,18 +265,18 @@
     "semantic_hash": ""
   },
   "backend/app/cli.py": {
-    "mtime": 1786341862.9429748,
-    "ast_hash": "75343c430be0b03e24af454135871f0e",
+    "mtime": 1786344863.8097885,
+    "ast_hash": "b095a064c04fee5544b470912f4cb248",
     "semantic_hash": ""
   },
   "backend/app/engine/prototype.py": {
-    "mtime": 1786341862.945485,
-    "ast_hash": "8b38b6bc3eda34c0c399ae7deab59bd1",
+    "mtime": 1786344791.4826496,
+    "ast_hash": "54a28a882b1895550355def72264917d",
     "semantic_hash": ""
   },
   "backend/tests/test_five_turn_prototype.py": {
-    "mtime": 1786341862.9500363,
-    "ast_hash": "1839237adba3718833e211e4ba82a714",
+    "mtime": 1786344807.6608067,
+    "ast_hash": "588617496cf01c199d20be2edb2bd827",
     "semantic_hash": ""
   },
   "docs/plans/2026-08-09-section-6-five-turn-prototype.md": {
@@ -340,13 +340,23 @@
     "semantic_hash": ""
   },
   "docs/plans/2026-08-10-section-9-balance-harness.md": {
-    "mtime": 1786341999.0254402,
-    "ast_hash": "9de96ef8589a7da921dacdc2fee11328",
+    "mtime": 1786344490.113775,
+    "ast_hash": "0addcea7f083ebed13e93b05110676ac",
     "semantic_hash": ""
   },
   "docs/plans/2026-08-10-section-9-review-round-1.md": {
     "mtime": 1786342341.705758,
     "ast_hash": "0e9f0404f980886fdf23bb08a3e81a86",
+    "semantic_hash": ""
+  },
+  "backend/app/engine/harness.py": {
+    "mtime": 1786344876.1704557,
+    "ast_hash": "4d557a37ef07f9faef5ebf873a494918",
+    "semantic_hash": ""
+  },
+  "backend/tests/test_balance_harness.py": {
+    "mtime": 1786344878.2253773,
+    "ast_hash": "707c0610f03548fdf5a24edb0b50ccbc",
     "semantic_hash": ""
   }
 }

@@ -298,7 +298,15 @@ class FiveTurnGame:
         return None
 
     def available_commands(self) -> list[str]:
-        return ["hold", "expand_farm", "build_granary", "buy_grain", "secure_route", "ship_grain"]
+        return [
+            "hold",
+            "expand_farm",
+            "build_granary",
+            "buy_grain",
+            "sell_grain",
+            "secure_route",
+            "ship_grain",
+        ]
 
     def _observable_for(self, idx: int) -> ObservableContext:
         """Build pre-turn observable context for rival choice (structured, not prose)."""

@@ -128,6 +128,47 @@ def resolve_buy(
     return cash_after, inventory_after, actual, cost, reason
 
 
+def resolve_sell(
+    *,
+    cash: int,
+    price_milli: int,
+    inventory: int,
+    requested: int,
+) -> tuple[int, int, int, int, str]:
+    """Resolve a sell_grain command — inverse of buy, at Home price.
+
+    Args:
+        cash: cash before sell
+        price_milli: Home price before turn (pre-turn)
+        inventory: grain before sell
+        requested: grain units requested to sell
+
+    Returns:
+        (cash_after, inventory_after, actual, revenue, reason_code)
+        Clamped to available inventory; uses same integer/milliunit conventions as buy.
+    """
+    requested = int(requested)
+    if requested <= 0:
+        return cash, inventory, 0, 0, "sell_grain_zero"
+    actual = requested
+    if actual > inventory:
+        actual = inventory
+    revenue = cost_for_quantity(actual, price_milli)
+    if actual == 0 and requested > 0 and inventory == 0:
+        reason = "insufficient_inventory"
+    elif actual < requested and actual == inventory:
+        reason = "insufficient_inventory"
+    elif actual == requested and requested > 0:
+        reason = "sell_grain"
+    else:
+        reason = "sell_grain" if actual > 0 else "sell_grain_zero"
+    cash_after = cash + revenue
+    inventory_after = inventory - actual
+    if inventory_after < 0:
+        inventory_after = 0
+    return cash_after, inventory_after, actual, revenue, reason
+
+
 def resolve_storage_settlement(
     *,
     inventory_before: int,

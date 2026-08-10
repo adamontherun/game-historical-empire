@@ -162,7 +162,7 @@ def test_rival_determinism_same_seed() -> None:
 
 
 def test_rival_capital_constraints_via_shared_primitives() -> None:
-    # Zero cash forces hold
+    # Zero cash with inventory can now sell (sell increases cash, no cost) — so poor sells
     poor = RivalState(
         cash=0,
         inventory=InventoryState(grain=20),
@@ -172,9 +172,9 @@ def test_rival_capital_constraints_via_shared_primitives() -> None:
     )
     obs = _obs(home=5000, river=6200)
     m = choose_rival_command(MIRA_PROFILE, poor, obs)
-    assert m.type == "hold", f"poor Mira should hold, got {m.type}"
+    assert m.type == "sell_grain", f"poor Mira with grain should sell, got {m.type}"
     d = choose_rival_command(DARAN_PROFILE, poor, obs)
-    assert d.type == "hold"
+    assert d.type == "sell_grain"
     # Execution never negative cash
     game = FiveTurnGame(seed="cap-test")
     s = game.run([PlayerCommand(type="hold") for _ in range(5)])

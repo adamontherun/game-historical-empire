@@ -50,11 +50,10 @@ def policy_production_heavy(
 
 
 def policy_storage_heavy(state: GameState, turn_idx: int, seed: str, version: str) -> PlayerCommand:
-    """Build granary T1, buy grain T2-3, hold thereafter."""
+    """Build granary T0, buy T1-2, hold drought T3, sell T4-5 at high price."""
     if turn_idx == 0 and _can_afford(state.player.cash, BUILD_GRANARY_COST):
         return PlayerCommand(type="build_granary")  # type: ignore[arg-type]
     if turn_idx in (1, 2):
-        # buy up to 20, constrained by cash and space
         price = state.market.current_price
         space = state.player.storage_capacity - state.player.inventory.grain
         if space <= 0 or price <= 0:
@@ -64,6 +63,11 @@ def policy_storage_heavy(state: GameState, turn_idx: int, seed: str, version: st
         if actual <= 0:
             return PlayerCommand(type="hold")  # type: ignore[arg-type]
         return PlayerCommand(type="buy_grain", quantity=actual)  # type: ignore[arg-type]
+    if turn_idx in (3, 4) and state.player.inventory.grain > 0:
+        # Sell after drought price spike — realize gains
+        qty = min(30, state.player.inventory.grain)
+        if qty > 0:
+            return PlayerCommand(type="sell_grain", quantity=qty)  # type: ignore[arg-type]
     return PlayerCommand(type="hold")  # type: ignore[arg-type]
 
 
@@ -119,6 +123,9 @@ def policy_random_legal(state: GameState, turn_idx: int, seed: str, version: str
         if affordable_qty > 0:
             qty = min(10, affordable_qty)
             candidates.append(PlayerCommand(type="buy_grain", quantity=qty))  # type: ignore[arg-type]
+    if state.player.inventory.grain > 0:
+        qty = min(10, state.player.inventory.grain)
+        candidates.append(PlayerCommand(type="sell_grain", quantity=qty))  # type: ignore[arg-type]
     if state.route.established and state.player.inventory.grain > 0:
         qty = min(10, state.player.inventory.grain, state.route.capacity)
         if qty > 0:
@@ -199,9 +206,11 @@ class BatchResult(BaseModel):
     dead_gate_pass: bool
     price_gate_pass: bool
     negativity_gate_pass: bool
+    hold_not_top_gate_pass: bool
     median_ratio: float
     dominant_reason: str
     dead_reason: str
+    hold_not_top_reason: str
 
 
 def _wealth(state: GameState) -> int:
@@ -383,6 +392,13 @@ def run_batch(config: BatchConfig) -> BatchResult:
     # also check envelope: per-turn move <= 20% +1 (allow rounding)
     # we check in gate but also report overall price range
 
+    # hold_not_top gate: cash_preserving must NOT have highest median
+    hold_median = next((a.median_wealth for a in aggregates if a.policy_id == "cash_preserving"), 0)
+    max_median = max((a.median_wealth for a in aggregates), default=0)
+    max_policy = next((a.policy_id for a in aggregates if a.median_wealth == max_median), "")
+    hold_not_top_pass = hold_median != max_median
+    hold_not_top_reason = f"cash {hold_median} vs max {max_median} ({max_policy}) {'PASS' if hold_not_top_pass else 'FAIL'} — cash must not be top"
+
     # negativity gate
     negativity_pass = not any_negative
 
@@ -398,9 +414,11 @@ def run_batch(config: BatchConfig) -> BatchResult:
         dead_gate_pass=dead_pass,
         price_gate_pass=price_pass,
         negativity_gate_pass=negativity_pass,
+        hold_not_top_gate_pass=hold_not_top_pass,
         median_ratio=median_ratio,
         dominant_reason=dominant_reason,
         dead_reason=dead_reason,
+        hold_not_top_reason=hold_not_top_reason,
     )
 
 
@@ -431,6 +449,9 @@ def format_markdown(result: BatchResult) -> str:
     lines.append(
         f"Dead gate (median ≥0.70*overall): {result.dead_reason} — {'PASS' if result.dead_gate_pass else 'FAIL'}"
     )
+    lines.append(
+        f"Hold-not-top gate (cash not max median): {result.hold_not_top_reason} — {'PASS' if result.hold_not_top_gate_pass else 'FAIL'}"
+    )
     lines.append(f"Price gate ([2000,9000]): {'PASS' if result.price_gate_pass else 'FAIL'}")
     lines.append(f"Negativity gate (no <0): {'PASS' if result.negativity_gate_pass else 'FAIL'}")
     lines.append("")
@@ -455,9 +476,11 @@ def to_json(result: BatchResult) -> str:
             "dead_pass": result.dead_gate_pass,
             "price_pass": result.price_gate_pass,
             "negativity_pass": result.negativity_gate_pass,
+            "hold_not_top_pass": result.hold_not_top_gate_pass,
             "median_ratio": result.median_ratio,
             "dominant_reason": result.dominant_reason,
             "dead_reason": result.dead_reason,
+            "hold_not_top_reason": result.hold_not_top_reason,
         },
         "per_seed": [r.model_dump() for r in result.per_seed],
     }
