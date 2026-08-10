@@ -6,19 +6,22 @@
 
 **Epilogue hook (engine+domain is real work):** 3-turn epilogue after 5-turn agriculture shifts bottleneck from storage+drought timing to skilled_labour. Adds `PlayerState.skilled_labour`, `InventoryState.finished_goods`, `GameState.legacies`, new commands `craft_goods`/`sell_finished_goods`/`hire_labour`, demand shift 410→280→220→180, workshop conversion grain→finished capped at labour×10 (GRAIN_PER_LABOUR=10, 10→3 uniform, granary inert), finished price 9500 (+800 river, but now inert for granary), Land Network +15 grain/turn weak vs labour cap, **three legacies** (granary inert, river +2 labour, land weak) — crisis dropped (was 40/40 constant; inventory_at_drought fixed per policy 130/180/110/130), hire_labour +1/turn consuming turn, Control C (demand OFF) and Control L (legacies OFF) for four-arm AC1.
 
-**Four-arm harness (n=200, prefix final-required, required changes applied):**
+**Four-arm harness (n=200, prefix final-collapse2, raw collapse 410→80/30/10 + price 25% →800):**
 ```
-Arm A (5 turns agri): storage_heavy 2345, production_heavy 2290, trade_heavy 2241, cash_preserving 2109, random 1195
-Arm B (8 full, river +2 labour, granary inert, 3 legacies): storage_heavy 2497, production_heavy 2271, trade_heavy 2405, cash 1653, random 962
-Control C (demand OFF): storage 3807, trade 3145, production 2322, cash 2393, random 1100
-Control L (legacies OFF): storage 2497, trade 2212, production 2271, cash 1653, random 952
-P_agri=storage_heavy rank A1 B1 C1 L1 lead_A 55 lead_B 92 lead_C 662 contraction_B -68% contraction_C -1104%
-AC1 B pass (rank≥2 or C≥40): False  Control C pass: False  AC1 credible (B and not C): False — FAIL
-Net-positive guard (some B>A): True best_gain 164 — PASS (trade 2241→2405 +164, storage 2345→2497 +152)
-Ratios bps: A 10240 B 10382
-Legacies per policy (deterministic): production (land), storage (granary), trade (river), cash ()
+Arm A (5 turns agri): storage_heavy 2345, production_heavy 2290, trade_heavy 2241, cash_preserving 2109, random 1341
+Arm B (8 full, river +2 labour, granary inert, 3 legacies, raw collapse 800): storage_heavy 1789, production_heavy 2075, trade_heavy 2257, cash 1302, random 862
+Control C (demand OFF, no collapse): storage 3920, trade 3461, production 2435, cash 2506, random 1390
+Control L (legacies OFF): storage 1789, trade 1861, production 2075, cash 1302, random 601
+P_agri=storage_heavy rank A1 B3 C1 L3 lead_A 55 lead_B -468 (-93 trade ahead) lead_C 459 contraction_B 950% contraction_C -735%
+AC1 B pass (rank≥2 or C≥40): True (rank 3)  Control C pass: False  AC1 credible (B and not C): True — PASS
+Net-positive guard (some B>A): True best_gain +16 (trade 2241→2257) — PASS
+Ratios bps: A 10240 B 10877
+Raw channel split at epilogue (storage): grain 230 @800 raw 184 + finished 9 @22000 198 = total 382 raw share 48% (was 82% at 4000) — PASS ≤50%
+Trade epilogue: grain 130 @800 104 + finished 27 @22000 594 = 698 total, cash 1559 total 2257 vs storage 1789 — PASS trade > storage
+Legacies per policy (deterministic 3): production (land), storage (granary inert), trade (river +2 labour), cash ()
+Trace: urban_demand → raw_price_collapse → price (800), plus craft/labour, buy_grain still available (space-gated) for labour-rich to buy collapsed grain
 ```
-AC1 FAIL: P_agri remains rank1, lead grew 55→92. River +2 labour triples channel (90 vs 30 grain over epilogue) but trade had least grain after agri (80 vs storage 110) and farm production is capped, so extra labour is grain-limited. Demand shift hurts storage most (3807→2497 -1310) but not enough to flip. Net-positive holds. Per review, next lever is not price (lever is labour count) but making channel larger via more grain stock for river or making raw price lower; both already at limits, so report FAIL honestly. Do not reword. API still serves FiveTurnGame (5) for e2e stability; epilogue via harness.
+AC1 PASS: P_agri (storage) rank 1→3, lead 55→-468 (trade ahead by 468), contraction 950%. Raw collapse makes grain-rich storage holding low-value raw (150 raw at 800 =150 vs 390 at 4000) total 382 vs trade 698, raw share 48% ≤50% — regime change, not a dip. Trade's 3× labour channel (90 vs 30) now dominates. Control C still storage rank1, so not an artifact of extra turns. Net-positive holds (trade +16) — not a punishment chapter. Keep buy_grain available for AC4 explanation (labour-rich buying cheap grain to craft). EightTurnGame 5+3, API still FiveTurnGame (5) for e2e.
 
 ### What exists
 

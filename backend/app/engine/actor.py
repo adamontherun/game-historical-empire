@@ -24,14 +24,19 @@ ROUTE_ESTABLISH_COST: int = 400
 GRAIN_PER_LABOUR: int = 10  # grain convertible per labour per turn
 FINISHED_PER_GRAIN_NUM: int = 3
 FINISHED_PER_GRAIN_DENOM: int = 10  # 10 grain -> 3 finished (30% yield)
-FINISHED_GOODS_PRICE: int = 9500  # milliunits per finished unit (urban buyer)
-FINISHED_GOODS_PRICE_RIVER_EXTRA: int = 800  # River Contracts extra
+FINISHED_GOODS_PRICE: int = 22000  # milliunits per finished unit — regime change: 22 vs raw 0.8 (27×) makes raw collapse matter
+FINISHED_GOODS_PRICE_RIVER_EXTRA: int = 0  # river advantage is labour, not price — keep uniform
 HIRE_LABOUR_COST: int = 400
 HIRE_LABOUR_COST_REPUTATION: int = 200  # Crisis Reputation discount
 LAND_NETWORK_EXTRA_GRAIN_PER_TURN: int = 15  # deliberately weak vs labour*10 cap
-EPILOGUE_RAW_DEMAND: tuple[int, ...] = (280, 220, 180)  # turns 5,6,7 vs agriculture 410
+# Epilogue demand collapse — regime change, not a dip: 410 -> ~100 -> 50 -> 20
+# Raw share target storage ≤50% (from 82%) requires raw price ~800-1000, not ~4000
+EPILOGUE_RAW_DEMAND: tuple[int, ...] = (80, 30, 10)  # turns 5,6,7 vs agriculture 410
 # Crisis Reputation inventory threshold — tuned from measured distribution (~25-40% band)
 CRISIS_INVENTORY_THRESHOLD: int = 80  # grain held into drought turn (turn 3)
+# Epilogue raw price collapse factor — direct regime shift, not just supply/demand dip
+EPILOGUE_RAW_PRICE_COLLAPSE_BPS: int = 2500  # 25% of computed price → ~1000-1200 milli (from ~4000)
+EPILOGUE_RAW_PRICE_FLOOR: int = 800  # floor to keep price >0 and trace meaningful
 
 
 def cost_for_quantity(quantity: int, price_milli: int) -> int:

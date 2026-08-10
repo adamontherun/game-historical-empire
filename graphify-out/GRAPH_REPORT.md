@@ -1,7 +1,7 @@
 # Graph Report - game-historical-empire  (2026-08-10)
 
 ## Corpus Check
-- 137 files · ~203,034 words
+- 137 files · ~203,344 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
@@ -10,7 +10,7 @@
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `0a237bad`
+- Built from commit: `f2f21c22`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
@@ -96,7 +96,7 @@
 - SHOULD-FIX
 - typescript
 - Section 8 implementation — consolidated review (round 3, against commit 28a0963)
-- test_rounding.py
+- turn.py
 - Section 10 plan — consolidated review (round 2)
 - test_two_markets_route.py
 - test_api.py
@@ -107,13 +107,13 @@
 - App.tsx
 - Section 13 — Plan Review, Round 1
 - harness.py
-- @eslint/js
+- rivals.py
 - api/__init__.py
 - MarketState
 - Section 11 — Mobile-First React Playable — Plan
 - 3. Design rulings — the vague spots, now decided
 - Section 10 implementation — review round 3
-- turn.py
+- prettier
 - compilerOptions
 - Audit — Sections 1–10, Consolidated Review Round 2
 - GameState
@@ -136,7 +136,7 @@
 - @vitejs/plugin-react
 - commit.test.tsx
 - test_invariants.py
-- rivals.py
+- test_rounding.py
 - @testing-library/jest-dom
 - default_start_state
 - SECTION 20 — Visual Asset System and Polish
@@ -454,9 +454,9 @@ Nodes (23): Audit — Sections 1–10, Consolidated Review Round 1, B1 — `make
 Cohesion: 0.22
 Nodes (8): Closeout (unchanged from F5), G1 — Remove the `PressureState | str` legacy shim (BLOCKING), G2 — Work Plan §6 (CLI + StrategicSummary stage display) was never implemented (BLOCKING), G3 — STATE.md contains a provably false provenance claim (BLOCKING), G4 — DECISIONS.md 012 contradicts its own rationale (BLOCKING), G5 — Pressure node label should derive from stage, not title (should-fix), G6 — Prefer a `mode="before"` validator over `object.__setattr__` (should-fix, minor), Section 8 implementation — consolidated review (round 3, against commit 28a0963)
 
-### Community 83 - "test_rounding.py"
-Cohesion: 0.18
-Nodes (17): apply_basis_points(), clamp_non_negative(), div_round_half_up(), mul_basis_points(), Deterministic integer rounding helpers for canonical economic math. All…, Multiply value by basis points (10_000 = 100%) with floor division.…, Alias for mul_basis_points — semantic for price adjustments., Integer division rounding half away from zero for positive denominators. For… (+9 more)
+### Community 83 - "turn.py"
+Cohesion: 0.09
+Nodes (29): Shared actor-level economic primitives — Section 7 extraction. Single source of…, Resolve a sell_grain command — inverse of buy, at Home price. Args: cash: cash…, Settle harvest into inventory with storage cap. Returns…, Resolve ship_grain settlement with shared clamping. Uses pre-turn…, Shared expand_farm affordability/mutation. Returns (cash_after, farm_after,…, Shared build_granary affordability/mutation. Returns (cash_after,…, Shared secure_route affordability/mutation. Returns (cash_after, route_after,…, Resolve craft_goods — grain -> finished_goods capped by labour. Returns… (+21 more)
 
 ### Community 84 - "Section 10 plan — consolidated review (round 2)"
 Cohesion: 0.20
@@ -498,6 +498,10 @@ Nodes (9): 1. What is settled — keep as planned, 2. BLOCKING — the AC1 contr
 Cohesion: 0.14
 Nodes (19): BatchResult, _can_afford(), format_markdown(), policy_cash_preserving(), policy_production_heavy(), policy_random_legal(), policy_storage_heavy(), policy_trade_heavy() (+11 more)
 
+### Community 94 - "rivals.py"
+Cohesion: 0.13
+Nodes (25): compute_farm_output(), cost_for_quantity(), Cost in Money for quantity at price_milli (milliunits per unit). Floor division…, Inventory value in Money at price_milli., Compute farm output for given capacity and world. Returns (farm_output,…, value_for(), _capital_bps(), _expected_return() (+17 more)
+
 ### Community 96 - "MarketState"
 Cohesion: 0.15
 Nodes (22): Domain package — re-exports canonical types., Pressure domain — Section 8 world-pressure arc types. Small, frozen, validated…, MarketState, OperationState, PlayerState, BaseModel, Canonical economic types for Sections 2-5. Integer-only canonical state per…, Economic operation — stub for farm/granary, extensible later. Represents a farm… (+14 more)
@@ -513,10 +517,6 @@ Nodes (33): 0. Status, 1. Settled by the grill — confirmed, do not relitigate,
 ### Community 99 - "Section 10 implementation — review round 3"
 Cohesion: 0.50
 Nodes (3): D1 — BLOCKING: `test_available_choices_turn_invariant` cannot detect the defect it exists for, D2 — Secondary, Section 10 implementation — review round 3
-
-### Community 100 - "turn.py"
-Cohesion: 0.09
-Nodes (29): Shared actor-level economic primitives — Section 7 extraction. Single source of…, Resolve a sell_grain command — inverse of buy, at Home price. Args: cash: cash…, Settle harvest into inventory with storage cap. Returns…, Resolve ship_grain settlement with shared clamping. Uses pre-turn…, Shared expand_farm affordability/mutation. Returns (cash_after, farm_after,…, Shared build_granary affordability/mutation. Returns (cash_after,…, Shared secure_route affordability/mutation. Returns (cash_after, route_after,…, Resolve craft_goods — grain -> finished_goods capped by labour. Returns… (+21 more)
 
 ### Community 101 - "compilerOptions"
 Cohesion: 0.08
@@ -536,7 +536,7 @@ Nodes (17): 1. Where to store the sequence, 2. Run-record format, 3. Completion 
 
 ### Community 105 - "devDependencies"
 Cohesion: 0.12
-Nodes (17): eslint, devDependencies, eslint, globals, prettier, @testing-library/react, @types/react, typescript-eslint (+9 more)
+Nodes (17): eslint, @eslint/js, devDependencies, eslint, @eslint/js, globals, @testing-library/react, @types/react (+9 more)
 
 ### Community 106 - "scripts"
 Cohesion: 0.17
@@ -578,9 +578,9 @@ Nodes (40): 0. Reading list (what this plan rests on), 10. Risks / Rollback, 11.
 Cohesion: 0.31
 Nodes (10): _bounded_price(), Bound movement toward target_price within max_movement_bps of current., Integer-safe target price from supply/demand., _target_price(), Invariant and property tests for Section 3 — AC #2, #4., test_bounded_price_monotonic_with_supply(), test_demand_unchanged_cannot_reduce_target_when_supply_falls(), test_price_stays_positive_extreme() (+2 more)
 
-### Community 129 - "rivals.py"
-Cohesion: 0.13
-Nodes (25): compute_farm_output(), cost_for_quantity(), Cost in Money for quantity at price_milli (milliunits per unit). Floor division…, Inventory value in Money at price_milli., Compute farm output for given capacity and world. Returns (farm_output,…, value_for(), _capital_bps(), _expected_return() (+17 more)
+### Community 129 - "test_rounding.py"
+Cohesion: 0.18
+Nodes (17): apply_basis_points(), clamp_non_negative(), div_round_half_up(), mul_basis_points(), Deterministic integer rounding helpers for canonical economic math. All…, Multiply value by basis points (10_000 = 100%) with floor division.…, Alias for mul_basis_points — semantic for price adjustments., Integer division rounding half away from zero for positive denominators. For… (+9 more)
 
 ### Community 131 - "default_start_state"
 Cohesion: 0.18
@@ -602,11 +602,11 @@ Nodes (5): 31. Do Not Build Ahead, 32. Do Not Rewrite Working Systems Without Ev
 ## Suggested Questions
 _Questions this graph is uniquely positioned to answer:_
 
-- **Why does `PlayerCommand` connect `PlayerCommand` to `MarketState`, `rivals.py`, `test_pressure_arc.py`, `default_start_state`, `turn.py`, `mappers.py`, `test_five_turn_prototype.py`, `test_balance_harness.py`, `GameState`, `test_causal_trace.py`, `FiveTurnGame`, `InventoryState`, `test_explanation.py`, `cli.py`, `test_invariants.py`, `test_api.py`, `test_two_markets_route.py`, `harness.py`?**
+- **Why does `PlayerCommand` connect `PlayerCommand` to `MarketState`, `test_pressure_arc.py`, `default_start_state`, `test_five_turn_prototype.py`, `mappers.py`, `test_balance_harness.py`, `GameState`, `test_causal_trace.py`, `FiveTurnGame`, `InventoryState`, `test_explanation.py`, `cli.py`, `turn.py`, `test_invariants.py`, `test_api.py`, `test_two_markets_route.py`, `harness.py`, `rivals.py`?**
   _High betweenness centrality (0.032) - this node is a cross-community bridge._
 - **Why does `FiveTurnGame` connect `FiveTurnGame` to `MarketState`, `test_pressure_arc.py`, `PlayerCommand`, `default_start_state`, `test_five_turn_prototype.py`, `mappers.py`, `test_balance_harness.py`, `GameState`, `InventoryState`, `cli.py`, `test_two_markets_route.py`, `test_api.py`, `harness.py`?**
   _High betweenness centrality (0.023) - this node is a cross-community bridge._
-- **Why does `resolve_turn()` connect `PlayerCommand` to `MarketState`, `test_pressure_arc.py`, `rivals.py`, `test_five_turn_prototype.py`, `turn.py`, `mappers.py`, `GameState`, `test_causal_trace.py`, `test_balance_harness.py`, `InventoryState`, `test_explanation.py`, `test_rounding.py`, `test_two_markets_route.py`, `test_api.py`, `test_invariants.py`?**
+- **Why does `resolve_turn()` connect `PlayerCommand` to `MarketState`, `test_pressure_arc.py`, `test_rounding.py`, `test_five_turn_prototype.py`, `mappers.py`, `GameState`, `test_causal_trace.py`, `test_balance_harness.py`, `InventoryState`, `test_explanation.py`, `turn.py`, `test_two_markets_route.py`, `test_api.py`, `test_invariants.py`, `rivals.py`?**
   _High betweenness centrality (0.017) - this node is a cross-community bridge._
 - **Are the 16 inferred relationships involving `PlayerCommand` (e.g. with `GameSession` and `FourArmResult`) actually correct?**
   _`PlayerCommand` has 16 INFERRED edges - model-reasoned connections that need verification._

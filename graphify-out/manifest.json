@@ -40,8 +40,8 @@
     "semantic_hash": "79fb1a94c42d32e68ee6a881643adb44"
   },
   "backend/app/engine/turn.py": {
-    "mtime": 1786390880.3549066,
-    "ast_hash": "d9493ed30ffe7f56778084da78dd7c9c",
+    "mtime": 1786391231.9054415,
+    "ast_hash": "5f78919c21902cb73551b774854afd93",
     "semantic_hash": ""
   },
   "backend/pyproject.toml": {
@@ -220,8 +220,8 @@
     "semantic_hash": ""
   },
   "STATE.md": {
-    "mtime": 1786390986.4885924,
-    "ast_hash": "dc1bb19e78de34f5d880b406059295aa",
+    "mtime": 1786391268.8197596,
+    "ast_hash": "6152e2a2be6647f5b6f2a0f7cdab9277",
     "semantic_hash": ""
   },
   "backend/AGENTS.md": {
@@ -280,8 +280,8 @@
     "semantic_hash": ""
   },
   "backend/app/engine/actor.py": {
-    "mtime": 1786389988.520225,
-    "ast_hash": "173e6795e587b17b9f8a8ea00e7f2877",
+    "mtime": 1786391210.959444,
+    "ast_hash": "0aa3533ec2cb8d73ee0627cc1503a5c2",
     "semantic_hash": ""
   },
   "backend/app/engine/rivals.py": {
