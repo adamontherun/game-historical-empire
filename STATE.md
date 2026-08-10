@@ -2,19 +2,25 @@
 
 > Handoff snapshot for Muse / human. Concise and current, not a history log.
 
-## Section 13 — IN PROGRESS — City & Craft Transition Epilogue (2026-08-10) — REVERTED TO PLAUSIBLE (moderate)
+## Section 13 — COMPLETE (mechanism) — City & Craft Transition Epilogue (2026-08-10) — AC1 statistical demonstration deferred to post-playtest tuning
 
 **Epilogue hook (engine+domain is real work):** 3-turn epilogue after 5-turn agriculture shifts bottleneck from storage+drought timing to skilled_labour. Adds `PlayerState.skilled_labour`, `InventoryState.finished_goods`, `GameState.legacies`, new commands `craft_goods`/`sell_finished_goods`/`hire_labour`, **moderate legible** demand shift 410→280→220→180 (removed punitive 80/30/10 + 25%→800 collapse), workshop conversion grain→finished capped at labour×10 (GRAIN_PER_LABOUR=10, 10→3 uniform, granary inert), finished price **9500 +800 river** (reverted from 22000, no collapse BPS), Land Network +15 grain/turn weak vs labour cap, **three legacies** (granary inert, river +2 labour, land weak) — crisis dropped (was 40/40 constant). Structural fixes KEEP: river_contracts grants +2 skilled_labour, granary_expertise inert for crafting, crisis_reputation dropped, land_network +15 deliberately weak. hire_labour +1/turn consuming turn.
 
-**Honest status (2026-08-10 correction):** The structural regime-shift mechanism is implemented and **unit-proven** via deterministic scenario test (equal wealth, labour-rich wins). The full statistical demonstration across harness policies is **deferred until human playtest confirms the loop is worth tuning**. Do not claim AC1 is met by the harness. `run_four_arm` remains in the codebase as an instrument for post-playtest tuning, not a gate.
+**Honest status:** The structural regime-shift mechanism is implemented and unit-proven; the harness-based demonstration across policies is deferred until human playtest confirms the loop is worth tuning. run_four_arm stays as an instrument, not a gate. Do not claim AC1 is met.
 
-**Scenario test (deterministic, not statistical) — PASS:**
+**Scenario test (deterministic, falsifiable single-variable) — PASS:**
 ```
-Equal wealth start: 2250 (grain-rich/labour-poor: 150 grain, 1 labour, 1500 cash vs grain-poorer/labour-rich: 70 grain, 3 labour, 1900 cash; price 5000)
-After 3 epilogue turns (craft max each turn):
-  grain-rich/labour-poor (land_network, 1 labour):  turn6 10 grain +3 finished @6000 wealth 1588 → turn8 10 grain +9 finished @8640 wealth 1671
-  grain-poorer/labour-rich (river_contracts, 3 labour): turn6 10 grain +9 finished @6000 wealth 2052 → turn8 10 grain +15 finished @8640 wealth 2140
-  → labour-rich 2140 > grain-rich 1671 — PASS (mechanism: labour×10 cap, 30 vs 10 grain/turn)
+Arms identical except labour: 150 grain, 1500 cash, price 5000, legacies ()
+  Arm 1 labour 1, Arm 2 labour 3 — same wealth start 2250
+After 3 epilogue turns (craft all grain, actor caps by labour×10):
+  labour-poor (1) : 3313 wealth (9 finished, labour×10 cap 10/turn)
+  labour-rich (3) : 3484 wealth (27 finished, labour×10 cap 30/turn)
+  → labour-rich 3484 > 3313 — PASS (single variable, labour is bottleneck)
+Mutation verification (falsifiability):
+  Remove labour cap (GRAIN_PER_LABOUR=10000, max_by_labour=10000):
+    both arms 3361 wealth, diff 0 → test FAILS (assertion labour-rich > poor fails)
+  → proves test measures labour cap, not cash/grain composition
+AC3 legacy linkage: river_contracts grants +2 labour (EightTurnGame base 1 → 3), granary/land grant 0
 ```
 
 **Four-arm harness (n=200, prefix sec13, MODERATE demand 280/220/180, price 9500+800) — instrument only, AC1 credible FAIL:**
@@ -142,17 +148,18 @@ docs/plans/2026-08-10-section-13-review-round-1.md
 ### Normal verification
 
 ```bash
-make test              # 151 passed, 1 warning in 2.79s (added test_epilogue_scenario)
+make test              # 152 passed, 1 warning in 2.28s (2 scenario tests: single-variable + river linkage)
 make lint              # All checks passed!
-make type              # 0 errors, 0 warnings, 0 informations — 41 files analyzed
+make type              # 0 errors, 0 warnings, 0 informations
 make format-check      # 41 files already formatted
-make front-typecheck   # tsc --noEmit — 0 errors
+make front-type        # tsc --noEmit — 0 errors
 make front-lint        # eslint . --ext .ts,.tsx — 0 problems
 make front-test        # vitest run — 6 passed (6), 29 passed (29)
 make check-all         # backend + frontend gates green
-# scenario test (deterministic gate, not harness)
+# scenario test (deterministic, falsifiable single-variable)
 uv run --project backend pytest -q backend/tests/test_epilogue_scenario.py -v
-# → 1 passed: equal wealth labour-rich 2140 > grain-rich 1671 after 3 turns
+# → 2 passed: 150 grain 1500 cash labour 1 vs 3, rich 3484 > poor 3313; river_contracts +2
+# mutation: GRAIN_PER_LABOUR=10000 → both 3361, diff 0, test FAILS — falsifiable
 # four-arm harness (instrument only, NOT a gate — reported honestly)
 # BatchConfig(n_seeds=200, prefix=sec13): AC1 credible FAIL (storage rank1, contraction -68%), net-positive PASS (+164 trade)
 ```
@@ -160,15 +167,17 @@ uv run --project backend pytest -q backend/tests/test_epilogue_scenario.py -v
 ### Last known green
 
 ```
-pytest 151 passed in 2.79s (1 warning: StarletteDeprecationWarning)
+pytest 152 passed in 2.28s (1 warning: StarletteDeprecationWarning)
 ruff check All checks passed!
-pyright 0 errors, 0 warnings, 0 informations — 41 files analyzed
+pyright 0 errors, 0 warnings, 0 informations
 ruff format --check 41 files already formatted
 tsc --noEmit — 0 errors (frontend)
 eslint — 0 problems (no-restricted-syntax for /1000 and /10000 outside format.ts, no waitForTimeout)
 vitest — 6 passed (6), 29 passed (29)
 check-all: backend + frontend gates green
-scenario test: 1 passed (labour-rich 2140 > grain-rich 1671, equal start 2250)
+scenario test: 2 passed (150 grain 1500 cash labour 1 vs 3, rich 3484 > poor 3313; river +2) — falsifiable
+  before mutation: poor 3313 rich 3484 diff 171 PASS
+  after mutation GRAIN_PER_LABOUR=10000: both 3361 diff 0 FAIL — proves labour cap is measured
 four-arm harness n=200 (instrument, not gate): AC1 credible FAIL (storage rank1, 55→92), net-positive PASS (trade +164)
   per-policy deltas: storage +6% (2345→2497), production -1% (2290→2271), trade +7% (2241→2405), cash -21% (2109→1653)
 ```
@@ -181,11 +190,11 @@ four-arm harness n=200 (instrument, not gate): AC1 credible FAIL (storage rank1,
 - DECISIONS 022 (R2): buy cap removal 55/110.
 - DECISIONS 023: Section 11 decision surface — verb cards + quantity verbatim + exact id + Commit + phase-selected pressure.
 - DECISIONS 024: sell cap removal — `sell` now uncapped at inventory.
-- DECISIONS 026: Land Network deliberately weak +15 vs labour×10, Crisis exposure+survival, hire 1/turn consumes turn, demand shift primary, four-arm+net-positive guards.
+- DECISIONS 026: Land Network deliberately weak +15 vs labour×10, Crisis exposure+survival, hire 1/turn consumes turn, demand shift primary. The structural regime-shift mechanism is implemented and unit-proven; the harness-based demonstration across policies is deferred until human playtest confirms the loop is worth tuning. run_four_arm stays as an instrument, not a gate.
 
 ### Intentionally missing
 
-History endpoint, SQLAlchemy/Alembic/Postgres, auth, LLM, `render.yaml` cloud deploy. Section 12 human playtest remains BLOCKED — awaiting real observations. Section 13 AC1 full statistical harness remains **deferred** — structural mechanism is unit-proven (scenario test), but four-arm credible demonstration failed (storage rank1) and is not claimed. Do not reword AC1; await human playtest before further tuning.
+History endpoint, SQLAlchemy/Alembic/Postgres, auth, LLM, `render.yaml` cloud deploy. Section 12 human playtest remains BLOCKED — awaiting real observations. Section 13: The structural regime-shift mechanism is implemented and unit-proven; the harness-based demonstration across policies is deferred until human playtest confirms the loop is worth tuning. run_four_arm stays as an instrument, not a gate. Await human playtest before further tuning.
 
 ### Next milestone
 
