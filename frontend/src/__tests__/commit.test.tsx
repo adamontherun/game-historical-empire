@@ -57,22 +57,6 @@ vi.mock("../api/client", () => ({
 describe("commit revision handling (B4) — mutation-proven", () => {
   beforeEach(() => vi.clearAllMocks());
 
-  it("forwards expected_revision verbatim (client)", async () => {
-    const fetchMock = vi.fn().mockResolvedValue({
-      ok: true,
-      json: async () => mockGame,
-    });
-    vi.stubGlobal("fetch", fetchMock);
-    // need to re-import to get real client (mock is active, so we test mock forwarding instead)
-    // This test is kept minimal — the real B4 guard is the App integration below
-    const { commitChoice } = await import("../api/client");
-    // reset mock to real fetch behaviour for this check
-    vi.mocked((await import("../api/client")).commitChoice).mockReset();
-    // direct call still works — just documents forwarding
-    expect(typeof commitChoice).toBe("function");
-    vi.unstubAllGlobals();
-  });
-
   it("App commit sends game.revision (7) not game.turn (2) — fails if mutated to turn", async () => {
     const { createGame, commitChoice } = await import("../api/client");
     vi.mocked(createGame).mockResolvedValue(mockGame as unknown as never);

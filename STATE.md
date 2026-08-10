@@ -76,21 +76,21 @@ frontend/
       FooterDebug.tsx          # R12: seed · rules
     styles/
       tokens.css               # --market-home/--market-river identity + --page-ground atmosphere + [data-pressure] + font stacks R11 + tabular-nums
-      app.css                  # 480px centred, cards, reveal, commit bar
+      app.css                  # 480px centred, cards (verb 8px/13px, qty 3px/11px), reveal, commit bar static 8px (J2 0% occlusion, J4 river single line)
     __tests__/
       format.test.ts           # 8 tests inc. /1000 grep via eslint
       tableau.test.ts          # 7 tests inc. positive investing + negative hold×5 flat (B9)
       decisionBlock.test.tsx   # 5 tests inc. verbatim {7,999} (B1), hold cost 0 (B6), 9→6 cards
-      commit.test.tsx          # 2 tests inc. synthetic turn 2 rev 7 → 7 (B4)
+      commit.test.tsx          # 1 test synthetic turn 2 rev 7 → 7 (B4) — vestigial removed J3
       outcomeReveal.test.tsx   # B7 magnitude
   e2e/
-    critical.spec.ts           # 4 tests: full 5-turn mobile (expand→granary S2, 4 screenshots, B2/B3/B5/B6/B7/B9), desktop smoke, AC2 no table, AC4 rivals; B8 deferred route gate, no waitForTimeout, console+pageerror
+    critical.spec.ts           # 4 tests: full 5-turn mobile (expand→granary S2, 4 viewport 390×844 J1 mobile-only, B2/B3/B5/B6/B7/B9), desktop smoke, AC2 no table, AC4 rivals; B8 sync double-click, no waitForTimeout, console+pageerror
     screenshots/
-      first-decision.png
-      drought-warning.png       # turn 2 worsening_dry before commit
-      drought-reveal.png        # after turn 3 commit: header aftermath vs reveal drought (B3)
-      final-summary.png         # turn 5 is_complete R10
-  dist/                        # vite build output
+      first-decision.png        # 390×844 viewport J1 scrolled top — J2 0% (static bar, was 82%)
+      drought-warning.png       # turn 2 worsening_dry — viewport J1 1073×2321@2.75x
+      drought-reveal.png        # after turn 3: header aftermath vs reveal drought B3 — viewport J1
+      final-summary.png         # turn 5 R10 — viewport J1
+  dist/                        # vite build output (rebuilt, 7.50kB css)
 Makefile                       # test/lint/type/format-check + front-type/front-lint/front-test/front-e2e + check-all
 docs/plans/2026-08-10-section-11-mobile-react-playable.md  # plan revised for B1–B9 + R1–R12 + S1–S2
 docs/plans/2026-08-10-section-11-design-direction.md      # partially superseded banner (review wins)
@@ -111,29 +111,29 @@ docs/plans/2026-08-10-section-11-review-round-1.md        # consolidated review 
 ### Normal verification
 
 ```bash
-make test              # 150 passed, 1 warning in 2.04s
+make test              # 150 passed, 1 warning in 2.01s
 make lint              # All checks passed!
-make type              # 0 errors, 0 warnings, 0 informations — 38 files analyzed (strict app + standard tests via executionEnvironments)
+make type              # 0 errors, 0 warnings, 0 informations — 38 files analyzed
 make format-check      # 39 files already formatted
 make front-type        # tsc --noEmit — 0 errors
-make front-lint        # eslint . --ext .ts,.tsx — 0 problems
-make front-test        # vitest run — 5 passed (5), 26 passed (26)
+make front-lint        # eslint . --ext .ts,.tsx — 0 problems (no-restricted-syntax, no waitForTimeout)
+make front-test        # vitest run — 5 passed (5), 25 passed (25) — J3 vestigial removed (was 26)
 make check-all         # backend + frontend gates green — check-all: backend + frontend gates green
-# e2e (via make front-e2e / npx playwright test)
-# — 8 passed (4 mobile + 4 desktop, 44.5s) — full 5-turn mobile (expand→granary, 4 screenshots I1 opaque, no overlap), desktop smoke, AC2 no table, AC4 rivals verbatim (I6), B1 unconditional buy, B6 sell no Cost, B8 synchronous double-click committingRef (I5, requestCount 1), no waitForTimeout, console+pageerror zero
+# e2e (via npx playwright test)
+# — 8 passed (4 mobile 390×844 + 4 desktop 1280×800, 43.5s) — full 5-turn mobile (expand→granary, 4 viewport screenshots J1 1073×2321@2.75x, scrolled top, desktop no longer overwrites), drought-warning turn2 worsening_dry, drought-reveal B3 header aftermath vs reveal drought, final-summary R10; J2 0% occlusion at scroll 0 (static bar, verb 8px, tap target fully visible, was 82%/98%), J4 route single calm river line with sign-coloured spread only, B1 verbatim, B6 sell no Cost, B8 sync double-click requestCount 1, no waitForTimeout, console+pageerror zero
 ```
 
 ### Last known green
 
 ```
-pytest 150 passed in 2.04s (1 warning: StarletteDeprecationWarning)
+pytest 150 passed in 2.01s (1 warning: StarletteDeprecationWarning)
 ruff check All checks passed!
-pyright 0 errors, 0 warnings, 0 informations — 38 files analyzed (strict app + standard tests via executionEnvironments)
+pyright 0 errors, 0 warnings, 0 informations — 38 files analyzed
 ruff format --check 39 files already formatted
-tsc --noEmit — 0 errors
+tsc --noEmit — 0 errors (frontend)
 eslint — 0 problems (no-restricted-syntax for /1000 and /10000 outside format.ts, no waitForTimeout)
-vitest — 5 passed (5), 26 passed (26) — including B4 App revision 7 vs turn 2 (I2) and B7 impact_money vs impact_bps (I3) mutation-proven
-playwright — 8 passed (4 mobile 390×844 + 4 desktop 1280×800) — 44.5s — screenshots: first-decision.png (I1 no overlap), drought-warning.png (turn 2 worsening_dry), drought-reveal.png (after turn 3: header aftermath vs reveal drought, B3), final-summary.png (turn 5 R10, I9 no duplicate seed·rules)
+vitest — 5 passed (5), 25 passed (25) — J3 vestigial removed, B4 revision 7 vs turn 2 + B7 impact_money mutation-proven
+playwright — 8 passed (4 mobile 390×844 + 4 desktop 1280×800) — 43.5s — screenshots: first-decision.png 1073×2321 viewport J1 0% occlusion (static bar), drought-warning.png turn2 worsening_dry viewport, drought-reveal.png header aftermath vs reveal drought B3 viewport, final-summary.png turn5 R10 viewport; J4 route single line river colour sign-only
 check-all: backend + frontend gates green
 ```
 

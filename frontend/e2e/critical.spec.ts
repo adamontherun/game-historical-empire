@@ -38,8 +38,11 @@ test.describe("critical path", () => {
     await expect(page.locator('[data-testid^="qty-buy_grain:"]')).toHaveCount(2);
     // empire tableau initial
     await expect(page.getByTestId("empire-tableau")).toBeVisible();
-    // first decision screenshot — must not show Commit covering a card (I1)
-    await page.screenshot({ path: path.resolve("e2e/screenshots/first-decision.png"), fullPage: true });
+    // first decision screenshot — viewport (J1), not fullPage, scrolled to top, I1 must not cover (mobile only, so 390×844)
+    if (test.info().project.name === "mobile") {
+      await page.evaluate(() => window.scrollTo(0, 0));
+      await page.screenshot({ path: path.resolve("e2e/screenshots/first-decision.png") });
+    }
 
     // S2: expand_farm then build_granary early to cross two thresholds for AC5
     // Turn 0: expand_farm
@@ -88,7 +91,10 @@ test.describe("critical path", () => {
     // check storage now reached
     await expect(page.getByTestId("tier-storage")).toContainText("Granary Network");
     await expect(page.getByTestId("tier-storage")).toContainText("Storage 180");
-    await page.screenshot({ path: path.resolve("e2e/screenshots/drought-warning.png"), fullPage: true });
+    if (test.info().project.name === "mobile") {
+      await page.evaluate(() => window.scrollTo(0, 0));
+      await page.screenshot({ path: path.resolve("e2e/screenshots/drought-warning.png") });
+    }
 
     // Turn 2 commit: hold (buy not guaranteed after granary with full storage, so we hold)
     await page.getByTestId("verb-hold").click();
@@ -110,7 +116,10 @@ test.describe("critical path", () => {
     // title "Drought" is in beat 0, world/pressure in beat 1 are lowercase "drought"
     // data-pressure on root should be drought during reveal (B3)
     await expect(page.locator('[data-pressure="drought"]')).toBeVisible();
-    await page.screenshot({ path: path.resolve("e2e/screenshots/drought-reveal.png"), fullPage: true });
+    if (test.info().project.name === "mobile") {
+      await page.evaluate(() => window.scrollTo(0, 0));
+      await page.screenshot({ path: path.resolve("e2e/screenshots/drought-reveal.png") });
+    }
     // numbers beat: Home price (R6), from 0 (R7) — just check Home price label
     await expect(page.locator('[data-testid="outcome-reveal"] [data-reveal-beat="2"]')).toContainText("Home price");
     // drivers beat: no residual, impact_money coloring — check drivers visible
@@ -146,7 +155,10 @@ test.describe("critical path", () => {
     await expect(page.getByTestId("completion-seed")).toContainText("seed");
     await expect(page.getByTestId("completion-seed")).toContainText("rules");
     await expect(page.getByTestId("footer-debug")).toHaveCount(0);
-    await page.screenshot({ path: path.resolve("e2e/screenshots/final-summary.png"), fullPage: true });
+    if (test.info().project.name === "mobile") {
+      await page.evaluate(() => window.scrollTo(0, 0));
+      await page.screenshot({ path: path.resolve("e2e/screenshots/final-summary.png") });
+    }
 
     // B8: controlled race — exactly one POST while pending, disabled while pending
     // Go back via Play again, then test double-click guard on first commit

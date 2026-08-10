@@ -220,8 +220,8 @@
     "semantic_hash": ""
   },
   "STATE.md": {
-    "mtime": 1786387968.1196992,
-    "ast_hash": "cbbd1357d8e46e0ad237f7b9f47b9ca7",
+    "mtime": 1786388547.7876213,
+    "ast_hash": "8f597238c37eb19ddfb30eb52d19b493",
     "semantic_hash": ""
   },
   "backend/AGENTS.md": {
@@ -470,8 +470,8 @@
     "semantic_hash": ""
   },
   "frontend/e2e/critical.spec.ts": {
-    "mtime": 1786387764.1945846,
-    "ast_hash": "4c8168766cebb0ad4f440b0320290efd",
+    "mtime": 1786388469.4835134,
+    "ast_hash": "c1e92f9ab4ee727b6bcee2c0c428f1a8",
     "semantic_hash": ""
   },
   "frontend/eslint.config.js": {
@@ -490,13 +490,13 @@
     "semantic_hash": ""
   },
   "frontend/src/App.tsx": {
-    "mtime": 1786387866.5646334,
+    "mtime": 1786388138.8747027,
     "ast_hash": "465415699ffd0e84555b7ec76d8edc66",
     "semantic_hash": ""
   },
   "frontend/src/__tests__/commit.test.tsx": {
-    "mtime": 1786387555.3323514,
-    "ast_hash": "915f49092b3f4ef0025e187e34383691",
+    "mtime": 1786388324.1944113,
+    "ast_hash": "f964387b5b4d4092ea05350559bf224e",
     "semantic_hash": ""
   },
   "frontend/src/__tests__/decisionBlock.test.tsx": {
@@ -575,7 +575,7 @@
     "semantic_hash": ""
   },
   "frontend/src/components/OutcomeReveal.tsx": {
-    "mtime": 1786387620.4247012,
+    "mtime": 1786388105.9662468,
     "ast_hash": "82f7e792d1dc2e73dd04a0a155c2703a",
     "semantic_hash": ""
   },
@@ -585,8 +585,8 @@
     "semantic_hash": ""
   },
   "frontend/src/components/RouteLine.tsx": {
-    "mtime": 1786386343.0693228,
-    "ast_hash": "4de9f46a71c9254742f18b262e313668",
+    "mtime": 1786388327.9617324,
+    "ast_hash": "e43abdee7138232c6a69b9ac8dc9a43b",
     "semantic_hash": ""
   },
   "frontend/src/components/StartScreen.tsx": {
@@ -640,23 +640,23 @@
     "semantic_hash": ""
   },
   "frontend/e2e/screenshots/drought-reveal.png": {
-    "mtime": 1786387937.5879369,
-    "ast_hash": "09b15c54bc77047444dddab2dd6f9cf6",
+    "mtime": 1786388483.4113097,
+    "ast_hash": "789157d0b9f3f818db8010062571b41e",
     "semantic_hash": ""
   },
   "frontend/e2e/screenshots/drought-warning.png": {
-    "mtime": 1786387932.633346,
-    "ast_hash": "336431886627471602a25ebd6455d9eb",
+    "mtime": 1786388478.5281005,
+    "ast_hash": "db0ada0774a91758b69ca5d5e89186bb",
     "semantic_hash": ""
   },
   "frontend/e2e/screenshots/final-summary.png": {
-    "mtime": 1786387940.1510558,
-    "ast_hash": "f79b3a4164574759ae9830e9445ba7e0",
+    "mtime": 1786388485.9779124,
+    "ast_hash": "cbc5caa2bdb1f664b7f3f2f2b1649741",
     "semantic_hash": ""
   },
   "frontend/e2e/screenshots/first-decision.png": {
-    "mtime": 1786387927.6301765,
-    "ast_hash": "2d7b5cde1d48f7880dd5496158ac4e88",
+    "mtime": 1786388473.5487638,
+    "ast_hash": "d71aa75678d743fc784a40cf9e118537",
     "semantic_hash": ""
   },
   "docs/plans/2026-08-10-section-11-review-round-2.md": {
