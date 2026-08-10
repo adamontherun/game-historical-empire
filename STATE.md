@@ -4,7 +4,7 @@
 
 ## Section 4 — COMPLETE (2026-08-09)
 
-**Causal explanation and outcome model:** exact wealth decomposition (`cash_effect + quantity_value_effect + price_value_effect == wealth_delta`), immutable causal DAG with tuples, story drivers as exact wealth-bps ranked paths (not single nodes), filtered zero-impact stories, valuation subgraph `inventory/price → quantity/price revaluation → wealth`, RNG ownership validated, CLI concise/verbose.
+**Causal explanation and outcome model:** exact wealth decomposition (`cash_effect + purchase_quantity_value + harvest_quantity_value + price_value_effect == wealth_delta`), immutable causal DAG with tuples, story drivers as exact wealth-bps ranked paths (not single nodes), filtered zero-impact stories, valuation subgraph `purchase_quantity_value + harvest_quantity_value → quantity_value_effect → wealth` and `inventory + price → price_value_effect → wealth` with `storage_capacity` explicit, RNG ownership validated, CLI concise/verbose.
 
 ### What exists
 
@@ -15,12 +15,12 @@ backend/
     domain/
       __init__.py            # re-exports CausalEdge/OutcomeDriver + types
       types.py               # Money/... + GameState/PlayerState/MarketState+WorldCondition+PlayerCommand (frozen, ge=0)
-      trace.py               # CausalNode(parent_ids:tuple)/CausalTrace(nodes:tuple, edges)/DomainEffect/OutcomeDriver/PlayerOutcome(drivers:tuple, top_drivers computed)/TurnResolution (frozen, validators: unique ids, parents before children, allowed roots world/command, farm_capacity only when delta==0, delta==after-before)
+      trace.py               # CausalNode(parent_ids:tuple)/CausalTrace(nodes:tuple, edges)/DomainEffect/OutcomeDriver/PlayerOutcome(drivers:tuple, top_drivers computed)/TurnResolution (frozen, validators: unique ids, parents before children, allowed roots world/command, farm_capacity/storage_capacity only when delta==0, delta==after-before, purchase/harvest quantity kinds)
     engine/
       __init__.py            # re-exports RNG + rounding + resolve_turn/TURN_ORDER
       rng.py                 # derive_seed/make_rng/rng_for — JSON canonical -> blake2b
       rounding.py            # mul_basis_points/apply_basis_points/div_round_half_up/clamp_non_negative
-      turn.py                # resolve_turn — command->production->supply->price->settlement->valuation, drought→farm_output→supply→price, exact valuation (_value), wealth nodes (quantity/price/cash/wealth), story drivers (command_cost, quantity_value, price_revaluation) filtered & ranked by exact wealth-bps, RNG validated
+      turn.py                # resolve_turn — command->production->supply->price->settlement->valuation, drought→farm_output→supply→price, exact valuation (_value: qty*price//1000), wealth nodes (purchase_quantity_value/harvest_quantity_value/quantity_value_effect/price_value_effect/cash_effect/wealth), story drivers (command_cost, purchase_quantity, harvest_quantity, price_revaluation) filtered & ranked by exact wealth-bps, RNG validated, storage_capacity stable node + inventory parents (farm_output, storage_capacity, inventory_after_buy)
       demo.py                # CLI demo: before/command/world/WHY? (3 story drivers with impact_money/impact_bps/causal_node_ids) + after + contrast; --verbose adds FULL CAUSAL TRACE + DOMAIN EFFECTS + EDGES
   tests/
     test_sanity.py
@@ -54,9 +54,9 @@ docs/
 
 - `backend/app/engine` and `backend/app/domain` are pure: no `fastapi`, `sqlalchemy`, `httpx`, `asyncpg`, `openai`, `clerk`. Enforced by AST rglob test. `pydantic` allowed for validated canonical types. `engine/turn.py` imports only `domain` + `rng`/`rounding`.
 - Canonical state is frozen with immutable tuples: `parent_ids: tuple[str,...]`, `nodes: tuple[CausalNode,...]`, `drivers: tuple[OutcomeDriver,...]`, `causal_node_ids: tuple[str,...]` — no mutable lists inside frozen models, DAG is authoritative.
-- Wealth is structural, not post-hoc math: `value(qty,price)=qty*price//1000`, `wealth_before=cash_before+value(before)`, `quantity_value_effect=value(after,price_before)-value(before,price_before)`, `price_value_effect=value(after,price_after)-value(after,price_before)`, `cash_effect=cash_after-cash_before`, `wealth_delta=sum` exactly, with nodes `quantity_value_effect` parents `(inventory,price)`, `price_value_effect` parents `(inventory,price)`, `wealth` parents `(cash_effect,quantity_value_effect,price_value_effect)`.
-- Story drivers are exact partitions: candidates `command_cost`/`quantity_value`/`price_revaluation` (plus storage/farm paths folded into quantity) filtered where `impact_money==0`, ranked by `impact_bps=abs(impact_money)*10000//max(wealth_before,1)` desc then `id` asc, `≤3` returned. No double-count, no counterfactual drought-vs-normal, sum of all drivers ≤ wealth_delta and sum of 3 exact effects == wealth_delta.
-- Validator: unique ids, parents before children, no cycles, allowed roots `world`/`command` regardless of delta, `farm_capacity`/`storage_capacity` empty only when `delta==0`, all valuation nodes require parents, `delta==after-before` enforced, `edges` derived.
+- Wealth is structural, not post-hoc math: `value(qty,price)=qty*price//1000`, `wealth_before=cash_before+value(before)`, `purchase_quantity_value=value(after_buy,price_before)-value(before,price_before)`, `harvest_quantity_value=value(final,price_before)-value(after_buy,price_before)`, `quantity_value_effect=purchase+harvest`, `price_value_effect=value(final,price_after)-value(final,price_before)`, `cash_effect=cash_after-cash_before`, `wealth_delta=cash+purchase+harvest+price` exactly, with nodes `purchase_quantity_value` parents `(command,inventory_after_buy)` (no price), `harvest_quantity_value` parents `(farm_output,storage_capacity,inventory)` (no price), `quantity_value_effect` parents `(purchase_quantity_value,harvest_quantity_value)` (no price), `price_value_effect` parents `(inventory,price)` alone carries changed-price causality, `wealth` parents `(cash_effect,quantity_value_effect,price_value_effect)`.
+- Story drivers are exact partitions: candidates `command_cost`/`purchase_quantity`/`harvest_quantity`/`price_revaluation` (`purchase` = buy at old price, `harvest` = farm output at old price storage-constrained) filtered where `impact_money==0`, ranked by `impact_bps=abs(impact_money)*10000//max(wealth_before,1)` desc then `id` asc, `≤3` returned. No double-count, no counterfactual drought-vs-normal, sum of `cash+purchase+harvest+price` == `wealth_delta` exactly, `quantity_value_effect` = `purchase+harvest`.
+- Validator: unique ids, parents before children, no cycles, allowed roots `world`/`command` regardless of delta, `farm_capacity`/`storage_capacity` empty only when `delta==0` (storage is explicit settlement parent: `inventory` parents `farm_output`+`storage_capacity`[+`inventory_after_buy`]), all valuation nodes require parents (`quantity_value_effect`←`purchase`+`harvest`, `purchase`←`command`/`inventory_after_buy` no price, `harvest`←`farm_output`+`storage_capacity`+`inventory` no price, `price_value_effect`←`inventory`+`price`), `delta==after-before` enforced, `edges` derived.
 - Deterministic RNG: `rng_context` validated `== state.to_turn_context()` else `ValueError`; `derive_seed` via JSON array + blake2b, no global random/hash, price remains deterministic.
 - `backend/pyproject.toml` single project, no `fastapi`/`sqlalchemy` until Section 10. Ruff/pyright scoped to `backend`.
 
@@ -64,7 +64,7 @@ docs/
 
 ```bash
 uv sync --project backend
-make test              # = uv run --project backend pytest -v  (65 passed)
+make test              # = uv run --project backend pytest -v  (66 passed)
 make lint              # = ruff check backend  (All checks passed)
 make type              # = pyright  (0 errors)
 make format-check      # = ruff format --check backend  (20 already formatted)
@@ -75,12 +75,12 @@ make format            # actually formats backend/
 
 ```
 uv sync --project backend  → Resolved 15 packages, 0 errors
-pytest -v                  → 65 passed (8 core + 7 rounding + 11 determinism + 2 purity/sanity + 15 kernel + 7 invariants + 11 causal_trace + 4 explanation)
+pytest -v                  → 66 passed (8 core + 7 rounding + 11 determinism + 2 purity/sanity + 15 kernel + 7 invariants + 12 causal_trace + 4 explanation)
 ruff check backend         → All checks passed
 ruff format --check backend→ 20 files already formatted
 pyright                    → 0 errors, 0 warnings
-demo                       → uv run --project backend python backend/app/engine/demo.py --world drought --command hold  prints BEFORE/COMMAND/WORLD/PLAYER OUTCOME/WHY? (2 story drivers, sum==wealth_delta)/AFTER
-demo verbose               → same --verbose adds FULL CAUSAL TRACE (world→farm_output→supply→price→quantity/price revaluation→wealth) + DOMAIN EFFECTS + EDGES
+demo                       → uv run --project backend python backend/app/engine/demo.py --world drought --command hold  prints BEFORE/COMMAND/WORLD/PLAYER OUTCOME/WHY? (2 story drivers harvest_quantity + price_revaluation, sum==wealth_delta)/AFTER ; purchase_quantity_value + harvest_quantity_value → quantity_value_effect → wealth; price_value_effect alone carries changed-price; inventory parents farm_output+storage_capacity
+demo verbose               → same --verbose adds FULL CAUSAL TRACE (world→farm_output→supply→price→purchase/harvest→quantity→price revaluation→wealth, storage_capacity explicit) + DOMAIN EFFECTS (purchase_quantity_value, harvest_quantity_value, quantity_value_effect, price_value_effect, cash_effect, wealth) + EDGES
 ```
 
 Cache provenance fixed in YOLO (`~/.cache/uv/sdists-v9/.git` removed, `uv cache prune`), no `UV_CACHE_DIR` workaround needed. `.git/refs` provenance cleared for branch creation; `.git/objects` provenance remains but does not block Git (refs are authoritative).
