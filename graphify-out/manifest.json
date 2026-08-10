@@ -383,5 +383,10 @@
     "mtime": 1786380758.2906315,
     "ast_hash": "92cb4c179bb8da04adf2b4131cf27047",
     "semantic_hash": ""
+  },
+  "docs/plans/2026-08-10-section-10-plan-review-round-1.md": {
+    "mtime": 1786381000.2497628,
+    "ast_hash": "565d2305f9366ab23d08f963409da1af",
+    "semantic_hash": ""
   }
 }
