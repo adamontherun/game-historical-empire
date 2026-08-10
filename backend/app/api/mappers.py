@@ -87,12 +87,12 @@ def choices_for(session: GameSession) -> tuple[ChoiceView, ...]:
         )
     # buy_grain: ANY turn, if headroom>0 — two options (partial+full)
     # B2 engine-agreement: clamp on actual engine rule storage - inventory
-    # 80 is buy cap (Section 9 tuning, keeps trade profitable within price band)
+    # No harness cap — player may fill entire storage; harness 80 is strategy only (DECISIONS 017)
     space = s.player.storage_capacity - s.player.inventory.grain
     price = s.market.current_price
     if price > 0:
         affordable = affordable_quantity(s.player.cash, price, 10_000_000)
-        max_buy = min(max(space, 0), affordable, 80)
+        max_buy = min(max(space, 0), affordable)
         if max_buy > 0:
             qtys = {max_buy, max(1, max_buy // 2)}
             for qty in sorted(qtys):

@@ -352,11 +352,11 @@ def test_available_choices_turn_invariant() -> None:
 
 def test_available_choices_include_two_quantities(client: TestClient) -> None:
     gv = _create_game(client, seed="two-qty")
-    # initial has buy_grain with 2 quantities when affordable — B2 engine-agreement: space 110 → 40/80
+    # initial has buy_grain with 2 quantities when affordable — B2 engine-agreement: space 110 → 55/110 (no harness cap)
     buy_ids = [c["id"] for c in gv["available_choices"] if c["kind"] == "buy_grain"]
     # should be 2 when space 110 (storage 130 - inventory 20)
     assert len(buy_ids) == 2, buy_ids
-    assert "buy_grain:40" in buy_ids and "buy_grain:80" in buy_ids
+    assert "buy_grain:55" in buy_ids and "buy_grain:110" in buy_ids
     # sell also 2 when inventory 20
     sell_ids = [c["id"] for c in gv["available_choices"] if c["kind"] == "sell_grain"]
     assert len(sell_ids) == 2, sell_ids
@@ -405,10 +405,11 @@ def test_choices_engine_agreement_unclamped() -> None:
     for ch in choices:
         if ch.quantity is not None:
             by_kind[ch.kind].append(ch.quantity)
-    # buy: largest 80 must be unclamped (space 110, affordable 200, cap 80)
+    # buy: largest must be engine max (space 110, affordable 200) — no harness cap
     assert "buy_grain" in by_kind
     max_buy = max(by_kind["buy_grain"])
-    assert max_buy == 80, f"buy max {max_buy} != 80 (engine space 110)"
+    # engine max = min(storage-inventory, affordable) = 110 at start state
+    assert max_buy == 110, f"buy max {max_buy} != 110 (engine space 110, harness cap removed)"
     state = g.state
     res = resolve_turn(
         state,
@@ -430,6 +431,7 @@ def test_choices_engine_agreement_unclamped() -> None:
         state.to_turn_context(),
     )
     node2 = next(n for n in res2.causal_trace.nodes if n.id == "inventory_after_command")
+    assert node2.delta is not None
     assert -node2.delta == max_sell or node2.delta == -max_sell
     assert node2.reason_code == "sell_grain"
 

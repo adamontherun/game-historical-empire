@@ -42,9 +42,6 @@ async def get_game(game_id: str) -> GameView:
     if session is None:
         raise HTTPException(status_code=404, detail="game not found")
     async with session.lock:
-        # B3a: yield inside lock so concurrent interleaving is observable;
-        # simulates future DB await and makes lock falsifiable
-        await asyncio.sleep(0)
         return to_game_view(session)
 
 
@@ -59,6 +56,7 @@ async def choose(game_id: str, choice_id: str, expected_revision: int) -> GameVi
                 detail=f"conflict: expected_revision {expected_revision} != current {session.revision}",
                 headers={"X-Current-Revision": str(session.revision)},
             )
+        # DECISIONS 021: yield inside lock keeps per-session lock load-bearing until real I/O lands (Section 16)
         await asyncio.sleep(0)
         if session.game.is_complete:
             raise HTTPException(status_code=409, detail="game complete")
