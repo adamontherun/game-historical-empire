@@ -1,19 +1,36 @@
-"""One-turn grain market kernel — Section 3.
+"""One-turn grain market kernel — Section 4.
 
 Resolves a single turn with explicit order:
 
-    Command -> Production -> Supply -> Price -> Inventory settlement -> Next state
+    Command -> Production -> Supply -> Price -> Settlement -> Valuation
 
 All canonical state is integer; rounding via helpers; deterministic RNG
 substream is consumed but core price remains deterministic to preserve
 monotonicity. Causal trace is emitted structurally during resolution.
+Wealth is now part of the causal graph via exact decomposition:
+
+    wealth_before = cash_before + value(inv_before, price_before)
+    quantity_value_effect = value(inv_after, price_before) - value(inv_before, price_before)
+    price_value_effect    = value(inv_after, price_after)  - value(inv_after, price_before)
+    cash_effect           = cash_after - cash_before
+    wealth_delta          = cash_effect + quantity_value_effect + price_value_effect
+
+where value(qty, price_milli) = qty * price_milli // 1000.
+Story drivers are exact partitions of wealth_delta ranked by wealth-bps.
 
 Spec: drought reduces production/yield, not directly price.
 """
 
 from __future__ import annotations
 
-from app.domain.trace import CausalNode, CausalTrace, DomainEffect, PlayerOutcome, TurnResolution
+from app.domain.trace import (
+    CausalNode,
+    CausalTrace,
+    DomainEffect,
+    OutcomeDriver,
+    PlayerOutcome,
+    TurnResolution,
+)
 from app.domain.types import (
     GameState,
     InventoryState,
@@ -35,7 +52,7 @@ BUILD_GRANARY_COST: int = 300
 BUILD_GRANARY_DELTA: int = 50
 
 # Public for tests to assert order.
-TURN_ORDER: str = "command -> production -> supply -> price -> settlement"
+TURN_ORDER: str = "command -> production -> supply -> price -> settlement -> valuation"
 
 
 def _cost_for_quantity(quantity: int, price_milli: int) -> int:
@@ -50,18 +67,20 @@ def _cost_for_quantity(quantity: int, price_milli: int) -> int:
 
 
 def _affordable_quantity(cash: int, price_milli: int, requested: int) -> int:
-    """Max quantity affordable at price_milli with cash, floored cost.
-
-    Given cost = qty * price // 1000 <= cash, max qty is
-    ((cash+1)*1000 -1)//price which accounts for flooring.
-    """
+    """Max quantity affordable at price_milli with cash, floored cost."""
     if requested <= 0:
         return 0
     if price_milli <= 0:
         return requested
-    # ((cash+1)*1000 -1)//price is max qty where floor cost <= cash
     max_affordable = ((cash + 1) * 1000 - 1) // price_milli
     return max_affordable
+
+
+def _value(qty: int, price_milli: int) -> int:
+    """Inventory value in Money at price_milli."""
+    if qty <= 0 or price_milli <= 0:
+        return 0
+    return (qty * price_milli) // 1000
 
 
 def _target_price(
@@ -70,21 +89,12 @@ def _target_price(
     demand: int,
     responsiveness: int,
 ) -> int:
-    """Integer-safe target price from supply/demand.
-
-    - effective_supply = max(supply,1)
-    - normalized_imbalance_bps = imbalance * 10_000 / effective_supply
-    - price_pressure_bps = normalized_imbalance_bps * responsiveness / 10_000
-    - target = base_price * (10_000 + pressure) / 10_000, clamped >=1
-    """
+    """Integer-safe target price from supply/demand."""
     effective_supply = supply if supply > 0 else 1
     imbalance = demand - supply
-    # Use half-up rounding for normalized imbalance to stay deterministic.
     normalized_bps = div_round_half_up(imbalance * 10_000, effective_supply)
     pressure_bps = (normalized_bps * responsiveness) // 10_000
-    # target may be < base_price when supply > demand
     raw = base_price * (10_000 + pressure_bps) // 10_000
-    # Ensure price stays positive; clamp to at least 1.
     if raw < 1:
         raw = 1
     return clamp_non_negative(raw)
@@ -116,24 +126,26 @@ def resolve_turn(
 ) -> TurnResolution:
     """Resolve one deterministic turn.
 
-    Order is explicit: command -> production -> supply -> price -> settlement.
+    Order is explicit: command -> production -> supply -> price -> settlement -> valuation.
 
     Args:
         state: Canonical before state.
         command: Single player major action.
         world: World condition for this turn (normal/drought).
-        rng_context: Turn identity for deterministic substreams.
+        rng_context: Turn identity for deterministic substreams — must equal state context.
 
     Returns:
-        TurnResolution with next_state, domain_effects, causal_trace,
-        player_outcome. No negatives, no direct drought->price edge.
+        TurnResolution with next_state, domain_effects, causal_trace, player_outcome.
+        Wealth is part of the graph via exact decomposition; drivers are exact partitions.
     """
-    # Consume deterministic RNG substream — preserves AC #1 and proves seed used.
-    # Not allowed to use global random; rng_for is the only source.
+    # RNG ownership validation — must equal state's context
+    expected = state.to_turn_context()
+    if rng_context != expected:
+        raise ValueError(f"rng_context {rng_context} != state context {expected}")
     rng = rng_for(
-        rng_context.run_seed,
-        rng_context.ruleset_version,
-        rng_context.turn,
+        expected.run_seed,
+        expected.ruleset_version,
+        expected.turn,
         "turn",
         "price_jitter",
         0,
@@ -171,7 +183,7 @@ def resolve_turn(
             after=None,
             delta=None,
             reason_code=world_reason,
-            parent_ids=[],
+            parent_ids=(),
         )
     )
 
@@ -197,7 +209,7 @@ def resolve_turn(
                 after=farm_capacity,
                 delta=d_farm,
                 reason_code=cmd_reason,
-                parent_ids=[],
+                parent_ids=(),
             )
         )
         nodes.append(
@@ -209,7 +221,7 @@ def resolve_turn(
                 after=cash,
                 delta=d_cash,
                 reason_code=cmd_reason,
-                parent_ids=["command"],
+                parent_ids=("command",),
             )
         )
         nodes.append(
@@ -221,7 +233,7 @@ def resolve_turn(
                 after=farm_capacity,
                 delta=d_farm,
                 reason_code=cmd_reason,
-                parent_ids=["command"],
+                parent_ids=("command",),
             )
         )
         effects.append(
@@ -259,7 +271,7 @@ def resolve_turn(
                 after=storage_capacity,
                 delta=d_storage,
                 reason_code=cmd_reason,
-                parent_ids=[],
+                parent_ids=(),
             )
         )
         nodes.append(
@@ -271,7 +283,7 @@ def resolve_turn(
                 after=cash,
                 delta=d_cash,
                 reason_code=cmd_reason,
-                parent_ids=["command"],
+                parent_ids=("command",),
             )
         )
         nodes.append(
@@ -283,7 +295,7 @@ def resolve_turn(
                 after=storage_capacity,
                 delta=d_storage,
                 reason_code=cmd_reason,
-                parent_ids=["command"],
+                parent_ids=("command",),
             )
         )
         effects.append(
@@ -303,34 +315,27 @@ def resolve_turn(
 
     elif command.type == "buy_grain":
         requested = command.quantity if command.quantity is not None else 10
-        # Clamp requested to non-negative int (Pydantic already ensures ge=0)
         requested = int(requested)
         available_space = storage_capacity - inventory
         if available_space < 0:
             available_space = 0
         affordable = _affordable_quantity(cash, before_price, requested)
-        # actual is min of requested, affordable, space
         actual = requested
         if actual > affordable:
             actual = affordable
         if actual > available_space:
             actual = available_space
         cost = _cost_for_quantity(actual, before_price)
-        # Determine reason
         if actual < requested and actual == affordable and actual < available_space:
             cmd_reason = "insufficient_cash"
         elif actual < requested and actual == available_space:
-            # space was limiting (could also be both, prefer storage message if space < affordable)
             if available_space < affordable:
                 cmd_reason = "insufficient_storage"
             else:
-                # both limited but cash also limiting; prioritize - noqa: E501
                 cmd_reason = (
                     "insufficient_cash" if affordable < requested else "insufficient_storage"
                 )
-            # More precise: if requested > available_space => storage
             if requested > available_space:
-                # if also insufficient cash, we need to pick the tighter bound
                 if affordable < available_space:
                     cmd_reason = "insufficient_cash"
                 else:
@@ -338,7 +343,6 @@ def resolve_turn(
         elif actual == requested and requested > 0:
             cmd_reason = "buy_grain"
         elif actual == 0 and requested > 0:
-            # Could be either cash or storage zero; decide
             if affordable == 0 and available_space > 0:
                 cmd_reason = "insufficient_cash"
             elif available_space == 0:
@@ -360,7 +364,7 @@ def resolve_turn(
                 after=inventory_after,
                 delta=actual,
                 reason_code=cmd_reason,
-                parent_ids=[],
+                parent_ids=(),
             )
         )
         nodes.append(
@@ -372,7 +376,7 @@ def resolve_turn(
                 after=cash_after,
                 delta=-cost,
                 reason_code=cmd_reason,
-                parent_ids=["command"],
+                parent_ids=("command",),
             )
         )
         nodes.append(
@@ -384,7 +388,7 @@ def resolve_turn(
                 after=inventory_after,
                 delta=actual,
                 reason_code=cmd_reason,
-                parent_ids=["command"],
+                parent_ids=("command",),
             )
         )
         effects.append(
@@ -420,7 +424,7 @@ def resolve_turn(
                 after=cash,
                 delta=0,
                 reason_code=cmd_reason,
-                parent_ids=[],
+                parent_ids=(),
             )
         )
         nodes.append(
@@ -432,7 +436,7 @@ def resolve_turn(
                 after=cash,
                 delta=0,
                 reason_code=cmd_reason,
-                parent_ids=["command"],
+                parent_ids=("command",),
             )
         )
         effects.append(
@@ -441,9 +445,8 @@ def resolve_turn(
             )
         )
 
-    # Emit stable farm_capacity state node every turn so farm_output
-    # depends on world + farm_capacity, not directly on command.
-    # This fixes false command → production edges for hold/buy/build.
+    # Emit stable farm_capacity state node every turn so
+    # farm_output depends on world + farm_capacity
     if not any(n.id == "farm_capacity" for n in nodes):
         nodes.append(
             CausalNode(
@@ -454,7 +457,22 @@ def resolve_turn(
                 after=farm_capacity,
                 delta=0,
                 reason_code="farm_capacity_unchanged",
-                parent_ids=[],
+                parent_ids=(),
+            )
+        )
+    # Emit stable storage_capacity state node every turn so
+    # inventory depends on farm_output + storage_capacity
+    if not any(n.id == "storage_capacity" for n in nodes):
+        nodes.append(
+            CausalNode(
+                id="storage_capacity",
+                label="Storage capacity",
+                kind="capacity",
+                before=before_storage,
+                after=storage_capacity,
+                delta=0,
+                reason_code="storage_capacity_unchanged",
+                parent_ids=(),
             )
         )
 
@@ -476,7 +494,7 @@ def resolve_turn(
             after=farm_output,
             delta=farm_output - base_output if world == "drought" else farm_output,
             reason_code=prod_reason,
-            parent_ids=["world", "farm_capacity"],
+            parent_ids=("world", "farm_capacity"),
         )
     )
     effects.append(
@@ -504,7 +522,7 @@ def resolve_turn(
             reason_code="harvest_added_to_supply"
             if world == "normal"
             else "lower_output_reduced_supply",
-            parent_ids=["farm_output"],
+            parent_ids=("farm_output",),
         )
     )
     effects.append(
@@ -540,7 +558,7 @@ def resolve_turn(
             reason_code="supply_below_demand"
             if before_demand > next_supply
             else "supply_above_demand",
-            parent_ids=["supply"],
+            parent_ids=("supply",),
         )
     )
     nodes.append(
@@ -552,7 +570,7 @@ def resolve_turn(
             after=target,
             delta=target - before_price,
             reason_code="target_from_pressure",
-            parent_ids=["price_pressure"],
+            parent_ids=("price_pressure",),
         )
     )
     nodes.append(
@@ -564,7 +582,7 @@ def resolve_turn(
             after=new_price,
             delta=price_delta,
             reason_code="bounded_movement_toward_target",
-            parent_ids=["target_price"],
+            parent_ids=("target_price",),
         )
     )
     effects.append(
@@ -581,31 +599,38 @@ def resolve_turn(
     inventory_before_settlement = inventory
     inventory_after_harvest = inventory_before_settlement + farm_output
     if inventory_after_harvest > storage_capacity:
-        # Cap to storage; excess is lost (or would spoil, but no spoilage in S3)
         excess = inventory_after_harvest - storage_capacity
         inventory_final = storage_capacity
         settle_reason = "capped_by_storage"
         settle_delta = inventory_final - inventory_before_settlement
-        # Record capped nature
+        if command.type == "buy_grain":
+            inv_parents: tuple[str, ...] = (
+                "farm_output",
+                "storage_capacity",
+                "inventory_after_buy",
+            )
+        else:
+            inv_parents = ("farm_output", "storage_capacity")
         nodes.append(
             CausalNode(
                 id="inventory",
-                label=f"Inventory capped {inventory_before_settlement}+{farm_output} → {inventory_final} (excess {excess})",  # noqa: E501
+                label=f"Inventory capped {inventory_before_settlement}+{farm_output} → {inventory_final} (excess {excess})",
                 kind="inventory",
                 before=inventory_before_settlement,
                 after=inventory_final,
                 delta=settle_delta,
                 reason_code=settle_reason,
-                parent_ids=[
-                    "farm_output",
-                    "inventory_after_buy" if command.type == "buy_grain" else "command",
-                ],
+                parent_ids=inv_parents,
             )
         )
     else:
         inventory_final = inventory_after_harvest
         settle_delta = farm_output
         settle_reason = "harvest_to_inventory"
+        if command.type == "buy_grain":
+            inv_parents = ("farm_output", "storage_capacity", "inventory_after_buy")
+        else:
+            inv_parents = ("farm_output", "storage_capacity")
         nodes.append(
             CausalNode(
                 id="inventory",
@@ -615,18 +640,12 @@ def resolve_turn(
                 after=inventory_final,
                 delta=settle_delta,
                 reason_code=settle_reason,
-                parent_ids=["farm_output"],
+                parent_ids=inv_parents,
             )
         )
-    # Only add domain effect for settlement; always add delta.  # noqa: E501
-    # But we already added inventory effect for buy; now add harvest.
-    # To ensure AC #6 every major change has trace, node above covers it.
-    # Add domain effect for inventory final vs before (overall)
+    # Domain effects for settlement
     overall_inventory_delta = inventory_final - before_inventory
-    # If we already added inventory for buy, this would be duplicate; combine.  # noqa: E501
-    # Simpler: add second effect for harvest; tests check at least one exists.
     if command.type == "buy_grain":
-        # already has one inventory effect; add harvest delta as separate
         effects.append(
             DomainEffect(
                 metric="inventory_harvest",
@@ -646,6 +665,182 @@ def resolve_turn(
                 reason_code=settle_reason,
             )
         )
+
+    # 6. Valuation — exact decomposition of wealth
+    # wealth_before = cash_before + value(inv_before, price_before)
+    # purchase_quantity_value = value(inv_after_buy, price_before) - value(inv_before, price_before)
+    # harvest_quantity_value  = value(inv_final, price_before) - value(inv_after_buy, price_before)
+    # price_value_effect      = value(inv_final, price_after)  - value(inv_final, price_before)
+    # cash_effect             = cash - cash_before
+    # wealth_delta            = cash_effect + purchase + harvest + price
+    value_before = _value(before_inventory, before_price)
+    value_after_buy = _value(inventory_before_settlement, before_price)
+    value_after_quantity = _value(inventory_final, before_price)
+    value_after = _value(inventory_final, new_price)
+    wealth_before = before_cash + value_before
+    wealth_after = cash + value_after
+    purchase_quantity_value = value_after_buy - value_before
+    harvest_quantity_value = value_after_quantity - value_after_buy
+    quantity_value_effect = (
+        purchase_quantity_value + harvest_quantity_value
+    )  # for backward compat if needed
+    price_value_effect = value_after - value_after_quantity
+    cash_effect = cash - before_cash
+    wealth_delta = (
+        cash_effect + purchase_quantity_value + harvest_quantity_value + price_value_effect
+    )
+    # Sanity: wealth_after - wealth_before must equal wealth_delta
+    assert wealth_after - wealth_before == wealth_delta
+    assert quantity_value_effect == purchase_quantity_value + harvest_quantity_value
+
+    # Purchase quantity — value of bought grain at old price
+    if command.type == "buy_grain":
+        purchase_parents: tuple[str, ...] = ("command", "inventory_after_buy")
+        purchase_reason = "purchase_quantity_value"
+        purchase_label = f"Purchase quantity value {value_before} → {value_after_buy} (delta {purchase_quantity_value:+})"
+    else:
+        purchase_parents = ("command",)
+        purchase_reason = "no_purchase"
+        purchase_label = f"Purchase quantity value {value_before} → {value_after_buy} (delta {purchase_quantity_value:+})"
+    nodes.append(
+        CausalNode(
+            id="purchase_quantity_value",
+            label=purchase_label,
+            kind="purchase_quantity_value",
+            before=value_before,
+            after=value_after_buy,
+            delta=purchase_quantity_value,
+            reason_code=purchase_reason,
+            parent_ids=purchase_parents,
+        )
+    )
+    # Harvest quantity — value of harvested grain at old price (storage-constrained)
+    if settle_reason == "capped_by_storage":
+        harvest_reason = "harvest_quantity_capped_by_storage"
+        harvest_label = f"Harvest quantity value {value_after_buy} → {value_after_quantity} (delta {harvest_quantity_value:+}, capped)"
+    else:
+        if world == "drought":
+            harvest_reason = "drought_harvest_quantity_value"
+            harvest_label = f"Harvest quantity value {value_after_buy} → {value_after_quantity} (delta {harvest_quantity_value:+})"
+        else:
+            harvest_reason = "harvest_quantity_value"
+            harvest_label = f"Harvest quantity value {value_after_buy} → {value_after_quantity} (delta {harvest_quantity_value:+})"
+    nodes.append(
+        CausalNode(
+            id="harvest_quantity_value",
+            label=harvest_label,
+            kind="harvest_quantity_value",
+            before=value_after_buy,
+            after=value_after_quantity,
+            delta=harvest_quantity_value,
+            reason_code=harvest_reason,
+            parent_ids=("farm_output", "storage_capacity", "inventory"),
+        )
+    )
+    # Combined quantity value — sum of purchase and harvest, for wealth decomposition and backward compat
+    nodes.append(
+        CausalNode(
+            id="quantity_value_effect",
+            label=f"Quantity value {value_before} → {value_after_quantity} (delta {quantity_value_effect:+})",
+            kind="quantity_value_effect",
+            before=value_before,
+            after=value_after_quantity,
+            delta=quantity_value_effect,
+            reason_code="quantity_value_effect",
+            parent_ids=("purchase_quantity_value", "harvest_quantity_value"),
+        )
+    )
+    nodes.append(
+        CausalNode(
+            id="price_value_effect",
+            label=f"Price revaluation {value_after_quantity} → {value_after} "
+            f"(delta {price_value_effect:+})",
+            kind="price_value_effect",
+            before=value_after_quantity,
+            after=value_after,
+            delta=price_value_effect,
+            reason_code="price_revalued_stored_grain",
+            parent_ids=("inventory", "price"),
+        )
+    )
+    nodes.append(
+        CausalNode(
+            id="cash_effect",
+            label=f"Cash effect {before_cash} → {cash} (delta {cash_effect:+})",
+            kind="cash",
+            before=before_cash,
+            after=cash,
+            delta=cash_effect,
+            reason_code=cmd_reason,
+            parent_ids=("cash_after_command",),
+        )
+    )
+    nodes.append(
+        CausalNode(
+            id="wealth",
+            label=f"Wealth {wealth_before} → {wealth_after} (delta {wealth_delta:+})",
+            kind="wealth",
+            before=wealth_before,
+            after=wealth_after,
+            delta=wealth_delta,
+            reason_code="wealth_from_cash_and_valuation",
+            parent_ids=("cash_effect", "quantity_value_effect", "price_value_effect"),
+        )
+    )
+    effects.append(
+        DomainEffect(
+            metric="purchase_quantity_value",
+            before=value_before,
+            after=value_after_buy,
+            delta=purchase_quantity_value,
+            reason_code="purchase_quantity_value",
+        )
+    )
+    effects.append(
+        DomainEffect(
+            metric="harvest_quantity_value",
+            before=value_after_buy,
+            after=value_after_quantity,
+            delta=harvest_quantity_value,
+            reason_code="harvest_quantity_value",
+        )
+    )
+    effects.append(
+        DomainEffect(
+            metric="quantity_value_effect",
+            before=value_before,
+            after=value_after_quantity,
+            delta=quantity_value_effect,
+            reason_code="quantity_value_effect",
+        )
+    )
+    effects.append(
+        DomainEffect(
+            metric="price_value_effect",
+            before=value_after_quantity,
+            after=value_after,
+            delta=price_value_effect,
+            reason_code="price_value_effect",
+        )
+    )
+    effects.append(
+        DomainEffect(
+            metric="cash_effect",
+            before=before_cash,
+            after=cash,
+            delta=cash_effect,
+            reason_code=cmd_reason,
+        )
+    )
+    effects.append(
+        DomainEffect(
+            metric="wealth",
+            before=wealth_before,
+            after=wealth_after,
+            delta=wealth_delta,
+            reason_code="wealth_change",
+        )
+    )
 
     # Next player state
     next_player = PlayerState(
@@ -670,34 +865,170 @@ def resolve_turn(
         market=next_market,
     )
 
-    # Player outcome — deterministic top drivers from trace by absolute delta
-    # Wealth delta includes cash + inventory value at new price vs old price
-    inventory_value_before = before_inventory * before_price // 1000
-    inventory_value_after = inventory_final * new_price // 1000
-    wealth_before = before_cash + inventory_value_before
-    wealth_after = cash + inventory_value_after
-    wealth_delta = wealth_after - wealth_before
+    # Build story drivers — exact partitions of wealth_delta, filtered, ranked by wealth-bps
+    wealth_before_for_bps = wealth_before if wealth_before > 0 else 1
 
-    # Rank drivers by abs(delta) where delta not None
-    candidates = [n for n in nodes if n.delta is not None and n.id not in ("world",)]
-    # Sort by abs(delta) desc, then id for determinism
-    candidates_sorted = sorted(
-        candidates, key=lambda n: (abs(n.delta if n.delta is not None else 0), n.id), reverse=True
-    )
-    top_drivers = [c.label for c in candidates_sorted[:3]]
+    def _bps(impact: int) -> int:
+        return abs(impact) * 10_000 // wealth_before_for_bps
+
+    candidates: list[OutcomeDriver] = []
+
+    # Candidate 1: command cost (cash_effect) — only if non-zero
+    if cash_effect != 0:
+        if command.type == "expand_farm":
+            label = f"Expanding farm cost {abs(cash_effect)}"
+            reason = "expand_farm_cost"
+        elif command.type == "build_granary":
+            label = f"Building granary cost {abs(cash_effect)}"
+            reason = "build_granary_cost"
+        elif command.type == "buy_grain":
+            if cmd_reason == "insufficient_cash":
+                label = f"Buy grain limited by cash (spent {abs(cash_effect)})"
+                reason = "buy_limited_cash"
+            elif cmd_reason == "insufficient_storage":
+                label = f"Buy grain limited by storage (spent {abs(cash_effect)})"
+                reason = "buy_limited_storage"
+            else:
+                label = f"Bought grain for {abs(cash_effect)}"
+                reason = "buy_grain_cost"
+        else:
+            label = f"Cash change {cash_effect:+}"
+            reason = cmd_reason
+        candidates.append(
+            OutcomeDriver(
+                id="command_cost",
+                label=label,
+                kind="cash",
+                impact_money=cash_effect,
+                impact_bps=_bps(cash_effect),
+                reason_code=reason,
+                causal_node_ids=("command", "cash_after_command", "cash_effect"),
+            )
+        )
+
+    # Candidate 2: purchase quantity value — only if purchase actually added value
+    if purchase_quantity_value != 0:
+        # This is the value of bought grain at old price; harvest is separate
+        if command.type == "buy_grain":
+            # Use actual purchase amount for label if available
+            # inventory_after_buy - before_inventory is purchase qty
+            purchase_qty = inventory_before_settlement - before_inventory
+            if cmd_reason in ("insufficient_cash", "insufficient_storage"):
+                label = f"Bought {purchase_qty} grain (value {purchase_quantity_value:+}, limited by {cmd_reason})"
+                reason = "purchase_quantity_limited"
+            else:
+                label = f"Bought {purchase_qty} grain (value {purchase_quantity_value:+})"
+                reason = "purchase_quantity_value"
+            causal_ids = ("command", "inventory_after_buy", "purchase_quantity_value")
+        else:
+            label = f"Purchase quantity value {purchase_quantity_value:+}"
+            reason = "purchase_quantity_value"
+            causal_ids = ("command", "purchase_quantity_value")
+        candidates.append(
+            OutcomeDriver(
+                id="purchase_quantity",
+                label=label,
+                kind="valuation",
+                impact_money=purchase_quantity_value,
+                impact_bps=_bps(purchase_quantity_value),
+                reason_code=reason,
+                causal_node_ids=causal_ids,
+            )
+        )
+
+    # Candidate 3: harvest quantity value — only if harvest added (or was capped) value
+    if harvest_quantity_value != 0:
+        if settle_reason == "capped_by_storage":
+            label = f"Storage cap limited harvest (quantity value {harvest_quantity_value:+})"
+            reason = "harvest_quantity_capped"
+            causal_ids = ("farm_output", "storage_capacity", "inventory", "harvest_quantity_value")
+        else:
+            if world == "drought":
+                label = f"Drought reduced harvest, quantity value {harvest_quantity_value:+}"
+                reason = "drought_harvest_quantity_value"
+                causal_ids = ("world", "farm_output", "harvest_quantity_value")
+            else:
+                label = f"Harvest added grain, quantity value {harvest_quantity_value:+}"
+                reason = "harvest_quantity_value"
+                causal_ids = ("farm_output", "harvest_quantity_value")
+        candidates.append(
+            OutcomeDriver(
+                id="harvest_quantity",
+                label=label,
+                kind="valuation",
+                impact_money=harvest_quantity_value,
+                impact_bps=_bps(harvest_quantity_value),
+                reason_code=reason,
+                causal_node_ids=causal_ids,
+            )
+        )
+
+    # Candidate 3: price revaluation (supply -> price -> valuation)
+    if price_value_effect != 0:
+        direction = "higher" if price_value_effect > 0 else "lower"
+        label = (
+            f"{direction.capitalize()} grain price revalued stored grain ({price_value_effect:+})"
+        )
+        reason = "price_revaluation"
+        causal_ids = (
+            "farm_output",
+            "supply",
+            "price_pressure",
+            "target_price",
+            "price",
+            "price_value_effect",
+        )
+        # For holds where price moves without farm_output
+        # change, still include farm_output for chain
+        candidates.append(
+            OutcomeDriver(
+                id="price_revaluation",
+                label=label,
+                kind="price",
+                impact_money=price_value_effect,
+                impact_bps=_bps(price_value_effect),
+                reason_code=reason,
+                causal_node_ids=causal_ids,
+            )
+        )
+
+    # Candidate 4: storage constraint — handled via quantity driver label
+    # Already covered; no separate driver to avoid double-count
+    if settle_reason == "capped_by_storage":
+        excess = inventory_before_settlement + farm_output - storage_capacity
+        if excess > 0:
+            # Only add if not already represented and meaningful
+            # Check if quantity driver already covers capped case —
+            # if it does, skip to avoid double-count
+            # Instead, add only if quantity_value_effect ==0 (fully capped)
+            if quantity_value_effect == 0:
+                # This driver would double-count if we add both,
+                # so skip — quantity driver already explains
+                pass
+            # If quantity driver non-zero but capped, we already
+            # have storage info in its label
+
+    # Candidate 5: farm output story as distinct from quantity value (for richer narrative)
+    # Only add if farm_output driver would be distinct and non-zero wealth impact already covered
+    # To avoid double-counting, we do not add a separate farm_output driver beyond quantity_value
+    # The quantity_value driver already represents farm_output's wealth impact exactly.
+
+    # Rank by impact_bps DESC, id ASC for determinism, keep top 3
+    candidates_sorted = sorted(candidates, key=lambda d: (-d.impact_bps, d.id))
+    drivers = tuple(candidates_sorted[:3])
 
     player_outcome = PlayerOutcome(
         wealth_delta=wealth_delta,
         inventory_delta=overall_inventory_delta,
         price_delta=price_delta,
-        top_drivers=top_drivers,
+        drivers=drivers,
     )
 
-    trace = CausalTrace(nodes=nodes)
+    trace = CausalTrace(nodes=tuple(nodes))
 
     return TurnResolution(
         next_state=next_state,
-        domain_effects=effects,
+        domain_effects=tuple(effects),
         causal_trace=trace,
         player_outcome=player_outcome,
     )

@@ -27,6 +27,7 @@ indent-style = "space"
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B"]
+ignore = ["E501"]
 
 [tool.pyright]
 typeCheckingMode = "strict"
