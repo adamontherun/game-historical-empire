@@ -15,7 +15,7 @@
     "semantic_hash": "395df197885f945e00c252832776aa57"
   },
   "backend/app/domain/trace.py": {
-    "mtime": 1786325215.5309033,
+    "mtime": 1786325925.3066938,
     "ast_hash": "d222247e777ea5991e7d6ed711dcd2d0",
     "semantic_hash": ""
   },
@@ -30,7 +30,7 @@
     "semantic_hash": "5df322d18868cfde0a116dd8f95c8c4a"
   },
   "backend/app/engine/demo.py": {
-    "mtime": 1786325251.2686598,
+    "mtime": 1786325925.3069441,
     "ast_hash": "82f9242f27d78f75c192c923406e1b27",
     "semantic_hash": ""
   },
@@ -45,7 +45,7 @@
     "semantic_hash": "79fb1a94c42d32e68ee6a881643adb44"
   },
   "backend/app/engine/turn.py": {
-    "mtime": 1786325592.4448426,
+    "mtime": 1786325925.307385,
     "ast_hash": "1149e303e0e782e1c55420a7542cadd6",
     "semantic_hash": ""
   },
@@ -80,7 +80,7 @@
     "semantic_hash": "68b4d1ca27d45e59dc5324b5191b644c"
   },
   "backend/tests/test_explanation.py": {
-    "mtime": 1786325614.4283004,
+    "mtime": 1786325925.3075972,
     "ast_hash": "681148856bbaf0d218b6a412a1b24818",
     "semantic_hash": ""
   },
@@ -210,7 +210,7 @@
     "semantic_hash": ""
   },
   "BUILD_SPEC.md": {
-    "mtime": 1786323999.513358,
+    "mtime": 1786325925.3057756,
     "ast_hash": "f6a60af3be953e7d4f3e4f488ae03622",
     "semantic_hash": ""
   },
@@ -220,13 +220,13 @@
     "semantic_hash": ""
   },
   "DECISIONS.md": {
-    "mtime": 1786325204.6774547,
+    "mtime": 1786325925.3060238,
     "ast_hash": "4bc1bcec36c037096c9dd7464ac28809",
     "semantic_hash": ""
   },
   "STATE.md": {
-    "mtime": 1786325714.4415855,
-    "ast_hash": "c2d1744018631a32cabad836a2e422b4",
+    "mtime": 1786325925.3062418,
+    "ast_hash": "f2722ec9ad0041579d51ee7c8553bd1a",
     "semantic_hash": ""
   },
   "backend/AGENTS.md": {
@@ -265,22 +265,22 @@
     "semantic_hash": ""
   },
   "backend/app/cli.py": {
-    "mtime": 1786325245.4303002,
+    "mtime": 1786325925.3064475,
     "ast_hash": "875686a30a5bf4ff6695e75c6dbc8179",
     "semantic_hash": ""
   },
   "backend/app/engine/prototype.py": {
-    "mtime": 1786325630.829005,
+    "mtime": 1786325925.3071098,
     "ast_hash": "3d2eb829a8e8b84dcaddabcc71caf1a9",
     "semantic_hash": ""
   },
   "backend/tests/test_five_turn_prototype.py": {
-    "mtime": 1786325696.1466706,
+    "mtime": 1786325925.3077276,
     "ast_hash": "2b6e099b688884c2adf84621818a42c8",
     "semantic_hash": ""
   },
   "docs/plans/2026-08-09-section-6-five-turn-prototype.md": {
-    "mtime": 1786323682.8185833,
+    "mtime": 1786325925.3079612,
     "ast_hash": "e83964a3b3e757939dfd300edf435fc1",
     "semantic_hash": ""
   }
