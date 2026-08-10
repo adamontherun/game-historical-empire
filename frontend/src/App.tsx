@@ -21,6 +21,7 @@ export default function App() {
   const [committing, setCommitting] = useState(false);
   const committingRef = useRef(false);
   const [toast, setToast] = useState<string | null>(null);
+  const [committedIds, setCommittedIds] = useState<string[]>([]);
 
   // B3: phase-selected displayPressure — reveal uses latest_outcome.pressure_stage, else top-level
   const displayPressure =
@@ -39,6 +40,7 @@ export default function App() {
       setGame(g);
       setPhase("decision");
       setSelectedId(null);
+      setCommittedIds([]);
     } catch (e) {
       setToast(e instanceof Error ? e.message : String(e));
     }
@@ -50,10 +52,12 @@ export default function App() {
     if (committingRef.current) return;
     committingRef.current = true;
     setCommitting(true);
+    const committedChoiceId = selectedId;
     try {
       // B4: always game.revision, never game.turn
-      const next = await commitChoice(game.game_id, selectedId, game.revision);
+      const next = await commitChoice(game.game_id, committedChoiceId, game.revision);
       setGame(next);
+      setCommittedIds((prev) => [...prev, committedChoiceId]);
       // B2: fifth commit has both latest_outcome and completion_summary — show reveal first
       if (next.latest_outcome) {
         setPhase("reveal");
@@ -107,6 +111,7 @@ export default function App() {
     setGame(null);
     setPhase("start");
     setSelectedId(null);
+    setCommittedIds([]);
   };
 
   if (phase === "start") {
@@ -133,7 +138,7 @@ export default function App() {
   if (phase === "completion") {
     return (
       <div data-pressure={displayPressure} className="shell">
-        <CompletionSummary game={game} onPlayAgain={handlePlayAgain} />
+        <CompletionSummary game={game} choiceIds={committedIds} onPlayAgain={handlePlayAgain} />
         {toast ? (
           <div data-testid="toast" style={{ padding: 12, color: "var(--drought)" }}>
             {toast}

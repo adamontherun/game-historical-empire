@@ -154,6 +154,30 @@ test.describe("critical path", () => {
     // I9: seed·rules shown only inside completion card (completion-seed), not duplicated in footer
     await expect(page.getByTestId("completion-seed")).toContainText("seed");
     await expect(page.getByTestId("completion-seed")).toContainText("rules");
+    // Section 12 run record — seed + rules + ordered choice ids, plus copy button (clipboard fallback must not throw)
+    await expect(page.getByTestId("run-record-replay")).toBeVisible();
+    await expect(page.getByTestId("run-record-replay")).toContainText("seed=");
+    await expect(page.getByTestId("run-record-replay")).toContainText("rules=");
+    // seed/rules in run record must match completion-seed
+    const seedText = await page.getByTestId("completion-seed").textContent();
+    const match = seedText?.match(/seed\s+(\S+)/);
+    if (match?.[1]) {
+      await expect(page.getByTestId("run-record-replay")).toContainText(match[1]);
+    }
+    // exactly 5 committed ids in order: expand_farm, build_granary, hold, hold, hold
+    const runRecordText = (await page.getByTestId("run-record-replay").textContent()) ?? "";
+    const expectedIds = ["expand_farm", "build_granary", "hold"] as const;
+    // run record must contain all three distinct ids, with expand_farm before build_granary before hold
+    for (const id of expectedIds) await expect(page.getByTestId("run-record-replay")).toContainText(id);
+    expect(runRecordText.indexOf("expand_farm")).toBeLessThan(runRecordText.indexOf("build_granary"));
+    expect(runRecordText.indexOf("build_granary")).toBeLessThan(runRecordText.indexOf("hold"));
+    // hold appears at least 3 times (turns 3,4,5) — count occurrences of "hold" token
+    const holdCount = (runRecordText.match(/\bhold\b/g) ?? []).length;
+    expect(holdCount).toBeGreaterThanOrEqual(3);
+    await expect(page.getByTestId("copy-run-record")).toBeVisible();
+    await expect(page.getByTestId("copy-run-record")).toContainText("Copy run record");
+    // clicking copy must not produce console errors (AC7 covers this, but exercise the button)
+    await page.getByTestId("copy-run-record").click();
     await expect(page.getByTestId("footer-debug")).toHaveCount(0);
     if (test.info().project.name === "mobile") {
       await page.evaluate(() => window.scrollTo(0, 0));

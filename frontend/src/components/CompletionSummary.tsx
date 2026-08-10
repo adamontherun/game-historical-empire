@@ -1,10 +1,43 @@
 import type { GameView } from "../api/types";
 import { money, signedMoney } from "../lib/format";
+import { formatRunRecord } from "../lib/runRecord";
 
 // R10 hierarchy
-export function CompletionSummary({ game, onPlayAgain }: { game: GameView; onPlayAgain: () => void }) {
+export function CompletionSummary({
+  game,
+  choiceIds,
+  onPlayAgain,
+}: {
+  game: GameView;
+  choiceIds: string[];
+  onPlayAgain: () => void;
+}) {
   const c = game.completion_summary!;
   const positive = c.wealth_delta_total >= 0;
+  const runRecord = formatRunRecord(game.run_seed, game.ruleset_version, choiceIds);
+
+  const handleCopy = async () => {
+    try {
+      const nav = navigator as unknown as { clipboard?: { writeText?: (t: string) => Promise<void> } };
+      if (nav.clipboard?.writeText) {
+        await nav.clipboard.writeText(runRecord);
+        return;
+      }
+      // fallback: textarea + execCommand
+      const ta = document.createElement("textarea");
+      ta.value = runRecord;
+      ta.setAttribute("readonly", "");
+      ta.style.position = "absolute";
+      ta.style.left = "-9999px";
+      document.body.appendChild(ta);
+      ta.select();
+      const doc = document as unknown as { execCommand?: (cmd: string) => boolean };
+      if (doc.execCommand) doc.execCommand("copy");
+      document.body.removeChild(ta);
+    } catch {
+      // swallow — do not throw, do not log (AC7)
+    }
+  };
   return (
     <div className="completion-summary" data-testid="completion-summary">
       <div className="completion-hero">Your five-turn ledger</div>
@@ -47,6 +80,38 @@ export function CompletionSummary({ game, onPlayAgain }: { game: GameView; onPla
         }}
       >
         Play again
+      </button>
+
+      <div
+        data-testid="run-record-replay"
+        style={{
+          marginTop: 12,
+          padding: "10px 12px",
+          background: "var(--card, #fff)",
+          borderRadius: 8,
+          border: "1px solid var(--border, #e5e5e5)",
+          fontSize: 12,
+          wordBreak: "break-all",
+          fontFamily: "monospace",
+        }}
+      >
+        {runRecord}
+      </div>
+      <button
+        onClick={handleCopy}
+        data-testid="copy-run-record"
+        style={{
+          marginTop: 8,
+          padding: "8px 12px",
+          borderRadius: 8,
+          border: "1px solid var(--border, #e5e5e5)",
+          background: "white",
+          fontSize: 13,
+          fontWeight: 600,
+          cursor: "pointer",
+        }}
+      >
+        Copy run record
       </button>
 
       <div className="footer-debug" data-testid="completion-seed" style={{ marginTop: 12, borderTop: 0 }}>
