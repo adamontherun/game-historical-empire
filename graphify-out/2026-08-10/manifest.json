@@ -220,8 +220,8 @@
     "semantic_hash": ""
   },
   "DECISIONS.md": {
-    "mtime": 1786380558.6068048,
-    "ast_hash": "1c1b1e757e429c534e22e31a1f100d4f",
+    "mtime": 1786380194.6507971,
+    "ast_hash": "9bb24349e4873aad686fdc6d10818558",
     "semantic_hash": ""
   },
   "STATE.md": {
@@ -270,7 +270,7 @@
     "semantic_hash": ""
   },
   "backend/app/engine/prototype.py": {
-    "mtime": 1786380324.792317,
+    "mtime": 1786380012.278574,
     "ast_hash": "1c6bf359a334226f61890f8f5db12d8d",
     "semantic_hash": ""
   },

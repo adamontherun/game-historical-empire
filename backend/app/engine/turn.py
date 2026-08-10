@@ -1,8 +1,8 @@
-"""One-turn grain market kernel — Sections 4–6.
+"""One-turn grain market kernel — Sections 4–6, regional_output Section 9.
 
 Resolves a single turn with explicit order:
 
-    Command -> Production -> HomeSupply -> RiverSupply -> HomePrice -> RiverPrice -> Settlement -> RouteSettlement -> Valuation
+    Command -> Production -> RegionalOutput -> HomeSupply -> RiverSupply -> HomePrice -> RiverPrice -> Settlement -> RouteSettlement -> Valuation
 
 All canonical state is integer; rounding via helpers; deterministic RNG
 substream is consumed but core price remains deterministic to preserve
@@ -22,18 +22,14 @@ Section 5 adds: Home Valley (existing market) + River Town (river_market)
 + River Route (route) with transport cost / capacity / reliability.
 Ship trade is settlement after harvest, valued at river price.
 
-Supply semantics (Section 6): MarketState.supply is a regional
-market-availability signal/index at the start of the turn, not a literal
-conserved physical stock. Home Valley signal evolves as
-signal_next = max(0, signal + farm_output - demand), i.e. each turn's
-availability index is adjusted by harvest and drained by regional
-consumption (demand). Price is set on signal_next via _target_price
-with effective_supply guard, so surplus (farm_output > demand) raises the
-signal and depresses price, shortage (drought) lowers the signal and
-raises price. The same farm_output also enters player inventory; for this
-prototype no conservation is implied between the regional signal and
-player inventory (ownership/flow accounting is deferred to Section 14).
-River Town signal remains stable (exogenous) for Section 6.
+Supply semantics (Section 6, revised Section 9): MarketState.supply is a regional
+market-availability signal/index at the start of the turn. Home Valley signal evolves as
+signal_next = max(0, signal + regional_output_after_world + farm_output - demand),
+where regional_output_after_world reuses the same drought reduction (DROUGHT_YIELD_REDUCTION_BPS)
+as the player's farm via actor. Price is set on signal_next via _target_price
+with effective_supply guard. The same farm_output also enters player inventory;
+for this prototype no conservation is implied between the regional signal and
+player inventory (ownership deferred to Section 14). River Town signal remains stable (exogenous).
 
 Spec: drought reduces production/yield, not directly price.
 """
@@ -65,9 +61,12 @@ from app.engine.actor import (
     resolve_buy,
     resolve_expand_farm,
     resolve_secure_route,
+    resolve_sell,
     resolve_shipment,
     resolve_storage_settlement,
 )
+
+# Regional output reuses the same drought reduction as compute_farm_output
 from app.engine.actor import (
     affordable_quantity as _affordable_quantity,  # noqa: F401
 )
@@ -80,8 +79,17 @@ from app.engine.actor import (
 from app.engine.rng import rng_for
 from app.engine.rounding import clamp_non_negative, div_round_half_up
 
+
+def _regional_output_after_world(base: int, world: str) -> tuple[int, str]:
+    """Non-player regional output after world effect — reuses same drought primitive."""
+    if world == "drought":
+        after = base * (10_000 - DROUGHT_YIELD_REDUCTION_BPS) // 10_000
+        return after, "drought_reduced_yield"
+    return base, "normal_yield"
+
+
 # Public for tests to assert order.
-TURN_ORDER: str = "pressure_stage -> world -> command -> production -> home_supply -> river_supply -> home_price -> river_price -> settlement -> route_settlement -> valuation"
+TURN_ORDER: str = "pressure_stage -> world -> command -> production -> regional_output -> home_supply -> river_supply -> home_price -> river_price -> settlement -> route_settlement -> valuation"
 
 
 def _target_price(
@@ -127,7 +135,7 @@ def resolve_turn(
 ) -> TurnResolution:
     """Resolve one deterministic turn.
 
-    Order is explicit: pressure_stage -> world -> command -> production -> home_supply -> river_supply -> home_price -> river_price -> settlement -> route_settlement -> valuation.
+    Order is explicit: pressure_stage -> world -> command -> production -> regional_output -> home_supply -> river_supply -> home_price -> river_price -> settlement -> route_settlement -> valuation.
 
     Args:
         state: Canonical before state (includes home market, river market, route).
@@ -433,6 +441,87 @@ def resolve_turn(
         cash = cash_after
         inventory = inventory_after
 
+    elif command.type == "sell_grain":
+        requested = command.quantity if command.quantity is not None else 10
+        requested = int(requested)
+        cash_after, inventory_after, actual, revenue, cmd_reason = resolve_sell(
+            cash=cash,
+            price_milli=before_price,
+            inventory=inventory,
+            requested=requested,
+        )
+
+        nodes.append(
+            CausalNode(
+                id="command",
+                label=f"Sell grain requested={requested} actual={actual}",
+                kind="command",
+                before=inventory,
+                after=inventory_after,
+                delta=-actual,
+                reason_code=cmd_reason,
+                parent_ids=(),
+            )
+        )
+        nodes.append(
+            CausalNode(
+                id="cash_after_command",
+                label="Cash after sell",
+                kind="cash",
+                before=before_cash,
+                after=cash_after,
+                delta=revenue,
+                reason_code=cmd_reason,
+                parent_ids=("command",),
+            )
+        )
+        nodes.append(
+            CausalNode(
+                id="inventory_after_sell",
+                label="Inventory after sell",
+                kind="inventory",
+                before=before_inventory,
+                after=inventory_after,
+                delta=-actual,
+                reason_code=cmd_reason,
+                parent_ids=("command",),
+            )
+        )
+        # Also emit inventory_after_buy alias for downstream valuation that expects it
+        nodes.append(
+            CausalNode(
+                id="inventory_after_buy",
+                label="Inventory after sell (alias)",
+                kind="inventory",
+                before=before_inventory,
+                after=inventory_after,
+                delta=-actual,
+                reason_code=cmd_reason,
+                parent_ids=("command",),
+            )
+        )
+        effects.append(
+            DomainEffect(
+                metric="cash",
+                before=before_cash,
+                after=cash_after,
+                delta=revenue,
+                reason_code=cmd_reason,
+            )
+        )
+        effects.append(
+            DomainEffect(
+                metric="inventory",
+                before=before_inventory,
+                after=inventory_after,
+                delta=-actual,
+                reason_code=cmd_reason,
+            )
+        )
+
+        cash = cash_after
+        inventory = inventory_after
+
     elif command.type == "secure_route":
         cash_before_cmd = cash
         cash, route_established, d_route, cmd_reason = resolve_secure_route(
@@ -722,10 +811,37 @@ def resolve_turn(
         )
     )
 
-    # 3. Home Supply — availability signal drained by demand (Section 6 semantics)
-    # MarketState.supply is an availability signal/index at start; next signal = max(0, signal + farm_output - demand)
+    # 2b. Regional output — non-player, same drought reduction
+    regional_base = state.market.regional_output
+    regional_after, regional_reason = _regional_output_after_world(regional_base, world)
+    nodes.append(
+        CausalNode(
+            id="regional_output",
+            label=f"Regional output {regional_after} (base {regional_base})",
+            kind="production",
+            before=regional_base if world == "drought" else None,
+            after=regional_after,
+            delta=regional_after - regional_base if world == "drought" else regional_after,
+            reason_code=regional_reason,
+            parent_ids=("world",),
+        )
+    )
+    effects.append(
+        DomainEffect(
+            metric="regional_output",
+            before=regional_base if world == "drought" else 0,
+            after=regional_after,
+            delta=regional_after - regional_base if world == "drought" else regional_after,
+            reason_code=regional_reason,
+        )
+    )
+
+    # 3. Home Supply — availability signal drained by demand (Section 9: includes regional)
+    # signal_next = max(0, signal + regional_after + farm_output - demand)
     supply_before_harvest = before_supply
-    next_supply = clamp_non_negative(supply_before_harvest + farm_output - before_demand)
+    next_supply = clamp_non_negative(
+        supply_before_harvest + regional_after + farm_output - before_demand
+    )
     supply_delta = next_supply - before_supply
     # Reason reflects whether signal grew (surplus) or shrank (shortage)
     if next_supply > before_supply:
@@ -739,26 +855,26 @@ def resolve_turn(
     nodes.append(
         CausalNode(
             id="supply",
-            label=f"Regional availability {before_supply}+{farm_output}-{before_demand}→{next_supply}",
+            label=f"Regional availability {before_supply}+{regional_after}+{farm_output}-{before_demand}→{next_supply}",
             kind="supply",
             before=before_supply,
             after=next_supply,
             delta=supply_delta,
             reason_code=supply_reason,
-            parent_ids=("farm_output", "demand"),
+            parent_ids=("regional_output", "farm_output", "demand"),
         )
     )
     # Also emit alias home_supply for clarity
     nodes.append(
         CausalNode(
             id="home_supply",
-            label=f"Home Valley availability {before_supply}+{farm_output}-{before_demand}→{next_supply}",
+            label=f"Home Valley availability {before_supply}+{regional_after}+{farm_output}-{before_demand}→{next_supply}",
             kind="supply",
             before=before_supply,
             after=next_supply,
             delta=supply_delta,
             reason_code=supply_reason,
-            parent_ids=("farm_output", "home_demand"),
+            parent_ids=("regional_output", "farm_output", "home_demand"),
         )
     )
     effects.append(
@@ -985,7 +1101,7 @@ def resolve_turn(
     # Reconstruct label details for trace (excess) while preserving shared math
     if settle_reason == "capped_by_storage":
         excess = inventory_before_settlement + farm_output - storage_capacity
-        if command.type == "buy_grain":
+        if command.type in ("buy_grain", "sell_grain"):
             inv_parents = ("farm_output", "storage_capacity", "inventory_after_buy")
         else:
             inv_parents = ("farm_output", "storage_capacity")
@@ -1003,7 +1119,7 @@ def resolve_turn(
         )
     else:
         # harvest_to_inventory
-        if command.type == "buy_grain":
+        if command.type in ("buy_grain", "sell_grain"):
             inv_parents = ("farm_output", "storage_capacity", "inventory_after_buy")
         else:
             inv_parents = ("farm_output", "storage_capacity")
@@ -1021,7 +1137,7 @@ def resolve_turn(
         )
     # Domain effects for settlement
     overall_inventory_delta_pre_ship = inventory_final_pre_ship - before_inventory
-    if command.type == "buy_grain":
+    if command.type in ("buy_grain", "sell_grain"):
         effects.append(
             DomainEffect(
                 metric="inventory_harvest",
@@ -1449,11 +1565,15 @@ def resolve_turn(
     if ship_quantity_value == 0:
         assert quantity_value_effect == purchase_quantity_value + harvest_quantity_value
 
-    # Purchase quantity — value of bought grain at old price
+    # Purchase/sell quantity — value of bought/sold grain at old price
     if command.type == "buy_grain":
         purchase_parents: tuple[str, ...] = ("command", "inventory_after_buy")
         purchase_reason = "purchase_quantity_value"
         purchase_label = f"Purchase quantity value {value_before} → {value_after_buy} (delta {purchase_quantity_value:+})"
+    elif command.type == "sell_grain":
+        purchase_parents = ("command", "inventory_after_sell")
+        purchase_reason = "sell_quantity_value"
+        purchase_label = f"Sell quantity value {value_before} → {value_after_buy} (delta {purchase_quantity_value:+})"
     else:
         purchase_parents = ("command",)
         purchase_reason = "no_purchase"
@@ -1635,6 +1755,7 @@ def resolve_turn(
         current_price=new_price,
         responsiveness=responsiveness,
         max_movement_bps=max_movement_bps,
+        regional_output=regional_base,
     )
     next_river_market = MarketState(
         supply=river_supply_next,
@@ -1699,6 +1820,13 @@ def resolve_turn(
             else:
                 label = f"Bought grain for {abs(command_cash)}"
                 reason = "buy_grain_cost"
+        elif command.type == "sell_grain":
+            if cmd_reason == "insufficient_inventory":
+                label = f"Sell grain limited by inventory (gained {abs(command_cash)})"
+                reason = "sell_limited_inventory"
+            else:
+                label = f"Sold grain for {abs(command_cash)}"
+                reason = "sell_grain_revenue"
         elif command.type == "secure_route":
             if cmd_reason == "already_established":
                 label = "Route already secured (no cost)"
@@ -1784,9 +1912,9 @@ def resolve_turn(
             )
             candidates.pop()  # filtered zero
 
-    # Candidate 2: purchase quantity value — only if purchase actually added value
+    # Candidate 2: purchase/sell quantity value — only if actually added value
     if purchase_quantity_value != 0:
-        # This is the value of bought grain at old price; harvest is separate
+        # This is the value of bought/sold grain at old price; harvest is separate
         if command.type == "buy_grain":
             # Use actual purchase amount for label if available
             # inventory_after_buy - before_inventory is purchase qty
@@ -1798,6 +1926,15 @@ def resolve_turn(
                 label = f"Bought {purchase_qty} grain (value {purchase_quantity_value:+})"
                 reason = "purchase_quantity_value"
             causal_ids = ("command", "inventory_after_buy", "purchase_quantity_value")
+        elif command.type == "sell_grain":
+            sold_qty = before_inventory - inventory_before_settlement
+            if cmd_reason == "insufficient_inventory":
+                label = f"Sold {sold_qty} grain (value {purchase_quantity_value:+}, limited by inventory)"
+                reason = "sell_quantity_limited"
+            else:
+                label = f"Sold {sold_qty} grain (value {purchase_quantity_value:+})"
+                reason = "sell_quantity_value"
+            causal_ids = ("command", "inventory_after_sell", "purchase_quantity_value")
         else:
             label = f"Purchase quantity value {purchase_quantity_value:+}"
             reason = "purchase_quantity_value"

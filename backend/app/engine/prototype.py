@@ -67,12 +67,24 @@ TURN_SPECS: tuple[TurnSpec, ...] = tuple(
 
 
 def default_start_state(seed: str = "seed-001", version: str = "1.0") -> GameState:
-    """Tuned start state for 5-turn legibility under availability-drained signal.
+    """Tuned start state — Section 9 retuned for binding constraints (storage scarcity, route viability).
 
-    Home Valley: supply 100, demand 90 (so signal 100+100-90=110 surplus weak),
-    River Town: supply 80, demand 130 (shortage high price), route 800/20/10000.
-    Player: cash 1000, grain 20, farm 10, storage 200 (larger to avoid
-    immediate cap and let farm expansion be useful).
+    Home Valley: regional_output 360 + farm 5*10=50 => total 410, player 12.2%
+    (was 21.7% with farm 10, now lower so free baseline does not saturate storage).
+    Demand 410 gives signal_next≈signal+0 stable in normal (mild), drought cuts
+    regional to 216 + farm 30 = 246 => signal_next≈signal-164 shortage. Supply 280.
+    Responsiveness 4000 keeps price within [2000,9000]. River unchanged.
+    Player: cash 1000 grain 20 farm 5 storage 130 (was 400 — makes granary load-bearing;
+    idle accumulates 270 over 5 turns so 400 never binds, 130 does; 130 chosen as
+    widest-margin point in sweep 100-150 where hold rank ≥3 with 8.6% margin,
+    ratio 1.02, price 3876-8535; 100 gave rank2, 115-120 <5%, 125 6.6%, 135 9.1% but
+    130 is rounder and >5% threshold). Route: capacity 20 (reverted from 60 — R3:
+    route repays at 20 with transport 300, +174 on 400 cost; 60 gave +280 but
+    strains price-taking approximation), transport 300 (was 800 — leaves real margin
+    after toll while preserving margin-negative at drought peak). Tuned with
+    competent policies to clear hold rank ≥3 with >5% margin. Price-taking boundary:
+    player sales/shipments are price-taking; endogenous price impact deferred to
+    Section 14.
     """
     return GameState(
         turn=0,
@@ -81,16 +93,17 @@ def default_start_state(seed: str = "seed-001", version: str = "1.0") -> GameSta
         player=PlayerState(
             cash=1000,
             inventory=InventoryState(grain=20),
-            farm_capacity=10,
-            storage_capacity=200,
+            farm_capacity=5,
+            storage_capacity=130,
         ),
         market=MarketState(
-            supply=100,
-            demand=90,
+            supply=280,
+            demand=410,
             base_price=5000,
             current_price=5000,
-            responsiveness=5000,
+            responsiveness=4000,
             max_movement_bps=2000,
+            regional_output=360,
         ),
         river_market=MarketState(
             supply=80,
@@ -101,7 +114,7 @@ def default_start_state(seed: str = "seed-001", version: str = "1.0") -> GameSta
             max_movement_bps=2000,
         ),
         route=RouteState(
-            transport_cost_per_unit=800,
+            transport_cost_per_unit=300,
             capacity=20,
             reliability_bps=10000,
             established=False,
@@ -292,7 +305,15 @@ class FiveTurnGame:
         return None
 
     def available_commands(self) -> list[str]:
-        return ["hold", "expand_farm", "build_granary", "buy_grain", "secure_route", "ship_grain"]
+        return [
+            "hold",
+            "expand_farm",
+            "build_granary",
+            "buy_grain",
+            "sell_grain",
+            "secure_route",
+            "ship_grain",
+        ]
 
     def _observable_for(self, idx: int) -> ObservableContext:
         """Build pre-turn observable context for rival choice (structured, not prose)."""

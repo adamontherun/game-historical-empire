@@ -28,6 +28,7 @@ from app.engine.actor import (
     resolve_buy,
     resolve_expand_farm,
     resolve_secure_route,
+    resolve_sell,
     resolve_shipment,
     resolve_storage_settlement,
     value_for,
@@ -37,7 +38,7 @@ from app.engine.rounding import mul_basis_points
 
 RivalId = Literal["mira", "daran"]
 CommandType = Literal[
-    "expand_farm", "build_granary", "buy_grain", "hold", "secure_route", "ship_grain"
+    "expand_farm", "build_granary", "buy_grain", "sell_grain", "hold", "secure_route", "ship_grain"
 ]
 ExposureTag = Literal["farm_penalize", "farm_reward"]
 
@@ -50,6 +51,7 @@ class RivalPreferences(BaseModel):
     expand_farm: int = Field(ge=0, description="Pref bps for expand_farm")
     build_granary: int = Field(ge=0, description="Pref bps for build_granary")
     buy_grain: int = Field(ge=0, description="Pref bps for buy_grain")
+    sell_grain: int = Field(ge=0, description="Pref bps for sell_grain")
     hold: int = Field(ge=0, description="Pref bps for hold")
     secure_route: int = Field(ge=0, description="Pref bps for secure_route")
     ship_grain: int = Field(ge=0, description="Pref bps for ship_grain")
@@ -114,6 +116,7 @@ MIRA_PREFERENCES = RivalPreferences(
     expand_farm=4500,
     build_granary=15000,
     buy_grain=13000,
+    sell_grain=14000,
     hold=10000,
     secure_route=14500,
     ship_grain=12000,
@@ -122,6 +125,7 @@ DARAN_PREFERENCES = RivalPreferences(
     expand_farm=16000,
     build_granary=7000,
     buy_grain=11000,
+    sell_grain=9000,
     hold=10000,
     secure_route=6000,
     ship_grain=5000,
@@ -171,13 +175,15 @@ HEADLINES_BY_REASON: dict[str, dict[str, str]] = {
         "insufficient_cash": "Mira is short of cash and could not buy grain.",
         "insufficient_storage": "Mira's granaries are full and could not buy more grain.",
         "buy_grain_zero": "Mira tried to buy grain but could not.",
+        "sell_grain": "Mira sold grain at market.",
+        "sell_grain_zero": "Mira tried to sell grain but had none.",
+        "insufficient_inventory": "Mira wanted to sell grain but had insufficient grain.",
         "secure_route": "Mira secured capacity on the river route.",
         "already_established": "Mira already has river access.",
         "insufficient_cash_for_route": "Mira is short of cash and could not secure the river route.",
         "ship_grain": "Mira shipped grain to River Town.",
         "limited_by_capacity": "Mira shipped grain to River Town.",
         "ship_limited": "Mira shipped grain to River Town.",
-        "insufficient_inventory": "Mira wanted to ship grain but had insufficient grain.",
         "insufficient_cash_for_transport": "Mira is short of cash for transport and could not ship.",
         "no_route_access": "Mira wanted to ship grain but lacked route access.",
         "hold": "Mira is conserving cash.",
@@ -192,13 +198,15 @@ HEADLINES_BY_REASON: dict[str, dict[str, str]] = {
         "insufficient_cash": "Daran is short of cash and could not buy grain.",
         "insufficient_storage": "Daran's granaries are full and could not buy more grain.",
         "buy_grain_zero": "Daran tried to buy grain but could not.",
+        "sell_grain": "Daran sold grain at market.",
+        "sell_grain_zero": "Daran tried to sell grain but had none.",
+        "insufficient_inventory": "Daran wanted to sell grain but had insufficient grain.",
         "secure_route": "Daran secured river access.",
         "already_established": "Daran already has river access.",
         "insufficient_cash_for_route": "Daran is short of cash and could not secure the route.",
         "ship_grain": "Daran shipped grain to River Town.",
         "limited_by_capacity": "Daran shipped grain to River Town.",
         "ship_limited": "Daran shipped grain to River Town.",
-        "insufficient_inventory": "Daran wanted to ship grain but had insufficient grain.",
         "insufficient_cash_for_transport": "Daran is short of cash for transport and could not ship.",
         "no_route_access": "Daran wanted to ship grain but lacked route access.",
         "hold": "Daran held his position.",
@@ -356,6 +364,20 @@ def _expected_return(
         cost = q * transport // 1000
         arbitrage = revenue - cost - (q * home // 1000)
         return max(0, arbitrage)
+    if cmd_type == "sell_grain":
+        if inv <= 0:
+            return 0
+        q = min(qty_default, inv)
+        revenue = q * home // 1000
+        # Don't sell before anticipated drought price rise — hold for higher
+        if obs.next_world_known == "drought":
+            return max(0, revenue // 3)
+        # Sell when price high relative to baseline (assume 5000 base)
+        if home > 5500:
+            return max(0, revenue * 12 // 10)
+        if home > 4800:
+            return max(0, revenue * 8 // 10)
+        return max(0, revenue // 3)
     if cmd_type == "hold":
         return 5
     return 0
@@ -390,6 +412,10 @@ def _capital_bps(rival_state: RivalState, cmd_type: str, obs: ObservableContext)
         # Need also route established
         if not rival_state.route_established:
             return 0
+    elif cmd_type == "sell_grain":
+        if rival_state.inventory.grain <= 0:
+            return 0
+        return 10000
     elif cmd_type == "hold":
         return 10000
     if cost == 0:
@@ -427,6 +453,9 @@ def _risk_bps(
             rival_state.inventory.grain + YIELD_PER_CAPACITY * rival_state.farm_capacity,
         )
         cost = q * obs.transport_cost_per_unit // 1000
+    elif cmd_type == "sell_grain":
+        cost = 0
+        return 10000
     elif cmd_type == "hold":
         cost = 0
     post_cash = rival_state.cash - cost
@@ -514,6 +543,7 @@ def choose_rival_command(
         PlayerCommand(type="expand_farm"),
         PlayerCommand(type="build_granary"),
         PlayerCommand(type="buy_grain", quantity=10),
+        PlayerCommand(type="sell_grain", quantity=10),
         PlayerCommand(type="hold"),
         PlayerCommand(type="secure_route"),
         PlayerCommand(type="ship_grain", quantity=10),
@@ -622,6 +652,18 @@ def apply_rival_command(
         storage_after_cmd = storage
         farm_after_cmd = farm
         route_after = route_established
+    elif cmd_type == "sell_grain":
+        cash_after_cmd, inv_after_cmd, _sell_actual, _rev, cmd_reason = resolve_sell(
+            cash=cash,
+            price_milli=home_pre,
+            inventory=inv,
+            requested=requested_qty,
+        )
+        storage_after_cmd = storage
+        farm_after_cmd = farm
+        route_after = route_established
+        # sell does not have buy_actual, keep for headline handling
+        buy_actual = 0
     elif cmd_type == "ship_grain":
         # Ship intent — settlement will determine actual; keep cmd_reason as ship_grain for now
         # Actual reason will be ship_reason after settlement; use placeholder

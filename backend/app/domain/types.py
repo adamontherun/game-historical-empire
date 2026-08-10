@@ -76,6 +76,10 @@ class MarketState(BaseModel):
 
     supply: Quantity = Field(description="Regional grain supply")
     demand: Quantity = Field(description="Regional grain demand")
+    regional_output: Quantity = Field(
+        default=0,
+        description="Non-player regional grain output per turn (Home only; River stays exogenous)",
+    )
     base_price: PriceMilliunits = Field(  # type: ignore[call-overload]
         description="Base price milliunits (>0)",
         strict=True,
@@ -151,16 +155,22 @@ class RouteState(BaseModel):
 
 
 class PlayerCommand(BaseModel):
-    """Player turn command — one major action per turn (Sections 3–5)."""
+    """Player turn command — one major action per turn (Sections 3–5, sell_grain added Section 9)."""
 
     model_config = ConfigDict(frozen=True)
 
     type: Literal[
-        "expand_farm", "build_granary", "buy_grain", "hold", "secure_route", "ship_grain"
+        "expand_farm",
+        "build_granary",
+        "buy_grain",
+        "sell_grain",
+        "hold",
+        "secure_route",
+        "ship_grain",
     ] = Field(description="Command type")
     quantity: Quantity | None = Field(
         default=None,
-        description="Grain quantity for buy_grain / ship_grain (ignored otherwise)",
+        description="Grain quantity for buy_grain / sell_grain / ship_grain (ignored otherwise)",
     )
 
 
