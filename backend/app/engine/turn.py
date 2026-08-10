@@ -1222,17 +1222,6 @@ def resolve_turn(
         _price_demand = before_demand
     target = _target_price(base_price, next_supply, _price_demand, responsiveness)
     new_price = _bounded_price(before_price, target, max_movement_bps)
-    # Epilogue raw price collapse — regime change, not a dip (user measured 82% raw share must fall to ≤50%)
-    # Apply collapse factor and floor in epilogue (turn>=5) to make raw ~800-1200 milli, not ~4000
-    if state.turn >= 5 and "disable_demand_shift" not in state.legacies:
-        from app.engine.actor import EPILOGUE_RAW_PRICE_COLLAPSE_BPS, EPILOGUE_RAW_PRICE_FLOOR
-
-        collapsed = new_price * EPILOGUE_RAW_PRICE_COLLAPSE_BPS // 10_000
-        if collapsed < EPILOGUE_RAW_PRICE_FLOOR:
-            collapsed = EPILOGUE_RAW_PRICE_FLOOR
-        # Keep causal trace honest: record collapse as additional price move
-        # new_price becomes collapsed; price_delta includes collapse
-        new_price = collapsed
     price_delta = new_price - before_price
     pressure_bps = (
         div_round_half_up(
@@ -1282,20 +1271,6 @@ def resolve_turn(
             parent_ids=("target_price",),
         )
     )
-    # Epilogue raw price collapse explicit trace (regime change, not just pressure)
-    if state.turn >= 5 and "disable_demand_shift" not in state.legacies:
-        nodes.append(
-            CausalNode(
-                id="raw_price_collapse",
-                label=f"Raw grain price collapses to {new_price} in city (was {before_price})",
-                kind="price",
-                before=before_price,
-                after=new_price,
-                delta=new_price - before_price,
-                reason_code="urban_demand_collapses_raw_price",
-                parent_ids=("urban_demand", "price"),
-            )
-        )
     # Home aliases for clarity
     nodes.append(
         CausalNode(

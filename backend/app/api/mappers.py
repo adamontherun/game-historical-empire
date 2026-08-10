@@ -215,10 +215,11 @@ def _outcome_view(session: GameSession) -> OutcomeView | None:
     else:
         # Epilogue: construct ephemeral pressure via game method if available
         try:
-            pressure = game._pressure_for_idx(idx)  # type: ignore[attr-defined]
+            _p = game._pressure_for_idx(idx)  # type: ignore[attr-defined]
+            pressure = _p  # type: ignore[assignment]
         except Exception:
             pressure = PRESSURE_ARC[-1]
-    title = pressure.title
+    title: str = pressure.title  # type: ignore[attr-defined]
     # Use stored command from session.commands — not trace label parsing (C4)
     if session.commands and idx < len(session.commands):
         cmd: PlayerCommand = session.commands[idx]
@@ -257,9 +258,9 @@ def _outcome_view(session: GameSession) -> OutcomeView | None:
 
     return OutcomeView(
         resolved_turn=idx,
-        title=title,
-        pressure_stage=pressure.stage,
-        world=pressure.world,
+        title=title,  # type: ignore[arg-type]
+        pressure_stage=pressure.stage,  # type: ignore[attr-defined]
+        world=pressure.world,  # type: ignore[attr-defined]
         command_type=cmd_type,
         command_quantity=cmd_qty,
         wealth_delta=res.player_outcome.wealth_delta,

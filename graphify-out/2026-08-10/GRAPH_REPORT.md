@@ -1,23 +1,23 @@
 # Graph Report - game-historical-empire  (2026-08-10)
 
 ## Corpus Check
-- 137 files · ~203,034 words
+- 138 files · ~204,373 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
-- 1734 nodes · 2735 edges · 134 communities (111 shown, 23 thin omitted)
-- Extraction: 97% EXTRACTED · 3% INFERRED · 0% AMBIGUOUS · INFERRED: 83 edges (avg confidence: 0.52)
+- 1730 nodes · 2852 edges · 136 communities (112 shown, 24 thin omitted)
+- Extraction: 95% EXTRACTED · 5% INFERRED · 0% AMBIGUOUS · INFERRED: 131 edges (avg confidence: 0.51)
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `f2f21c22`
+- Built from commit: `f9d027cf`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
 ## Community Hubs (Navigation)
 - SECTION 9 — Headless Strategy and Balance Harness
 - test_pressure_arc.py
-- resolve_turn
+- PlayerCommand
 - test_five_turn_prototype.py
 - What You Must Do When Invoked
 - mappers.py
@@ -96,27 +96,27 @@
 - SHOULD-FIX
 - typescript
 - Section 8 implementation — consolidated review (round 3, against commit 28a0963)
-- .edges
+- rivals.py
 - Section 10 plan — consolidated review (round 2)
-- PlayerCommand
+- resolve_turn
 - test_api.py
 - Section 9 — review round 3 (consolidated) — SUPERSEDES round 2 on the route
 - Section 9 — review round 4 (consolidated, final) — SUPERSEDES rounds 2 and 3
-- Orchestration Guide — how BUILD_SPEC sections get built
+- ⚠️ STAGE DISCIPLINE — READ BEFORE ANYTHING ELSE
 - 2. SHOULD-FIX
 - App.tsx
 - Section 13 — Plan Review, Round 1
-- harness.py
-- @eslint/js
-- api/__init__.py
 - GameState
+- RivalProfile
+- api/__init__.py
+- MarketState
 - Section 11 — Mobile-First React Playable — Plan
 - 3. Design rulings — the vague spots, now decided
 - Section 10 implementation — review round 3
 - prettier
 - compilerOptions
 - Audit — Sections 1–10, Consolidated Review Round 2
-- EightTurnGame
+- prototype.py
 - Section 12 — Playtest Gate Instrumentation — Plan
 - devDependencies
 - scripts
@@ -136,52 +136,54 @@
 - @vitejs/plugin-react
 - commit.test.tsx
 - test_invariants.py
-- BaseModel
+- Part VIII — Agent Guardrails
 - @testing-library/jest-dom
 - epilogue_harness.py
 - SECTION 20 — Visual Asset System and Polish
-- Part VIII — Agent Guardrails
+- test_no_float_in_rival_scoring
+- test_rival_state_has_no_headline
+- @eslint/js
 
 ## God Nodes (most connected - your core abstractions)
-1. `PlayerCommand` - 108 edges
-2. `FiveTurnGame` - 72 edges
-3. `resolve_turn()` - 70 edges
-4. `InventoryState` - 43 edges
-5. `GameState` - 43 edges
-6. `MarketState` - 27 edges
-7. `Decisions` - 27 edges
-8. `RivalState` - 24 edges
-9. `apply_rival_command()` - 24 edges
-10. `PlayerState` - 23 edges
+1. `PlayerCommand` - 116 edges
+2. `FiveTurnGame` - 84 edges
+3. `resolve_turn()` - 82 edges
+4. `GameState` - 56 edges
+5. `InventoryState` - 51 edges
+6. `MarketState` - 33 edges
+7. `PlayerState` - 31 edges
+8. `RivalState` - 31 edges
+9. `EightTurnGame` - 27 edges
+10. `Decisions` - 27 edges
 
 ## Surprising Connections (you probably didn't know these)
+- `GameSession` --uses--> `PlayerCommand`  [INFERRED]
+  backend/app/api/sessions.py → backend/app/domain/types.py
 - `GameSession` --uses--> `FiveTurnGame`  [INFERRED]
   backend/app/api/sessions.py → backend/app/engine/prototype.py
 - `format_rivals()` --references--> `FiveTurnGame`  [EXTRACTED]
   backend/app/cli.py → backend/app/engine/prototype.py
-- `FourArmResult` --uses--> `FiveTurnGame`  [INFERRED]
-  backend/app/engine/epilogue_harness.py → backend/app/engine/prototype.py
-- `BatchConfig` --uses--> `FiveTurnGame`  [INFERRED]
-  backend/app/engine/harness.py → backend/app/engine/prototype.py
-- `BatchResult` --uses--> `FiveTurnGame`  [INFERRED]
-  backend/app/engine/harness.py → backend/app/engine/prototype.py
+- `EightTurnGame` --uses--> `PressureState`  [INFERRED]
+  backend/app/engine/prototype.py → backend/app/domain/pressure.py
+- `FiveTurnGame` --uses--> `PressureState`  [INFERRED]
+  backend/app/engine/prototype.py → backend/app/domain/pressure.py
 
 ## Import Cycles
 - None detected.
 
-## Communities (134 total, 23 thin omitted)
+## Communities (136 total, 24 thin omitted)
 
 ### Community 0 - "SECTION 9 — Headless Strategy and Balance Harness"
 Cohesion: 0.40
 Nodes (5): Acceptance criteria, Goal, In scope, SECTION 9 — Headless Strategy and Balance Harness, Stop condition
 
 ### Community 1 - "test_pressure_arc.py"
-Cohesion: 0.08
-Nodes (24): PressureState, BaseModel, model_validator, One step of the authored pressure arc — frozen, validated. Exactly 7 fields per…, next_world_known_for_turn(), Derive world for turn idx from pressure arc., Structured threat known at turn idx (pre-turn). Only T3 (idx=2, worsening_dry)…, world_for_turn() (+16 more)
+Cohesion: 0.07
+Nodes (30): PressureState, BaseModel, model_validator, Pressure domain — Section 8 world-pressure arc types. Small, frozen, validated…, One step of the authored pressure arc — frozen, validated. Exactly 7 fields per…, next_world_known_for_turn(), pressure_for_turn(), Pressure arc — Section 8 authored 5-turn arc. Hard-coded, deterministic, no… (+22 more)
 
-### Community 2 - "resolve_turn"
-Cohesion: 0.17
-Nodes (22): GameState, PlayerCommand, PressureState, TurnResolution, Resolve one deterministic turn. Order is explicit: pressure_stage -> world ->…, resolve_turn(), _base_state(), Section 3 kernel tests — AC #1,3,4,5,6. (+14 more)
+### Community 2 - "PlayerCommand"
+Cohesion: 0.24
+Nodes (17): PlayerCommand, Player turn command — one major action per turn (Sections 3–5, sell_grain…, _base_state(), Section 3 kernel tests — AC #1,3,4,5,6., test_build_granary_increases_storage(), test_buy_beyond_cash_is_clamped(), test_buy_beyond_storage_is_clamped(), test_determinism_same_inputs_same_result() (+9 more)
 
 ### Community 3 - "test_five_turn_prototype.py"
 Cohesion: 0.13
@@ -192,8 +194,8 @@ Cohesion: 0.08
 Nodes (24): For /graphify add and --watch, For /graphify query, For the commit hook and native AGENTS.md integration, For --update and --cluster-only, /graphify, Honesty Rules, Interpreter guard for subcommands, Part A - Structural extraction for code files (+16 more)
 
 ### Community 5 - "mappers.py"
-Cohesion: 0.07
-Nodes (68): choice_map_for(), choices_for(), _completion_summary(), _market_view(), _outcome_view(), GameView, Mappers: FiveTurnGame -> GameView. Pure, no mutation., Map choice_id -> PlayerCommand for current revision. (+60 more)
+Cohesion: 0.06
+Nodes (69): choice_map_for(), choices_for(), _completion_summary(), _market_view(), _outcome_view(), GameView, Mappers: FiveTurnGame -> GameView. Pure, no mutation., Map choice_id -> PlayerCommand for current revision. (+61 more)
 
 ### Community 6 - "Plan — Section 1: Repository Contract and Walking Skeleton"
 Cohesion: 0.10
@@ -408,12 +410,12 @@ Cohesion: 0.10
 Nodes (20): 1 — Extract shared actor primitives (behavior-preserving, no market/trace change), 2 — Rival profile/state/result types, 3 — Integer scoring & deterministic choice, 4 — Rival execution via shared primitives + truthful headlines, 5 — Prototype integration with corrected timing, 6 — Structured threat plumbing, 7 — CLI reveal, 8 — Tests (behavioral, not scripted) (+12 more)
 
 ### Community 71 - "test_balance_harness.py"
-Cohesion: 0.15
-Nodes (23): BatchConfig, model_validator, Run batch — deterministic, pure, no global random., run_batch(), default_start_state(), Tuned start state — Section 9 retuned for binding constraints (storage…, Section 9 — Balance harness acceptance tests. Covers AC1-6 with confound-…, New invariant: drought raises price even with farm_capacity=0 via regional. (+15 more)
+Cohesion: 0.19
+Nodes (18): BatchConfig, model_validator, Run batch — deterministic, pure, no global random., run_batch(), Section 9 — Balance harness acceptance tests. Covers AC1-6 with confound-…, Regression: starting storage must be scarce enough that granary matters. Idle…, Matched control: policy_storage_heavy must beat itself with build_granary…, Matched control: policy_trade_heavy must beat itself with secure_route… (+10 more)
 
 ### Community 72 - "test_causal_trace.py"
 Cohesion: 0.11
-Nodes (25): CausalNode, Causal trace, domain effects, and player outcome for Sections 4–5. Structural…, One step in the causal chain with explicit parent links., pressure_for_world(), Pressure arc — Section 8 authored 5-turn arc. Hard-coded, deterministic, no…, Return canonical test pressure for a WorldCondition (G1 helper)., _base_state(), Section 4 — causal trace hardening, exact wealth decomposition, and story… (+17 more)
+Nodes (25): CausalNode, One step in the causal chain with explicit parent links., pressure_for_world(), Return canonical test pressure for a WorldCondition (G1 helper)., _base_state(), Section 4 — causal trace hardening, exact wealth decomposition, and story…, Wealth delta must equal cash + purchase + harvest + price effects exactly., Drivers must reference trace nodes, not snapshot diff. (+17 more)
 
 ### Community 73 - "Section 11 — Design Direction (Claude, design authority)"
 Cohesion: 0.10
@@ -428,8 +430,8 @@ Cohesion: 0.12
 Nodes (15): Constraints And Non-goals, Context And Current Facts (verified against code), Fit to Stack & Hosting, Goal, Grill — Headless Stress Test (Rev 2, answered from code/evidence, folded into plan), Implementation Authority, Key Decisions (all settled — no open choices), Open Questions (+7 more)
 
 ### Community 76 - "FiveTurnGame"
-Cohesion: 0.12
-Nodes (9): FiveTurnGame, In-memory 5-turn game — owns GameState, history, and session rivals. Rivals are…, Derived headlines per turn for UI convenience., test_harness_uses_pressure_not_bare_string(), test_headlines_derived_and_visible_after_first_turn(), test_rival_determinism_same_seed(), test_available_commands_include_all_verbs(), RivalState (+1 more)
+Cohesion: 0.09
+Nodes (10): FiveTurnGame, In-memory 5-turn game — owns GameState, history, and session rivals. Rivals are…, Derived headlines per turn for UI convenience., test_harness_uses_pressure_not_bare_string(), Canonical hold-5 run must have ≥1 turn where Mira/Daran choose different types…, test_canonical_run_has_three_diffs(), test_headlines_derived_and_visible_after_first_turn(), test_rival_determinism_same_seed() (+2 more)
 
 ### Community 77 - "Section 9 — implementation review, round 2 (consolidated)"
 Cohesion: 0.18
@@ -440,8 +442,8 @@ Cohesion: 0.06
 Nodes (33): Constraints And Non-goals, Context And Current Facts, Goal, K1 — Where `GameView` lives (pure engine boundary, global §13), K2 — `choice_id`: what it IS and how it prevents mutation (AC2) — **REVISED per B1/B6**, K3 — Revision semantics (where, increment, failure, atomicity) — **REVISED per B7/C5**, K4 — AC4 "no frontend formula needed" — **REVISED per B2/B3/B4/B5/C1/C3/C4**, K5 — AC5 "engine imports no FastAPI" enforced by TEST (+25 more)
 
 ### Community 79 - "InventoryState"
-Cohesion: 0.05
-Nodes (90): InventoryState, Player inventory — grain for Sections 2-4, finished_goods added Section 13., compute_farm_output(), cost_for_quantity(), Shared actor-level economic primitives — Section 7 extraction. Single source of…, Resolve a sell_grain command — inverse of buy, at Home price. Args: cash: cash…, Settle harvest into inventory with storage cap. Returns…, Resolve ship_grain settlement with shared clamping. Uses pre-turn… (+82 more)
+Cohesion: 0.14
+Nodes (35): InventoryState, Player inventory — grain for Sections 2-4, finished_goods added Section 13., _capital_bps(), choose_rival_command(), ObservableContext, Information visible to rivals when choosing (pre-turn)., Economic settlement context post player market resolution., Capital factor in bps: 0 if unaffordable, 5000 if tight, 10000 if comfortable. (+27 more)
 
 ### Community 80 - "SHOULD-FIX"
 Cohesion: 0.08
@@ -451,17 +453,17 @@ Nodes (23): Audit — Sections 1–10, Consolidated Review Round 1, B1 — `make
 Cohesion: 0.22
 Nodes (8): Closeout (unchanged from F5), G1 — Remove the `PressureState | str` legacy shim (BLOCKING), G2 — Work Plan §6 (CLI + StrategicSummary stage display) was never implemented (BLOCKING), G3 — STATE.md contains a provably false provenance claim (BLOCKING), G4 — DECISIONS.md 012 contradicts its own rationale (BLOCKING), G5 — Pressure node label should derive from stage, not title (should-fix), G6 — Prefer a `mode="before"` validator over `object.__setattr__` (should-fix, minor), Section 8 implementation — consolidated review (round 3, against commit 28a0963)
 
-### Community 83 - ".edges"
-Cohesion: 0.33
-Nodes (4): String view of driver labels (derived from drivers)., Derived edges as (parent, child) tuples from parent_ids., CausalEdge, computed_field
+### Community 83 - "rivals.py"
+Cohesion: 0.09
+Nodes (39): compute_farm_output(), cost_for_quantity(), Shared actor-level economic primitives — Section 7 extraction. Single source of…, Resolve a sell_grain command — inverse of buy, at Home price. Args: cash: cash…, Settle harvest into inventory with storage cap. Returns…, Resolve ship_grain settlement with shared clamping. Uses pre-turn…, Shared expand_farm affordability/mutation. Returns (cash_after, farm_after,…, Shared build_granary affordability/mutation. Returns (cash_after,… (+31 more)
 
 ### Community 84 - "Section 10 plan — consolidated review (round 2)"
 Cohesion: 0.20
 Nodes (9): C1 — Correction to round 1's B4: `OperationState` is not invented, C2 — Correction to round 1's B2 reasoning (conclusion unchanged), C3 — NEW BLOCKER: `completion_summary: StrategicSummary` smuggles a history endpoint into `GameView`, C4 — NEW BLOCKER: current-turn context and latest-outcome context are conflated, C5 — `GET` must take the same per-session lock, or it can return a torn view, C6 — Test dependencies are missing, C7 — Cleanup confirmations, Section 10 plan — consolidated review (round 2) (+1 more)
 
-### Community 85 - "PlayerCommand"
-Cohesion: 0.12
-Nodes (30): PlayerCommand, Player turn command — one major action per turn (Sections 3–5, sell_grain…, _base_state(), Section 5 — Two Markets and One Trade Route acceptance tests. AC 1: Home Valley…, AC2: Transport cost can erase apparent arbitrage profit., AC3: Route capacity limits shipped quantity., AC4: Profitability depends on market supply/demand divergence, not scripted…, AC5: Player can complete turn staying in Home Valley (no trade). (+22 more)
+### Community 85 - "resolve_turn"
+Cohesion: 0.09
+Nodes (35): Resolve one deterministic turn. Order is explicit: pressure_stage -> world ->…, resolve_turn(), _base_state(), Section 5 — Two Markets and One Trade Route acceptance tests. AC 1: Home Valley…, AC2: Transport cost can erase apparent arbitrage profit., AC3: Route capacity limits shipped quantity., AC4: Profitability depends on market supply/demand divergence, not scripted…, AC5: Player can complete turn staying in Home Valley (no trade). (+27 more)
 
 ### Community 86 - "test_api.py"
 Cohesion: 0.20
@@ -475,9 +477,9 @@ Nodes (9): Keep as-is, R1 — Retraction: round 2's route fix was buying a passi
 Cohesion: 0.13
 Nodes (14): Do not, Final target config, R1 — The granary does not repay its cost, and `test_build_granary_not_worthless` cannot see it, R2 — But the granary is not broken. `policy_storage_heavy` is a third strawman, R3 — Revert `route.capacity` to 20. Transport cost was the entire route fix, R4 — Retract round 3's River Town rescale entirely, R5 — State the price-taking boundary explicitly instead of pretending to fix it, R6 — `hold rank ≥3` must be computed over the four intentional policies, not five (+6 more)
 
-### Community 89 - "Orchestration Guide — how BUILD_SPEC sections get built"
-Cohesion: 0.20
-Nodes (9): 1. The loop, per section, 2. Driving Muse headlessly, 3. Driving ChatGPT, 4. Verification discipline (non-negotiable), 5. Standing decisions (set by the product owner), 6. Recurring failure patterns to watch for, 7. Where things live, 8. Known upcoming blockers (+1 more)
+### Community 89 - "⚠️ STAGE DISCIPLINE — READ BEFORE ANYTHING ELSE"
+Cohesion: 0.14
+Nodes (13): 1. The loop, per section, 2. Driving Muse headlessly, 3. Driving ChatGPT, 4. Verification discipline (non-negotiable), 5. Standing decisions (set by the product owner), 6. Recurring failure patterns to watch for, 7. Where things live, 8. Known upcoming blockers (+5 more)
 
 ### Community 90 - "2. SHOULD-FIX"
 Cohesion: 0.11
@@ -491,13 +493,17 @@ Nodes (49): commitChoice(), createGame(), getGame(), req(), useCommit(), useCrea
 Cohesion: 0.20
 Nodes (9): 1. What is settled — keep as planned, 2. BLOCKING — the AC1 control arm is testing the wrong thing, 3. RULING — Q5 (demand decay): keep the curve, and stop treating it as taste, 4. RULING — Q6 (`hire_labour`): ship it, capped at 1/turn, and it consumes the turn, 5. SHOULD-FIX — Crisis Reputation currently rewards passivity, not crisis, 6. SHOULD-FIX — state the labour cap interaction with Land Network explicitly, 7. Not asked for, 8. Instruction to Muse (+1 more)
 
-### Community 93 - "harness.py"
-Cohesion: 0.15
-Nodes (17): BatchResult, _can_afford(), policy_cash_preserving(), policy_production_heavy(), policy_random_legal(), policy_storage_heavy(), policy_trade_heavy(), _policy_trade_heavy_no_route() (+9 more)
-
-### Community 96 - "GameState"
+### Community 93 - "GameState"
 Cohesion: 0.12
-Nodes (32): Domain package — re-exports canonical types., Pressure domain — Section 8 world-pressure arc types. Small, frozen, validated…, PlayerOutcome, Concise player outcome for the turn reveal., Full result of resolving one turn., TurnResolution, GameState, MarketState (+24 more)
+Nodes (24): GameState, Top-level canonical game state for Sections 2-5. For backward compatibility,…, Derive TurnContext for RNG calls., BatchResult, _can_afford(), policy_cash_preserving(), policy_production_heavy(), policy_random_legal() (+16 more)
+
+### Community 94 - "RivalProfile"
+Cohesion: 0.22
+Nodes (9): _exposure_bps(), _headline_for(), BaseModel, Immutable preference vector — bps per command, frozen so profile cannot mutate., Exposure factor: Mira penalizes farm concentration, Daran rewards it., Derive truthful headline from reason_code and actual quantities. Partial fills…, Personality — preferences and risk, not economic state., RivalPreferences (+1 more)
+
+### Community 96 - "MarketState"
+Cohesion: 0.16
+Nodes (23): Domain package — re-exports canonical types., MarketState, OperationState, PlayerState, BaseModel, Canonical economic types for Sections 2-5. Integer-only canonical state per…, Lightweight turn identity for RNG derivation., River Route — single route between Home Valley and River Town (Section 5).… (+15 more)
 
 ### Community 97 - "Section 11 — Mobile-First React Playable — Plan"
 Cohesion: 0.07
@@ -519,9 +525,9 @@ Nodes (23): compilerOptions, allowImportingTsExtensions, forceConsistentCasingIn
 Cohesion: 0.25
 Nodes (7): Audit — Sections 1–10, Consolidated Review Round 2, Not carried forward, R1 — BLOCKING. The type-gate fix excluded the test suite from type checking entirely., R2 — SHOULD-FIX. Buy is still capped by a harness-policy constant, which DECISIONS 017 forbids., R3 — SHOULD-FIX. A production `await` was added to serve a test; make it a documented decision., Verified good — round 1 genuinely fixed these, Work order
 
-### Community 103 - "EightTurnGame"
-Cohesion: 0.08
-Nodes (18): derive_legacies(), EightTurnGame, GameState, PlayerCommand, PressureState, TurnResolution, Wealth = cash + grain*home_price + finished*finished_price (milli)., Derive legacies deterministically from final agricultural state. Three legacies… (+10 more)
+### Community 103 - "prototype.py"
+Cohesion: 0.10
+Nodes (19): PlayerOutcome, Causal trace, domain effects, and player outcome for Sections 4–5. Structural…, Concise player outcome for the turn reveal., Full result of resolving one turn., TurnResolution, derive_legacies(), EightTurnGame, BaseModel (+11 more)
 
 ### Community 104 - "Section 12 — Playtest Gate Instrumentation — Plan"
 Cohesion: 0.11
@@ -568,8 +574,12 @@ Cohesion: 0.05
 Nodes (40): 0. Reading list (what this plan rests on), 10. Risks / Rollback, 11. Open Questions, 12. Self-grill, 1. Goal, 2. AC1 / AC2 measurement design — fixed before any run, 3. Success Criteria, 4. Context and Current Facts (+32 more)
 
 ### Community 125 - "test_invariants.py"
-Cohesion: 0.20
-Nodes (14): _bounded_price(), One-turn grain market kernel — Sections 4–6, regional_output Section 9.…, Bound movement toward target_price within max_movement_bps of current., Non-player regional output after world effect — reuses same drought primitive., Integer-safe target price from supply/demand., _regional_output_after_world(), _target_price(), Invariant and property tests for Section 3 — AC #2, #4. (+6 more)
+Cohesion: 0.26
+Nodes (12): _bounded_price(), Bound movement toward target_price within max_movement_bps of current., Integer-safe target price from supply/demand., _target_price(), Invariant and property tests for Section 3 — AC #2, #4., _state(), test_bounded_price_monotonic_with_supply(), test_demand_unchanged_cannot_reduce_target_when_supply_falls() (+4 more)
+
+### Community 129 - "Part VIII — Agent Guardrails"
+Cohesion: 0.40
+Nodes (5): 31. Do Not Build Ahead, 32. Do Not Rewrite Working Systems Without Evidence, 33. Dependencies Require Justification, 34. Agent Completion Report Template, Part VIII — Agent Guardrails
 
 ### Community 131 - "epilogue_harness.py"
 Cohesion: 0.33
@@ -579,29 +589,25 @@ Nodes (8): _epilogue_command(), format_four_arm(), FourArmResult, _median(), Bas
 Cohesion: 0.40
 Nodes (5): Acceptance criteria, Goal, In scope, SECTION 20 — Visual Asset System and Polish, Stop condition
 
-### Community 133 - "Part VIII — Agent Guardrails"
-Cohesion: 0.40
-Nodes (5): 31. Do Not Build Ahead, 32. Do Not Rewrite Working Systems Without Evidence, 33. Dependencies Require Justification, 34. Agent Completion Report Template, Part VIII — Agent Guardrails
-
 ## Knowledge Gaps
-- **853 isolated node(s):** `What exists`, `Boundaries`, `Normal verification`, `Last known green`, `Decisions relevant` (+848 more)
+- **857 isolated node(s):** `Orchestration Guide — how BUILD_SPEC sections get built`, `The failure mode this section exists to prevent`, `Rules`, `What this does NOT relax`, `1. The loop, per section` (+852 more)
   These have ≤1 connection - possible missing edges or undocumented components.
-- **23 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
+- **24 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
 
 ## Suggested Questions
 _Questions this graph is uniquely positioned to answer:_
 
-- **Why does `PlayerCommand` connect `PlayerCommand` to `GameState`, `test_pressure_arc.py`, `resolve_turn`, `epilogue_harness.py`, `test_five_turn_prototype.py`, `mappers.py`, `test_balance_harness.py`, `test_causal_trace.py`, `FiveTurnGame`, `InventoryState`, `test_explanation.py`, `cli.py`, `test_invariants.py`, `test_api.py`, `harness.py`?**
-  _High betweenness centrality (0.034) - this node is a cross-community bridge._
-- **Why does `FiveTurnGame` connect `FiveTurnGame` to `GameState`, `test_pressure_arc.py`, `epilogue_harness.py`, `test_five_turn_prototype.py`, `mappers.py`, `test_balance_harness.py`, `EightTurnGame`, `InventoryState`, `cli.py`, `test_api.py`, `harness.py`?**
-  _High betweenness centrality (0.019) - this node is a cross-community bridge._
-- **Why does `resolve_turn()` connect `resolve_turn` to `GameState`, `engine/__init__.py`, `test_five_turn_prototype.py`, `mappers.py`, `EightTurnGame`, `test_balance_harness.py`, `test_causal_trace.py`, `InventoryState`, `test_explanation.py`, `PlayerCommand`, `test_api.py`, `test_invariants.py`?**
-  _High betweenness centrality (0.015) - this node is a cross-community bridge._
-- **Are the 12 inferred relationships involving `PlayerCommand` (e.g. with `GameSession` and `FourArmResult`) actually correct?**
-  _`PlayerCommand` has 12 INFERRED edges - model-reasoned connections that need verification._
-- **Are the 6 inferred relationships involving `FiveTurnGame` (e.g. with `GameSession` and `FourArmResult`) actually correct?**
-  _`FiveTurnGame` has 6 INFERRED edges - model-reasoned connections that need verification._
-- **Are the 6 inferred relationships involving `InventoryState` (e.g. with `ObservableContext` and `RivalPreferences`) actually correct?**
-  _`InventoryState` has 6 INFERRED edges - model-reasoned connections that need verification._
-- **Are the 10 inferred relationships involving `GameState` (e.g. with `CausalNode` and `CausalTrace`) actually correct?**
-  _`GameState` has 10 INFERRED edges - model-reasoned connections that need verification._
+- **Why does `PlayerCommand` connect `PlayerCommand` to `MarketState`, `test_pressure_arc.py`, `epilogue_harness.py`, `test_five_turn_prototype.py`, `mappers.py`, `test_balance_harness.py`, `prototype.py`, `test_causal_trace.py`, `FiveTurnGame`, `InventoryState`, `test_explanation.py`, `cli.py`, `rivals.py`, `test_invariants.py`, `test_api.py`, `resolve_turn`, `GameState`, `RivalProfile`?**
+  _High betweenness centrality (0.033) - this node is a cross-community bridge._
+- **Why does `FiveTurnGame` connect `FiveTurnGame` to `MarketState`, `test_pressure_arc.py`, `PlayerCommand`, `epilogue_harness.py`, `test_five_turn_prototype.py`, `mappers.py`, `test_balance_harness.py`, `prototype.py`, `test_causal_trace.py`, `InventoryState`, `cli.py`, `test_api.py`, `GameState`?**
+  _High betweenness centrality (0.026) - this node is a cross-community bridge._
+- **Why does `resolve_turn()` connect `resolve_turn` to `MarketState`, `PlayerCommand`, `engine/__init__.py`, `test_five_turn_prototype.py`, `mappers.py`, `prototype.py`, `test_balance_harness.py`, `test_causal_trace.py`, `InventoryState`, `test_explanation.py`, `rivals.py`, `GameState`, `test_api.py`, `test_invariants.py`?**
+  _High betweenness centrality (0.021) - this node is a cross-community bridge._
+- **Are the 16 inferred relationships involving `PlayerCommand` (e.g. with `GameSession` and `FourArmResult`) actually correct?**
+  _`PlayerCommand` has 16 INFERRED edges - model-reasoned connections that need verification._
+- **Are the 18 inferred relationships involving `FiveTurnGame` (e.g. with `GameSession` and `FourArmResult`) actually correct?**
+  _`FiveTurnGame` has 18 INFERRED edges - model-reasoned connections that need verification._
+- **Are the 14 inferred relationships involving `GameState` (e.g. with `CausalNode` and `CausalTrace`) actually correct?**
+  _`GameState` has 14 INFERRED edges - model-reasoned connections that need verification._
+- **Are the 10 inferred relationships involving `InventoryState` (e.g. with `EightTurnGame` and `FiveTurnGame`) actually correct?**
+  _`InventoryState` has 10 INFERRED edges - model-reasoned connections that need verification._

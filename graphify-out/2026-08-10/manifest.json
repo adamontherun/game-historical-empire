@@ -40,8 +40,8 @@
     "semantic_hash": "79fb1a94c42d32e68ee6a881643adb44"
   },
   "backend/app/engine/turn.py": {
-    "mtime": 1786390880.3549066,
-    "ast_hash": "d9493ed30ffe7f56778084da78dd7c9c",
+    "mtime": 1786391436.9548547,
+    "ast_hash": "b4988029a8c33279d35ed55ceef10e27",
     "semantic_hash": ""
   },
   "backend/pyproject.toml": {
@@ -220,8 +220,8 @@
     "semantic_hash": ""
   },
   "STATE.md": {
-    "mtime": 1786390986.4885924,
-    "ast_hash": "dc1bb19e78de34f5d880b406059295aa",
+    "mtime": 1786391268.8197596,
+    "ast_hash": "6152e2a2be6647f5b6f2a0f7cdab9277",
     "semantic_hash": ""
   },
   "backend/AGENTS.md": {
@@ -280,8 +280,8 @@
     "semantic_hash": ""
   },
   "backend/app/engine/actor.py": {
-    "mtime": 1786389988.520225,
-    "ast_hash": "173e6795e587b17b9f8a8ea00e7f2877",
+    "mtime": 1786391417.118137,
+    "ast_hash": "b24bacb8d761ca17a105fb819ea27ce7",
     "semantic_hash": ""
   },
   "backend/app/engine/rivals.py": {
@@ -355,8 +355,8 @@
     "semantic_hash": ""
   },
   "docs/ORCHESTRATION.md": {
-    "mtime": 1786380586.241577,
-    "ast_hash": "1bc5c43bf0a71456a72163a6b48a187c",
+    "mtime": 1786391499.7607548,
+    "ast_hash": "d25c3f7fb35ee72911a4d9cac9f4fa62",
     "semantic_hash": ""
   },
   "docs/plans/2026-08-10-section-9-review-round-2.md": {
@@ -707,6 +707,11 @@
   "frontend/src/components/LegacyStrip.tsx": {
     "mtime": 1786390416.4652896,
     "ast_hash": "d544af7dafce45c3e35cf8499486c7d6",
+    "semantic_hash": ""
+  },
+  "backend/tests/test_epilogue_scenario.py": {
+    "mtime": 1786391502.241202,
+    "ast_hash": "2ef1d7e543b28fea548c2b4bb4844c88",
     "semantic_hash": ""
   }
 }

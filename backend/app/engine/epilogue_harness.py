@@ -15,12 +15,12 @@ from __future__ import annotations
 
 from pydantic import BaseModel, ConfigDict
 
-from app.domain.types import PlayerCommand
+from app.domain.types import GameState, PlayerCommand
 from app.engine.harness import POLICY_FUNCS, BatchConfig
 from app.engine.prototype import EightTurnGame, FiveTurnGame, default_start_state
 
 
-def _epilogue_command(state) -> PlayerCommand:
+def _epilogue_command(state: GameState) -> PlayerCommand:
     """Uniform epilogue policy: craft if possible, else sell finished, else sell grain/hold.
 
     Shared across all policies for fairness — not a per-policy invention.

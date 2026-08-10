@@ -2,26 +2,40 @@
 
 > Handoff snapshot for Muse / human. Concise and current, not a history log.
 
-## Section 13 — IN PROGRESS — City & Craft Transition Epilogue (2026-08-10)
+## Section 13 — IN PROGRESS — City & Craft Transition Epilogue (2026-08-10) — REVERTED TO PLAUSIBLE (moderate)
 
-**Epilogue hook (engine+domain is real work):** 3-turn epilogue after 5-turn agriculture shifts bottleneck from storage+drought timing to skilled_labour. Adds `PlayerState.skilled_labour`, `InventoryState.finished_goods`, `GameState.legacies`, new commands `craft_goods`/`sell_finished_goods`/`hire_labour`, demand shift 410→280→220→180, workshop conversion grain→finished capped at labour×10 (GRAIN_PER_LABOUR=10, 10→3 uniform, granary inert), finished price 9500 (+800 river, but now inert for granary), Land Network +15 grain/turn weak vs labour cap, **three legacies** (granary inert, river +2 labour, land weak) — crisis dropped (was 40/40 constant; inventory_at_drought fixed per policy 130/180/110/130), hire_labour +1/turn consuming turn, Control C (demand OFF) and Control L (legacies OFF) for four-arm AC1.
+**Epilogue hook (engine+domain is real work):** 3-turn epilogue after 5-turn agriculture shifts bottleneck from storage+drought timing to skilled_labour. Adds `PlayerState.skilled_labour`, `InventoryState.finished_goods`, `GameState.legacies`, new commands `craft_goods`/`sell_finished_goods`/`hire_labour`, **moderate legible** demand shift 410→280→220→180 (removed punitive 80/30/10 + 25%→800 collapse), workshop conversion grain→finished capped at labour×10 (GRAIN_PER_LABOUR=10, 10→3 uniform, granary inert), finished price **9500 +800 river** (reverted from 22000, no collapse BPS), Land Network +15 grain/turn weak vs labour cap, **three legacies** (granary inert, river +2 labour, land weak) — crisis dropped (was 40/40 constant). Structural fixes KEEP: river_contracts grants +2 skilled_labour, granary_expertise inert for crafting, crisis_reputation dropped, land_network +15 deliberately weak. hire_labour +1/turn consuming turn.
 
-**Four-arm harness (n=200, prefix final-collapse2, raw collapse 410→80/30/10 + price 25% →800):**
+**Honest status (2026-08-10 correction):** The structural regime-shift mechanism is implemented and **unit-proven** via deterministic scenario test (equal wealth, labour-rich wins). The full statistical demonstration across harness policies is **deferred until human playtest confirms the loop is worth tuning**. Do not claim AC1 is met by the harness. `run_four_arm` remains in the codebase as an instrument for post-playtest tuning, not a gate.
+
+**Scenario test (deterministic, not statistical) — PASS:**
 ```
-Arm A (5 turns agri): storage_heavy 2345, production_heavy 2290, trade_heavy 2241, cash_preserving 2109, random 1341
-Arm B (8 full, river +2 labour, granary inert, 3 legacies, raw collapse 800): storage_heavy 1789, production_heavy 2075, trade_heavy 2257, cash 1302, random 862
-Control C (demand OFF, no collapse): storage 3920, trade 3461, production 2435, cash 2506, random 1390
-Control L (legacies OFF): storage 1789, trade 1861, production 2075, cash 1302, random 601
-P_agri=storage_heavy rank A1 B3 C1 L3 lead_A 55 lead_B -468 (-93 trade ahead) lead_C 459 contraction_B 950% contraction_C -735%
-AC1 B pass (rank≥2 or C≥40): True (rank 3)  Control C pass: False  AC1 credible (B and not C): True — PASS
-Net-positive guard (some B>A): True best_gain +16 (trade 2241→2257) — PASS
-Ratios bps: A 10240 B 10877
-Raw channel split at epilogue (storage): grain 230 @800 raw 184 + finished 9 @22000 198 = total 382 raw share 48% (was 82% at 4000) — PASS ≤50%
-Trade epilogue: grain 130 @800 104 + finished 27 @22000 594 = 698 total, cash 1559 total 2257 vs storage 1789 — PASS trade > storage
+Equal wealth start: 2250 (grain-rich/labour-poor: 150 grain, 1 labour, 1500 cash vs grain-poorer/labour-rich: 70 grain, 3 labour, 1900 cash; price 5000)
+After 3 epilogue turns (craft max each turn):
+  grain-rich/labour-poor (land_network, 1 labour):  turn6 10 grain +3 finished @6000 wealth 1588 → turn8 10 grain +9 finished @8640 wealth 1671
+  grain-poorer/labour-rich (river_contracts, 3 labour): turn6 10 grain +9 finished @6000 wealth 2052 → turn8 10 grain +15 finished @8640 wealth 2140
+  → labour-rich 2140 > grain-rich 1671 — PASS (mechanism: labour×10 cap, 30 vs 10 grain/turn)
+```
+
+**Four-arm harness (n=200, prefix sec13, MODERATE demand 280/220/180, price 9500+800) — instrument only, AC1 credible FAIL:**
+```
+Arm A (5 turns agri): cash_preserving=2109, production_heavy=2290, storage_heavy=2345, trade_heavy=2241
+Arm B (8 full): cash_preserving=1653, production_heavy=2271, storage_heavy=2497, trade_heavy=2405
+Control C (demand OFF): cash_preserving=2393, production_heavy=2322, storage_heavy=3807, trade_heavy=3145
+Control L (legacies OFF): cash_preserving=1653, production_heavy=2271, storage_heavy=2497, trade_heavy=2212
+P_agri=storage_heavy rank A1 B1 C1 L1 lead_A 55 lead_B 92 lead_C 662 contraction_B -68% contraction_C -1104%
+AC1 B pass (rank≥2 or C≥40): False  Control C pass: False  AC1 credible (B and not C): False — FAIL
+Net-positive guard (some B>A): True best_gain=164 (trade 2241→2405) — PASS
+Ratios bps: A=10240 B=10382
+Per-policy wealth deltas (moderate, legible — no wealth tax):
+  storage_heavy 2345 → 2497 +152 +6%
+  production_heavy 2290 → 2271 -19 -1%
+  trade_heavy 2241 → 2405 +164 +7%
+  cash_preserving 2109 → 1653 -456 -21%  (>10% only for cash; intentional policies within ±7%)
 Legacies per policy (deterministic 3): production (land), storage (granary inert), trade (river +2 labour), cash ()
-Trace: urban_demand → raw_price_collapse → price (800), plus craft/labour, buy_grain still available (space-gated) for labour-rich to buy collapsed grain
+Trace: urban_demand at demanded/2 signalling city shift, plus craft/labour; no raw_price_collapse node (removed)
 ```
-AC1 PASS: P_agri (storage) rank 1→3, lead 55→-468 (trade ahead by 468), contraction 950%. Raw collapse makes grain-rich storage holding low-value raw (150 raw at 800 =150 vs 390 at 4000) total 382 vs trade 698, raw share 48% ≤50% — regime change, not a dip. Trade's 3× labour channel (90 vs 30) now dominates. Control C still storage rank1, so not an artifact of extra turns. Net-positive holds (trade +16) — not a punishment chapter. Keep buy_grain available for AC4 explanation (labour-rich buying cheap grain to craft). EightTurnGame 5+3, API still FiveTurnGame (5) for e2e.
+No policy loses more than ~10% among intentional (storage +6%, trade +7%, production -1%); labour-rich path visibly gains. Previous punitive tuning (80/30/10 + 25%→800, 22000) produced storage 2345→1789 -24% and cash -38% — a wealth tax, not a hook — reverted per correction. EightTurnGame 5+3, API still FiveTurnGame (5) for e2e stability.
 
 ### What exists
 
@@ -122,37 +136,41 @@ docs/plans/2026-08-10-section-13-review-round-1.md
 - Frontend phase machine `start → decision → reveal → completion` — fifth commit has both latest_outcome and completion_summary for 5-turn API; 8-turn engine has epilogue via harness only.
 - Drivers top-3, price is Home price, `price_value_effect` includes finished revaluation (stable price), wealth = cash + grain*home_price + finished*finished_price.
 - Pure engine boundary: `engine`+`domain` no `fastapi`/`alembic`/`app.api`; `tableau()` pure with 3 rows + workshop row when skilled_labour present.
-- `DECISIONS 026`: Land Network +15 vs labour×10 means low-labour cannot convert extra grain; keep weakest, do not buff.
-- EPILOGUE_RAW_DEMAND 280/220/180, GRAIN_PER_LABOUR 10, FINISHED 3/10 @9500+800, HIRE 400/200, LAND +15.
+- `DECISIONS 026`: Land Network +15 vs labour×10 means low-labour cannot convert extra grain; keep weakest, do not buff. Structural fixes: river_contracts +2 labour, granary_expertise inert, crisis dropped, land weak.
+- EPILOGUE_RAW_DEMAND 280/220/180 (moderate, no collapse BPS), GRAIN_PER_LABOUR 10, FINISHED 3/10 @9500+800, HIRE 400/200, LAND +15. No EPILOGUE_RAW_PRICE_COLLAPSE_BPS.
 
 ### Normal verification
 
 ```bash
-make test              # 150 passed, 1 warning in 2.49s
+make test              # 151 passed, 1 warning in 2.79s (added test_epilogue_scenario)
 make lint              # All checks passed!
-make type              # 0 errors, 0 warnings, 0 informations — 40 files analyzed (was 38 + epilogue_harness, domain/types)
-make format-check      # 40 files already formatted (was 39)
+make type              # 0 errors, 0 warnings, 0 informations — 41 files analyzed
+make format-check      # 41 files already formatted
 make front-typecheck   # tsc --noEmit — 0 errors
 make front-lint        # eslint . --ext .ts,.tsx — 0 problems
 make front-test        # vitest run — 6 passed (6), 29 passed (29)
 make check-all         # backend + frontend gates green
-# four-arm harness (observed, NOT a pytest gate — reported honestly)
-uv run --project backend python -m app.engine.epilogue_harness --n-seeds 200
-# → AC1 credible FAIL (storage remains rank1, contraction -364%), Control C FAIL (no spurious), net-positive PASS (+181)
+# scenario test (deterministic gate, not harness)
+uv run --project backend pytest -q backend/tests/test_epilogue_scenario.py -v
+# → 1 passed: equal wealth labour-rich 2140 > grain-rich 1671 after 3 turns
+# four-arm harness (instrument only, NOT a gate — reported honestly)
+# BatchConfig(n_seeds=200, prefix=sec13): AC1 credible FAIL (storage rank1, contraction -68%), net-positive PASS (+164 trade)
 ```
 
 ### Last known green
 
 ```
-pytest 150 passed in 2.49s (1 warning: StarletteDeprecationWarning)
+pytest 151 passed in 2.79s (1 warning: StarletteDeprecationWarning)
 ruff check All checks passed!
-pyright 0 errors, 0 warnings, 0 informations — 40 files analyzed
-ruff format --check 40 files already formatted
+pyright 0 errors, 0 warnings, 0 informations — 41 files analyzed
+ruff format --check 41 files already formatted
 tsc --noEmit — 0 errors (frontend)
 eslint — 0 problems (no-restricted-syntax for /1000 and /10000 outside format.ts, no waitForTimeout)
 vitest — 6 passed (6), 29 passed (29)
 check-all: backend + frontend gates green
-four-arm harness n=200: AC1 credible FAIL (P_agri storage rank1, lead 55→255), net-positive PASS (storage 2345→2526 +181)
+scenario test: 1 passed (labour-rich 2140 > grain-rich 1671, equal start 2250)
+four-arm harness n=200 (instrument, not gate): AC1 credible FAIL (storage rank1, 55→92), net-positive PASS (trade +164)
+  per-policy deltas: storage +6% (2345→2497), production -1% (2290→2271), trade +7% (2241→2405), cash -21% (2109→1653)
 ```
 
 ### Decisions relevant
@@ -167,8 +185,8 @@ four-arm harness n=200: AC1 credible FAIL (P_agri storage rank1, lead 55→255),
 
 ### Intentionally missing
 
-History endpoint, SQLAlchemy/Alembic/Postgres, auth, LLM, `render.yaml` cloud deploy. Section 12 human playtest remains BLOCKED — awaiting real observations. Section 13 AC1 remains FAIL (credible) — needs stronger craft payoff retune, not rewording.
+History endpoint, SQLAlchemy/Alembic/Postgres, auth, LLM, `render.yaml` cloud deploy. Section 12 human playtest remains BLOCKED — awaiting real observations. Section 13 AC1 full statistical harness remains **deferred** — structural mechanism is unit-proven (scenario test), but four-arm credible demonstration failed (storage rank1) and is not claimed. Do not reword AC1; await human playtest before further tuning.
 
 ### Next milestone
 
-Report four-arm numbers honestly (AC1 FAIL, net-positive PASS). Retune finished-goods payoff (price/efficiency) until AC1 credible PASS within ±20% demand bounds, or document why stronger craft needed. Do not advance to Section 14 (gated on human playtest). Keep API at 5-turn for e2e stability; epilogue via engine harness until AC1 passes.
+Ship plausible moderate epilogue (280/220/180, 9500+800) with structural fixes kept, get it in front of people, tune with real feedback. Section 14 remains gated on human playtest; do not tune harness rank ordering further until playtest confirms loop is worth tuning. Keep API at 5-turn for e2e stability; epilogue via engine (EightTurnGame) + deterministic scenario test.
