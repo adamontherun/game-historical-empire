@@ -205,8 +205,8 @@
     "semantic_hash": ""
   },
   "BUILD_SPEC.md": {
-    "mtime": 1786388811.6681201,
-    "ast_hash": "b141e2347642ec17f5a32f3da01af940",
+    "mtime": 1786389069.905832,
+    "ast_hash": "5dda8abf100e4fa1b0d28ee7b75ce9c1",
     "semantic_hash": ""
   },
   "CLAUDE.md": {
@@ -215,13 +215,13 @@
     "semantic_hash": ""
   },
   "DECISIONS.md": {
-    "mtime": 1786388811.6688557,
-    "ast_hash": "709c3cdbed58a1c2160c91e52ab1477a",
+    "mtime": 1786389317.908723,
+    "ast_hash": "ced0ee10be66ee6099e47f872e32136b",
     "semantic_hash": ""
   },
   "STATE.md": {
-    "mtime": 1786388811.671778,
-    "ast_hash": "8f597238c37eb19ddfb30eb52d19b493",
+    "mtime": 1786389079.7472775,
+    "ast_hash": "228558f7660b8fa1af86eb6fac9b2005",
     "semantic_hash": ""
   },
   "backend/AGENTS.md": {
@@ -475,7 +475,7 @@
     "semantic_hash": ""
   },
   "frontend/src/App.tsx": {
-    "mtime": 1786388950.8150632,
+    "mtime": 1786389235.1907256,
     "ast_hash": "789c79fa3066452b69dc0fd7b52a56f4",
     "semantic_hash": ""
   },
@@ -645,28 +645,28 @@
     "semantic_hash": ""
   },
   "frontend/e2e/screenshots/drought-reveal.png": {
-    "mtime": 1786389027.7826753,
-    "ast_hash": "cedb36fc57f887c8eeb38ee32eddc3b4",
+    "mtime": 1786389261.4809105,
+    "ast_hash": "5d040d08cef13256b8f028fe3ae7c6f6",
     "semantic_hash": ""
   },
   "frontend/e2e/screenshots/drought-warning.png": {
-    "mtime": 1786389022.9238982,
+    "mtime": 1786389256.613515,
     "ast_hash": "576546142559793b6ad29609be591db9",
     "semantic_hash": ""
   },
   "frontend/e2e/screenshots/final-summary.png": {
-    "mtime": 1786389030.39311,
-    "ast_hash": "47c2b1d56696272dd87297679c6a92bf",
+    "mtime": 1786389264.0960138,
+    "ast_hash": "5f66ea314c47dc4e2f6db5c6acb13944",
     "semantic_hash": ""
   },
   "frontend/e2e/screenshots/first-decision.png": {
-    "mtime": 1786389017.953183,
+    "mtime": 1786389251.636937,
     "ast_hash": "d332d5013b0bd1837651c6935cc4dee8",
     "semantic_hash": ""
   },
   "frontend/src/__tests__/runRecord.test.tsx": {
-    "mtime": 1786388990.5114665,
-    "ast_hash": "c6b2f9c44469ddd194744c8f6b9f3531",
+    "mtime": 1786389220.382715,
+    "ast_hash": "2e673408ce5be5d4b63e6aa5007f9529",
     "semantic_hash": ""
   },
   "frontend/src/lib/runRecord.ts": {
