@@ -15,6 +15,7 @@ from pathlib import Path
 # Ensure `backend` is on sys.path when run as script without PYTHONPATH.
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
+from app.domain.pressure import PressureState
 from app.domain.types import (
     GameState,
     InventoryState,
@@ -128,15 +129,35 @@ def main() -> None:
 
     world = args.world  # type: ignore[assignment]
 
+    # Build pressure for demo (single turn, turn 0)
+    def _pressure_for_world(w: str) -> PressureState:
+        stage = "drought" if w == "drought" else "normal"
+        title = "Drought" if w == "drought" else "Normal"
+        signal = (
+            "Drought cuts farm output — regional supply tightens."
+            if w == "drought"
+            else "Normal harvest"
+        )
+        return PressureState(
+            pressure_id="demo",
+            stage=stage,  # type: ignore[arg-type]
+            activation_turn=0,
+            world=w,  # type: ignore[arg-type]
+            signal=signal,
+            title=title,
+        )
+
+    pressure = _pressure_for_world(world)
+
     print("=" * 60)
     print("Historical Empire — Section 5 Two Markets + Route Demo")
     print(f"TURN_ORDER: {TURN_ORDER}")
     print("=" * 60)
     _print_state("BEFORE STATE", state)
     print(f"\nCOMMAND: {cmd.type} {f'qty={cmd.quantity}' if cmd.quantity is not None else ''}")
-    print(f"WORLD CONDITION: {world}")
+    print(f"WORLD CONDITION: {world}  (pressure {pressure.stage})")
 
-    res = resolve_turn(state, cmd, world, state.to_turn_context())
+    res = resolve_turn(state, cmd, pressure, state.to_turn_context())
 
     # Concise outcome — always shown
     print("\n--- PLAYER OUTCOME (concise) ---")
@@ -196,7 +217,8 @@ def main() -> None:
 
     # Also show contrasting world for same command to illustrate opportunity cost
     other_world = "normal" if world == "drought" else "drought"
-    res2 = resolve_turn(state, cmd, other_world, state.to_turn_context())  # type: ignore[arg-type]
+    other_pressure = _pressure_for_world(other_world)
+    res2 = resolve_turn(state, cmd, other_pressure, state.to_turn_context())
     print("\n" + "=" * 60)
     print(f"CONTRAST: same command '{cmd.type}' under world '{other_world}'")
     print(

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from app.domain.types import GameState, InventoryState, MarketState, PlayerCommand, PlayerState
+from app.engine.pressure import PRESSURE_DROUGHT, PRESSURE_NORMAL
 from app.engine.turn import resolve_turn
 
 
@@ -37,8 +38,8 @@ def test_drought_to_wealth_structural_chain_exact() -> None:
     """Drought chain must be structurally present via parent_ids and exact wealth math."""
     state = _state(farm=10, supply=100, demand=120, grain=20, storage=100)
     cmd = PlayerCommand(type="hold")
-    drought = resolve_turn(state, cmd, "drought", state.to_turn_context())
-    normal = resolve_turn(state, cmd, "normal", state.to_turn_context())
+    drought = resolve_turn(state, cmd, PRESSURE_DROUGHT, state.to_turn_context())
+    normal = resolve_turn(state, cmd, PRESSURE_NORMAL, state.to_turn_context())
 
     # Drought reduces farm output
     def farm_out(res):  # type: ignore[no-untyped-def]
@@ -128,7 +129,7 @@ def test_drought_to_wealth_structural_chain_exact() -> None:
 
 def test_story_drivers_cover_wealth_chain() -> None:
     state = _state()
-    res = resolve_turn(state, PlayerCommand(type="hold"), "drought", state.to_turn_context())
+    res = resolve_turn(state, PlayerCommand(type="hold"), PRESSURE_DROUGHT, state.to_turn_context())
     # Drivers collectively should reference farm_output, price, wealth/valuation
     all_causal = set()
     for d in res.player_outcome.drivers:
@@ -151,7 +152,9 @@ def test_story_drivers_cover_wealth_chain() -> None:
 
 def test_concise_le_three_full_trace_preserved() -> None:
     state = _state()
-    res = resolve_turn(state, PlayerCommand(type="expand_farm"), "drought", state.to_turn_context())
+    res = resolve_turn(
+        state, PlayerCommand(type="expand_farm"), PRESSURE_DROUGHT, state.to_turn_context()
+    )
     # Concise drivers ≤3
     assert len(res.player_outcome.drivers) <= 3
     # Full trace preserved (≥10 nodes including valuation)
@@ -176,8 +179,8 @@ def test_normal_vs_drought_different_drivers() -> None:
     """Same command, different world should produce different driver impacts."""
     state = _state(farm=10, supply=100, demand=120)
     cmd = PlayerCommand(type="hold")
-    normal = resolve_turn(state, cmd, "normal", state.to_turn_context())
-    drought = resolve_turn(state, cmd, "drought", state.to_turn_context())
+    normal = resolve_turn(state, cmd, PRESSURE_NORMAL, state.to_turn_context())
+    drought = resolve_turn(state, cmd, PRESSURE_DROUGHT, state.to_turn_context())
     # Drought farm output smaller, so quantity effect smaller
     q_normal = next(n for n in normal.causal_trace.nodes if n.id == "quantity_value_effect").delta
     q_drought = next(n for n in drought.causal_trace.nodes if n.id == "quantity_value_effect").delta

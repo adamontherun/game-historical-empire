@@ -18,6 +18,7 @@ from app.domain.types import (
     PlayerState,
     RouteState,
 )
+from app.engine.pressure import PRESSURE_NORMAL, pressure_for_world
 from app.engine.turn import TURN_ORDER, resolve_turn
 
 
@@ -74,7 +75,7 @@ def test_two_markets_can_have_different_prices() -> None:
     """AC1: Home and River can have different prices from same underlying grain."""
     # Home surplus (supply > demand) vs River shortage (demand > supply)
     state = _base_state(home_supply=200, home_demand=100, river_supply=60, river_demand=150)
-    res = resolve_turn(state, PlayerCommand(type="hold"), "normal", state.to_turn_context())
+    res = resolve_turn(state, PlayerCommand(type="hold"), PRESSURE_NORMAL, state.to_turn_context())
     assert res.next_state.market.current_price != res.next_state.river_market.current_price
     # Both prices derived via same kernel but different inputs — divergence is emergent
     # Ensure Home chain still: farm_output -> supply -> price
@@ -112,10 +113,16 @@ def test_transport_cost_can_make_apparent_price_difference_unprofitable() -> Non
     s_low = _base_state(transport_cost=200, **base_kwargs)  # type: ignore[arg-type]
     s_high = _base_state(transport_cost=3000, **base_kwargs)  # type: ignore[arg-type]
     res_low = resolve_turn(
-        s_low, PlayerCommand(type="ship_grain", quantity=10), "normal", s_low.to_turn_context()
+        s_low,
+        PlayerCommand(type="ship_grain", quantity=10),
+        PRESSURE_NORMAL,
+        s_low.to_turn_context(),
     )
     res_high = resolve_turn(
-        s_high, PlayerCommand(type="ship_grain", quantity=10), "normal", s_high.to_turn_context()
+        s_high,
+        PlayerCommand(type="ship_grain", quantity=10),
+        PRESSURE_NORMAL,
+        s_high.to_turn_context(),
     )
     # Low cost should have trade net positive or higher
     low_trade = next((d for d in res_low.player_outcome.drivers if d.id == "trade_arbitrage"), None)
@@ -146,7 +153,10 @@ def test_route_capacity_constrains_trade_volume() -> None:
         cash=5000, grain=80, storage=200, route_capacity=5, established=True, farm=10
     )
     res = resolve_turn(
-        state, PlayerCommand(type="ship_grain", quantity=50), "normal", state.to_turn_context()
+        state,
+        PlayerCommand(type="ship_grain", quantity=50),
+        PRESSURE_NORMAL,
+        state.to_turn_context(),
     )
     # Shipment effect should be capped at capacity 5
     shipment_eff = next(e for e in res.domain_effects if e.metric == "shipment")
@@ -197,11 +207,14 @@ def test_profitable_arbitrage_emerges_from_market_conditions_not_script() -> Non
     res_profit = resolve_turn(
         s_profit,
         PlayerCommand(type="ship_grain", quantity=10),
-        "normal",
+        PRESSURE_NORMAL,
         s_profit.to_turn_context(),
     )
     res_loss = resolve_turn(
-        s_loss, PlayerCommand(type="ship_grain", quantity=10), "normal", s_loss.to_turn_context()
+        s_loss,
+        PlayerCommand(type="ship_grain", quantity=10),
+        PRESSURE_NORMAL,
+        s_loss.to_turn_context(),
     )
     # Extract trade net
     profit_trade = next(
@@ -242,7 +255,7 @@ def test_player_can_remain_entirely_in_home_valley() -> None:
         state = _base_state(established=False)
         qty = 10 if cmd_type == "buy_grain" else None
         cmd = PlayerCommand(type=cmd_type, quantity=qty)  # type: ignore[arg-type]
-        res = resolve_turn(state, cmd, "normal", state.to_turn_context())  # type: ignore[arg-type]
+        res = resolve_turn(state, cmd, PRESSURE_NORMAL, state.to_turn_context())
         # Should produce valid next_state, no crash, inventory/cash non-negative
         assert res.next_state.turn == state.turn + 1
         assert res.next_state.player.cash >= 0
@@ -259,10 +272,10 @@ def test_player_can_remain_entirely_in_home_valley() -> None:
     s_no_route = _base_state(established=False)
     s_has_route = _base_state(established=True)
     res_no = resolve_turn(
-        s_no_route, PlayerCommand(type="hold"), "normal", s_no_route.to_turn_context()
+        s_no_route, PlayerCommand(type="hold"), PRESSURE_NORMAL, s_no_route.to_turn_context()
     )
     res_has = resolve_turn(
-        s_has_route, PlayerCommand(type="hold"), "normal", s_has_route.to_turn_context()
+        s_has_route, PlayerCommand(type="hold"), PRESSURE_NORMAL, s_has_route.to_turn_context()
     )
     # Both should succeed and home market chain identical aside from route nodes
     assert res_no.next_state.market.current_price == res_has.next_state.market.current_price
@@ -288,19 +301,19 @@ def test_all_results_remain_deterministic() -> None:
                 seed="seed-determinism-001",
             )
             ctx = s.to_turn_context()
-            r1 = resolve_turn(s, cmd, world, ctx)  # type: ignore[arg-type]
-            r2 = resolve_turn(s, cmd, world, ctx)  # type: ignore[arg-type]
+            r1 = resolve_turn(s, cmd, pressure_for_world(world), ctx)
+            r2 = resolve_turn(s, cmd, pressure_for_world(world), ctx)
             assert r1 == r2, f"non-deterministic for {cmd_type}/{world}"
             # Seed change may produce different derived RNG but still deterministic per seed
             s2 = s.model_copy(update={"run_seed": "seed-different"})
             ctx2 = s2.to_turn_context()
-            r3 = resolve_turn(s2, cmd, world, ctx2)  # type: ignore[arg-type]
-            r4 = resolve_turn(s2, cmd, world, ctx2)  # type: ignore[arg-type]
+            r3 = resolve_turn(s2, cmd, pressure_for_world(world), ctx2)
+            r4 = resolve_turn(s2, cmd, pressure_for_world(world), ctx2)
             assert r3 == r4
             # Different turn should also be deterministic per turn
             s3 = _base_state(turn=5, established=True, seed="seed-001")
-            r5 = resolve_turn(s3, cmd, world, s3.to_turn_context())  # type: ignore[arg-type]
-            r6 = resolve_turn(s3, cmd, world, s3.to_turn_context())  # type: ignore[arg-type]
+            r5 = resolve_turn(s3, cmd, pressure_for_world(world), s3.to_turn_context())
+            r6 = resolve_turn(s3, cmd, pressure_for_world(world), s3.to_turn_context())
             assert r5 == r6
 
 
@@ -308,13 +321,15 @@ def test_secure_route_creates_trade_access() -> None:
     """Command that creates trade access must be deterministic and cost cash."""
     state = _base_state(cash=1000, established=False)
     # First secure should cost and establish
-    res = resolve_turn(state, PlayerCommand(type="secure_route"), "normal", state.to_turn_context())
+    res = resolve_turn(
+        state, PlayerCommand(type="secure_route"), PRESSURE_NORMAL, state.to_turn_context()
+    )
     assert res.next_state.route.established is True
     assert res.next_state.player.cash == 600  # 1000 -400
     # Second secure when already established should not charge again
     state2 = res.next_state
     res2 = resolve_turn(
-        state2, PlayerCommand(type="secure_route"), "normal", state2.to_turn_context()
+        state2, PlayerCommand(type="secure_route"), PRESSURE_NORMAL, state2.to_turn_context()
     )
     assert res2.next_state.route.established is True
     assert (
@@ -326,7 +341,7 @@ def test_secure_route_creates_trade_access() -> None:
     # Insufficient cash should not establish
     poor = _base_state(cash=100, established=False)
     res_poor = resolve_turn(
-        poor, PlayerCommand(type="secure_route"), "normal", poor.to_turn_context()
+        poor, PlayerCommand(type="secure_route"), PRESSURE_NORMAL, poor.to_turn_context()
     )
     assert res_poor.next_state.route.established is False
     assert res_poor.next_state.player.cash == 100
@@ -337,7 +352,10 @@ def test_ship_requires_route_access() -> None:
     """Ship without established route should be blocked and not move grain."""
     state = _base_state(cash=1000, grain=20, storage=100, established=False)
     res = resolve_turn(
-        state, PlayerCommand(type="ship_grain", quantity=10), "normal", state.to_turn_context()
+        state,
+        PlayerCommand(type="ship_grain", quantity=10),
+        PRESSURE_NORMAL,
+        state.to_turn_context(),
     )
     # No inventory movement
     shipment = next(e for e in res.domain_effects if e.metric == "shipment")
@@ -365,7 +383,7 @@ def test_wealth_decomposition_still_exact_with_route() -> None:
             state = _base_state(cash=2000, grain=30, storage=200, established=True)
             qty = 10 if cmd_type in ("buy_grain", "ship_grain") else None
             cmd = PlayerCommand(type=cmd_type, quantity=qty)  # type: ignore[arg-type]
-            res = resolve_turn(state, cmd, world, state.to_turn_context())  # type: ignore[arg-type]
+            res = resolve_turn(state, cmd, pressure_for_world(world), state.to_turn_context())
             eff = {e.metric: e for e in res.domain_effects}
             wealth = eff["wealth"].delta
             assert (
@@ -404,7 +422,10 @@ def test_arbitrage_uses_resolved_home_price_not_before() -> None:
         established=True,
     )
     res = resolve_turn(
-        state, PlayerCommand(type="ship_grain", quantity=10), "normal", state.to_turn_context()
+        state,
+        PlayerCommand(type="ship_grain", quantity=10),
+        PRESSURE_NORMAL,
+        state.to_turn_context(),
     )
     assert res.next_state.market.current_price == 6000
     assert res.next_state.river_market.current_price == 6240
@@ -426,7 +447,10 @@ def test_trade_causal_graph_truthful() -> None:
     """Fix 2: cash_effect via cash_after_trade, price_value_effect via inventory_after_trade, shipment limits structural."""
     state = _base_state(cash=5000, grain=50, storage=200, established=True, reliability=10000)
     res = resolve_turn(
-        state, PlayerCommand(type="ship_grain", quantity=10), "normal", state.to_turn_context()
+        state,
+        PlayerCommand(type="ship_grain", quantity=10),
+        PRESSURE_NORMAL,
+        state.to_turn_context(),
     )
     nodes = {n.id: n for n in res.causal_trace.nodes}
     # cash_effect must parent cash_after_trade, not cash_after_command directly
@@ -454,7 +478,10 @@ def test_trade_causal_graph_truthful() -> None:
     # Also check blocked case has cash_after_trade zero correctly
     blocked = _base_state(cash=1000, grain=20, established=False)
     res_blocked = resolve_turn(
-        blocked, PlayerCommand(type="ship_grain", quantity=10), "normal", blocked.to_turn_context()
+        blocked,
+        PlayerCommand(type="ship_grain", quantity=10),
+        PRESSURE_NORMAL,
+        blocked.to_turn_context(),
     )
     nodes_b = {n.id: n for n in res_blocked.causal_trace.nodes}
     assert nodes_b["cash_after_trade"].delta == 0
@@ -486,7 +513,7 @@ def test_reliability_and_delay_semantics() -> None:
             }
         )
         res = resolve_turn(
-            s, PlayerCommand(type="ship_grain", quantity=10), "normal", s.to_turn_context()
+            s, PlayerCommand(type="ship_grain", quantity=10), PRESSURE_NORMAL, s.to_turn_context()
         )
         rev = next(n for n in res.causal_trace.nodes if n.id == "trade_revenue")
         assert rev.delta == expected_rev, (

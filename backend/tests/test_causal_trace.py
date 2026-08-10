@@ -14,6 +14,7 @@ from app.domain.types import (
     PlayerState,
     TurnContext,
 )
+from app.engine.pressure import PRESSURE_DROUGHT, PRESSURE_NORMAL, pressure_for_world
 from app.engine.turn import TURN_ORDER, resolve_turn
 
 
@@ -53,7 +54,7 @@ def test_every_important_node_has_parent_including_valuation() -> None:
             state = _base_state()
             qty = 5 if cmd_type == "buy_grain" else None
             cmd = PlayerCommand(type=cmd_type, quantity=qty)  # type: ignore[arg-type]
-            res = resolve_turn(state, cmd, world, state.to_turn_context())  # type: ignore[arg-type]
+            res = resolve_turn(state, cmd, pressure_for_world(world), state.to_turn_context())
             ids = {n.id for n in res.causal_trace.nodes}
             # Core chain must exist
             for required in (
@@ -77,9 +78,14 @@ def test_every_important_node_has_parent_including_valuation() -> None:
             assert isinstance(res.causal_trace.nodes, tuple)
             for node in res.causal_trace.nodes:
                 assert isinstance(node.parent_ids, tuple)
-                # Allowed roots
-                if node.id in ("world", "command"):
+                # Allowed roots — pressure_stage is now root, world is child of pressure_stage (Section 8)
+                if node.id in ("pressure_stage", "command"):
                     assert node.parent_ids == (), f"{node.id} should be root"
+                    continue
+                if node.id == "world":
+                    assert node.parent_ids == ("pressure_stage",), (
+                        f"world should be child of pressure_stage, got {node.parent_ids}"
+                    )
                     continue
                 if node.id == "farm_capacity" and node.delta == 0:
                     assert node.parent_ids == ()
@@ -127,7 +133,7 @@ def test_every_important_node_has_parent_including_valuation() -> None:
 
 def test_trace_immutable_tuples() -> None:
     state = _base_state()
-    res = resolve_turn(state, PlayerCommand(type="hold"), "normal", state.to_turn_context())
+    res = resolve_turn(state, PlayerCommand(type="hold"), PRESSURE_NORMAL, state.to_turn_context())
     assert isinstance(res.causal_trace.nodes, tuple)
     assert isinstance(res.domain_effects, tuple)
     assert isinstance(res.player_outcome.drivers, tuple)
@@ -160,7 +166,7 @@ def test_wealth_decomposition_exact() -> None:
             state = _base_state(cash=1000, grain=20, farm=10, storage=100)
             qty = 10 if cmd_type == "buy_grain" else None
             cmd = PlayerCommand(type=cmd_type, quantity=qty)  # type: ignore[arg-type]
-            res = resolve_turn(state, cmd, world, state.to_turn_context())  # type: ignore[arg-type]
+            res = resolve_turn(state, cmd, pressure_for_world(world), state.to_turn_context())
             # Extract valuation effects
             eff = {e.metric: e for e in res.domain_effects}
             assert "purchase_quantity_value" in eff
@@ -201,7 +207,7 @@ def test_wealth_decomposition_exact() -> None:
 
 def test_wealth_graph_parents() -> None:
     state = _base_state()
-    res = resolve_turn(state, PlayerCommand(type="hold"), "normal", state.to_turn_context())
+    res = resolve_turn(state, PlayerCommand(type="hold"), PRESSURE_NORMAL, state.to_turn_context())
     q = next(n for n in res.causal_trace.nodes if n.id == "quantity_value_effect")
     p = next(n for n in res.causal_trace.nodes if n.id == "price_value_effect")
     w = next(n for n in res.causal_trace.nodes if n.id == "wealth")
@@ -226,7 +232,7 @@ def test_drivers_derived_from_trace_not_snapshot() -> None:
     state = _base_state(cash=500, grain=25, storage=30, farm=0, current_price=5000)
     # Storage 30, grain 25 => space 5, request 20 => clamped to 5
     cmd = PlayerCommand(type="buy_grain", quantity=20)
-    res = resolve_turn(state, cmd, "normal", state.to_turn_context())
+    res = resolve_turn(state, cmd, PRESSURE_NORMAL, state.to_turn_context())
     # Buy was storage-limited
     buy_node = next(n for n in res.causal_trace.nodes if n.id == "inventory_after_buy")
     assert buy_node.reason_code == "insufficient_storage"
@@ -252,8 +258,8 @@ def test_driver_ranking_deterministic_exact_wealth_bps() -> None:
     state = _base_state(cash=1000, grain=20, farm=10, storage=100)
     cmd = PlayerCommand(type="expand_farm")
     ctx = state.to_turn_context()
-    r1 = resolve_turn(state, cmd, "drought", ctx)
-    r2 = resolve_turn(state, cmd, "drought", ctx)
+    r1 = resolve_turn(state, cmd, PRESSURE_DROUGHT, ctx)
+    r2 = resolve_turn(state, cmd, PRESSURE_DROUGHT, ctx)
     assert r1.player_outcome.drivers == r2.player_outcome.drivers
     # Also ensure ranking is by wealth-bps desc, id asc
     for drivers in [r1.player_outcome.drivers]:
@@ -295,7 +301,7 @@ def test_story_drivers_are_paths_and_filtered() -> None:
         base_price=5000,
     )
     # With supply==demand, price pressure 0, target==base, bounded may be 0 delta
-    res = resolve_turn(state, PlayerCommand(type="hold"), "normal", state.to_turn_context())
+    res = resolve_turn(state, PlayerCommand(type="hold"), PRESSURE_NORMAL, state.to_turn_context())
     # Drivers should be ≤3 and each should have path length >=2 or at least 2 nodes for price story
     assert len(res.player_outcome.drivers) <= 3
     for d in res.player_outcome.drivers:
@@ -308,7 +314,9 @@ def test_story_drivers_are_paths_and_filtered() -> None:
     state2 = _base_state(
         cash=1000, grain=20, farm=10, storage=100, supply=10, demand=120, current_price=5000
     )
-    res2 = resolve_turn(state2, PlayerCommand(type="hold"), "normal", state2.to_turn_context())
+    res2 = resolve_turn(
+        state2, PlayerCommand(type="hold"), PRESSURE_NORMAL, state2.to_turn_context()
+    )
     assert len(res2.player_outcome.drivers) <= 3
     # Price revaluation should have long path
     price_drivers = [d for d in res2.player_outcome.drivers if d.id == "price_revaluation"]
@@ -483,18 +491,18 @@ def test_rng_context_mismatch_raises() -> None:
     state = _base_state(turn=0, seed="seed-001", version="1.0")
     bad_ctx = TurnContext(turn=999, run_seed="seed-001", ruleset_version="1.0")
     with pytest.raises(ValueError, match="rng_context"):
-        resolve_turn(state, PlayerCommand(type="hold"), "normal", bad_ctx)
+        resolve_turn(state, PlayerCommand(type="hold"), PRESSURE_NORMAL, bad_ctx)
     # Also wrong seed
     bad_ctx2 = TurnContext(turn=0, run_seed="other", ruleset_version="1.0")
     with pytest.raises(ValueError):
-        resolve_turn(state, PlayerCommand(type="hold"), "normal", bad_ctx2)
+        resolve_turn(state, PlayerCommand(type="hold"), PRESSURE_NORMAL, bad_ctx2)
 
 
 def test_storage_capped_zero_quantity_effect() -> None:
     """If storage is full, quantity value effect should be zero and driver discarded."""
     # Storage exactly full before harvest: grain 100, storage 100, farm 10 => 100 output would exceed
     state = _base_state(cash=1000, grain=100, farm=10, storage=100, supply=100, demand=120)
-    res = resolve_turn(state, PlayerCommand(type="hold"), "normal", state.to_turn_context())
+    res = resolve_turn(state, PlayerCommand(type="hold"), PRESSURE_NORMAL, state.to_turn_context())
     # Inventory should be capped at 100, so delta 0, quantity effect 0
     inv_node = next(n for n in res.causal_trace.nodes if n.id == "inventory")
     assert inv_node.after == 100
@@ -529,7 +537,7 @@ def test_buy_quantity_split_no_false_harvest_story() -> None:
     """Farm 0 buy must not produce a harvest story — quantity is entirely purchase."""
     state = _base_state(cash=1000, grain=0, farm=0, storage=100, supply=100, demand=120)
     res = resolve_turn(
-        state, PlayerCommand(type="buy_grain", quantity=5), "normal", state.to_turn_context()
+        state, PlayerCommand(type="buy_grain", quantity=5), PRESSURE_NORMAL, state.to_turn_context()
     )
     pur = next(n for n in res.causal_trace.nodes if n.id == "purchase_quantity_value")
     har = next(n for n in res.causal_trace.nodes if n.id == "harvest_quantity_value")
@@ -556,5 +564,5 @@ def test_buy_quantity_split_no_false_harvest_story() -> None:
 def test_turn_order_includes_valuation() -> None:
     assert (
         TURN_ORDER
-        == "command -> production -> home_supply -> river_supply -> home_price -> river_price -> settlement -> route_settlement -> valuation"
+        == "pressure_stage -> world -> command -> production -> home_supply -> river_supply -> home_price -> river_price -> settlement -> route_settlement -> valuation"
     )

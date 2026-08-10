@@ -13,6 +13,7 @@ Plus supply semantics signal-drained gate (availability signal, not physical sto
 from __future__ import annotations
 
 from app.domain.types import PlayerCommand
+from app.engine.pressure import PRESSURE_DROUGHT, PRESSURE_NORMAL
 from app.engine.prototype import (
     TURN_LIMIT,
     TURN_SPECS,
@@ -95,8 +96,8 @@ def test_supply_semantics_is_signal_drained_by_demand() -> None:
     # Use the default start state's market: supply 100 demand 90
     # For normal: signal_next = 100 + 100 -90 =110
     # For drought: 100+60-90=70
-    normal = resolve_turn(state, _hold(), "normal", state.to_turn_context())
-    drought = resolve_turn(state, _hold(), "drought", state.to_turn_context())
+    normal = resolve_turn(state, _hold(), PRESSURE_NORMAL, state.to_turn_context())
+    drought = resolve_turn(state, _hold(), PRESSURE_DROUGHT, state.to_turn_context())
     assert normal.next_state.market.supply == 110, (
         f"expected 110 got {normal.next_state.market.supply}"
     )
@@ -309,7 +310,7 @@ def test_start_state_must_be_turn_zero() -> None:
 def test_demand_in_causal_graph() -> None:
     """Demand must be explicit in causal graph as parent of supply and price."""
     state = default_start_state(seed="demand-graph")
-    res = resolve_turn(state, _hold(), "normal", state.to_turn_context())
+    res = resolve_turn(state, _hold(), PRESSURE_NORMAL, state.to_turn_context())
     ids = {n.id for n in res.causal_trace.nodes}
     assert "demand" in ids
     assert "home_demand" in ids

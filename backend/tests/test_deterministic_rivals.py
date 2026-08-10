@@ -21,6 +21,7 @@ from app.engine.actor import (
     cost_for_quantity,
     value_for,
 )
+from app.engine.pressure import pressure_for_world
 from app.engine.prototype import FiveTurnGame
 from app.engine.rivals import (
     DARAN_PROFILE,
@@ -472,7 +473,12 @@ def test_player_market_isolation() -> None:
         from app.engine.prototype import TURN_SPECS
 
         spec = TURN_SPECS[idx]
-        s = rt(s, PlayerCommand(type="hold"), spec.world, s.to_turn_context()).next_state
+        s = rt(
+            s,
+            PlayerCommand(type="hold"),
+            pressure_for_world(spec.world),
+            s.to_turn_context(),  # type: ignore[arg-type]
+        ).next_state
     # Now via FiveTurnGame (which also advances rivals)
     g = FiveTurnGame(seed="iso-test")
     g.run([PlayerCommand(type="hold") for _ in range(5)])

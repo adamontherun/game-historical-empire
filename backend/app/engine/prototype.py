@@ -1,21 +1,22 @@
-"""Five-turn headless prototype — Section 7 with deterministic rivals.
+"""Five-turn headless prototype — Section 8 pressure-driven arc.
 
-Orchestrates exactly five deterministic turns with an authored world/signal arc
+Orchestrates exactly five deterministic turns with an authored pressure arc
 and session-owned rivals Mira/Daran (pure, no DB, no LLM, isolated supply).
 
 Supply semantics: MarketState.supply is a market-availability signal/index,
 drained by demand each turn (turn.py Section 6). Rivals do not mutate the
 shared availability signal in Section 7 (isolation).
 
-TURN_SPECS is the only world schedule (hardcoded, not a DSL).
-Structured threat `next_world_known` models the telegraphed warning
-(T3 → drought) without parsing prose.
+PRESSURE_ARC (engine/pressure.py) is now the single source; TURN_SPECS is
+derived for backward compatibility. Structured threat `next_world_known`
+is derived from pressure stage (worsening_dry → drought), not prose.
 """
 
 from __future__ import annotations
 
 from pydantic import BaseModel, ConfigDict
 
+from app.domain.pressure import PressureState
 from app.domain.trace import TurnResolution
 from app.domain.types import (
     GameState,
@@ -25,6 +26,11 @@ from app.domain.types import (
     PlayerState,
     RouteState,
     WorldCondition,
+)
+from app.engine.pressure import (
+    PRESSURE_ARC,
+    next_world_known_for_turn,
+    pressure_for_turn,
 )
 from app.engine.rivals import (
     DARAN_PROFILE,
@@ -53,36 +59,10 @@ class TurnSpec(BaseModel):
     title: str
 
 
-# Truthful signals — each describes actual mechanics, not imaginary deltas.
-# T1 demand is high (starting state's demand), T2 surplus is emergent from
-# signal + harvest > demand, T3 warning precedes T4 drought, T4 is the
-# actual world change, T5 is aftermath.
-TURN_SPECS: tuple[TurnSpec, ...] = (
-    TurnSpec(
-        world="normal",
-        title="A Growing Settlement",
-        signal="The growing settlement keeps food demand high.",
-    ),
-    TurnSpec(
-        world="normal",
-        title="Surplus",
-        signal="Repeated harvests have left grain abundant and prices weak.",
-    ),
-    TurnSpec(
-        world="normal",
-        title="Warning Signs",
-        signal="Dry weather suggests the next harvest may be threatened.",
-    ),
-    TurnSpec(
-        world="drought",
-        title="Drought",
-        signal="Drought cuts farm output — regional supply tightens.",
-    ),
-    TurnSpec(
-        world="normal",
-        title="Aftermath",
-        signal="Markets adjust to the drought's aftermath.",
-    ),
+# PRESSURE_ARC is the single source (Section 8); TURN_SPECS derived for
+# backward compatibility (existing tests import TURN_SPECS).
+TURN_SPECS: tuple[TurnSpec, ...] = tuple(
+    TurnSpec(world=p.world, signal=p.signal, title=p.title) for p in PRESSURE_ARC
 )
 
 
@@ -136,15 +116,9 @@ def _wealth(state: GameState) -> int:
     return state.player.cash + (state.player.inventory.grain * state.market.current_price // 1000)
 
 
-def _next_world_known_for_turn(idx: int) -> WorldCondition | None:
-    """Structured threat known at turn idx (pre-turn).
-
-    Section 7: only T3 (idx=2, title Warning Signs, world normal) telegraphs
-    T4's drought. Do not parse signal prose; derive from authored TURN_SPECS.
-    """
-    if idx == 2:  # Warning Signs precedes Drought
-        return "drought"
-    return None
+# Backward compat shim: pre-Section 8 code called _next_world_known_for_turn
+def _next_world_known_for_turn(idx: int) -> WorldCondition | None:  # noqa: D103
+    return next_world_known_for_turn(idx)
 
 
 class StrategicSummary(BaseModel):
@@ -184,17 +158,19 @@ class StrategicSummary(BaseModel):
         lines.append(
             f"  river price: {self.initial_state.river_market.current_price} → {self.final_state.river_market.current_price}"
         )
-        # per-turn highlights
+        # per-turn highlights — include pressure stage per G2
         for i, res in enumerate(self.history):
             spec = TURN_SPECS[i] if i < len(TURN_SPECS) else None
             title = spec.title if spec else f"Turn {i + 1}"
+            pressure = PRESSURE_ARC[i] if i < len(PRESSURE_ARC) else None
+            stage = f" [{pressure.stage}]" if pressure else ""
             drivers = (
                 ", ".join(d.label for d in res.player_outcome.drivers)
                 if res.player_outcome.drivers
                 else "no material drivers"
             )
             lines.append(
-                f"  T{i + 1} {title}: wealth {res.player_outcome.wealth_delta:+} — {drivers}"
+                f"  T{i + 1} {title}{stage}: wealth {res.player_outcome.wealth_delta:+} — {drivers}"
             )
         # Rival per-turn headlines (derived)
         if self.rival_history is not None:
@@ -305,16 +281,26 @@ class FiveTurnGame:
         spec = self.current_spec()
         return spec.title if spec else "Complete"
 
+    @property
+    def current_pressure(self) -> PressureState | None:
+        """Current pressure stage, None when game is complete (Q3)."""
+        if self.is_complete:
+            return None
+        idx = len(self._history)
+        if 0 <= idx < len(PRESSURE_ARC):
+            return pressure_for_turn(idx)
+        return None
+
     def available_commands(self) -> list[str]:
         return ["hold", "expand_farm", "build_granary", "buy_grain", "secure_route", "ship_grain"]
 
     def _observable_for(self, idx: int) -> ObservableContext:
         """Build pre-turn observable context for rival choice (structured, not prose)."""
-        spec = TURN_SPECS[idx]
+        pressure = pressure_for_turn(idx)
         return ObservableContext(
             turn=idx,
-            world_now=spec.world,
-            next_world_known=_next_world_known_for_turn(idx),
+            world_now=pressure.world,
+            next_world_known=next_world_known_for_turn(idx),
             home_price_pre=self._state.market.current_price,
             river_price_pre=self._state.river_market.current_price,
             transport_cost_per_unit=self._state.route.transport_cost_per_unit,
@@ -332,7 +318,7 @@ class FiveTurnGame:
         idx = len(self._history)
         if idx >= len(TURN_SPECS):
             raise ValueError("no world spec for next turn")
-        spec = TURN_SPECS[idx]
+        pressure = pressure_for_turn(idx)
 
         # 1. Rivals choose from pre-turn observable info (before player resolution)
         obs = self._observable_for(idx)
@@ -343,13 +329,13 @@ class FiveTurnGame:
 
         # 2. Resolve player/world market turn (authoritative)
         ctx = self._state.to_turn_context()
-        res = resolve_turn(self._state, command, spec.world, ctx)
+        res = resolve_turn(self._state, command, pressure, ctx)
         self._history.append(res)
         self._state = res.next_state
 
         # 3. Rivals settle using correct timing: buy at pre, ship at resolved River, valuation at resolved Home
         settlement = SettlementContext(
-            world_now=spec.world,
+            world_now=pressure.world,
             home_price_pre=obs.home_price_pre,
             river_price_resolved=res.next_state.river_market.current_price,
             home_price_resolved=res.next_state.market.current_price,

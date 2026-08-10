@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from app.domain.types import GameState, InventoryState, MarketState, PlayerCommand, PlayerState
+from app.engine.pressure import PRESSURE_NORMAL, pressure_for_world
 from app.engine.turn import _bounded_price, _target_price, resolve_turn
 
 
@@ -87,8 +88,8 @@ def test_resolve_turn_monotonic_via_engine() -> None:
     s_high = _state(supply=150, demand=120, current_price=5000)
     s_low = _state(supply=100, demand=120, current_price=5000)
     # Both have same farm 5 => same output, but starting supply differs
-    r_high = resolve_turn(s_high, cmd, "normal", s_high.to_turn_context())
-    r_low = resolve_turn(s_low, cmd, "normal", s_low.to_turn_context())
+    r_high = resolve_turn(s_high, cmd, PRESSURE_NORMAL, s_high.to_turn_context())
+    r_low = resolve_turn(s_low, cmd, PRESSURE_NORMAL, s_low.to_turn_context())
     assert r_low.next_state.market.current_price >= r_high.next_state.market.current_price
 
 
@@ -120,7 +121,9 @@ def test_no_negatives_across_random_spread() -> None:
                 for cmd_type in ("hold", "expand_farm", "build_granary", "buy_grain"):
                     qty = 5 if cmd_type == "buy_grain" else None
                     cmd = PlayerCommand(type=cmd_type, quantity=qty)  # type: ignore[arg-type]
-                    res = resolve_turn(state, cmd, world, state.to_turn_context())  # type: ignore[arg-type]
+                    res = resolve_turn(
+                        state, cmd, pressure_for_world(world), state.to_turn_context()
+                    )
                     assert res.next_state.player.cash >= 0
                     assert res.next_state.player.inventory.grain >= 0
                     assert res.next_state.market.supply >= 0
