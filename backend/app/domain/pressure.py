@@ -6,7 +6,7 @@ Pressure is turn-derived/session-authored, not canonical GameState.
 
 from __future__ import annotations
 
-from typing import Literal
+from typing import Literal, cast
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
@@ -38,19 +38,19 @@ class PressureState(BaseModel):
         description="Trace causal_source_id — defaults to f'pressure:{pressure_id}:{stage}'",
     )
 
-    @model_validator(mode="before")  # pyright: ignore[reportUnknownVariableType]
+    @model_validator(mode="before")
     @classmethod
     def _populate_causal_source_id(cls, data: object) -> object:
         # Populate default causal_source_id before validation (G6: avoid frozen mutation)
-        if isinstance(data, dict):
-            d = data  # type: ignore[assignment]
-            cid = d.get("causal_source_id")  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
-            if not cid:
-                pid = d.get("pressure_id")  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
-                stage = d.get("stage")  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
-                if pid and stage:
-                    d["causal_source_id"] = f"pressure:{pid}:{stage}"  # pyright: ignore[reportUnknownMemberType]
-        return data  # pyright: ignore[reportUnknownVariableType]
+        if not isinstance(data, dict):
+            return data
+        d = cast("dict[str, object]", data)
+        if not d.get("causal_source_id"):
+            pid = d.get("pressure_id")
+            stage = d.get("stage")
+            if pid and stage:
+                d["causal_source_id"] = f"pressure:{pid}:{stage}"
+        return d
 
     @model_validator(mode="after")
     def _validate(self) -> PressureState:
