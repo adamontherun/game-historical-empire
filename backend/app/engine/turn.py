@@ -58,15 +58,13 @@ from app.domain.types import (
     WorldCondition,
 )
 from app.engine.actor import (
-    BUILD_GRANARY_COST,
-    BUILD_GRANARY_DELTA,
     DROUGHT_YIELD_REDUCTION_BPS,  # noqa: F401  re-export for backward compat
-    EXPAND_FARM_COST,
-    EXPAND_FARM_DELTA,
-    ROUTE_ESTABLISH_COST,
     YIELD_PER_CAPACITY,  # noqa: F401
     compute_farm_output,
+    resolve_build_granary,
     resolve_buy,
+    resolve_expand_farm,
+    resolve_secure_route,
     resolve_shipment,
     resolve_storage_settlement,
 )
@@ -230,16 +228,11 @@ def resolve_turn(
     # 1. Command
     cmd_reason = ""
     if command.type == "expand_farm":
-        if cash >= EXPAND_FARM_COST:
-            cash -= EXPAND_FARM_COST
-            farm_capacity += EXPAND_FARM_DELTA
-            cmd_reason = "expand_farm"
-            d_cash = -EXPAND_FARM_COST
-            d_farm = EXPAND_FARM_DELTA
-        else:
-            cmd_reason = "insufficient_cash_for_expand"
-            d_cash = 0
-            d_farm = 0
+        cash_before_cmd = cash
+        cash, farm_capacity, d_farm, cmd_reason = resolve_expand_farm(
+            cash=cash, farm_capacity=farm_capacity
+        )
+        d_cash = cash - cash_before_cmd
         nodes.append(
             CausalNode(
                 id="command",
@@ -292,16 +285,11 @@ def resolve_turn(
         )
 
     elif command.type == "build_granary":
-        if cash >= BUILD_GRANARY_COST:
-            cash -= BUILD_GRANARY_COST
-            storage_capacity += BUILD_GRANARY_DELTA
-            cmd_reason = "build_granary"
-            d_cash = -BUILD_GRANARY_COST
-            d_storage = BUILD_GRANARY_DELTA
-        else:
-            cmd_reason = "insufficient_cash_for_granary"
-            d_cash = 0
-            d_storage = 0
+        cash_before_cmd = cash
+        cash, storage_capacity, d_storage, cmd_reason = resolve_build_granary(
+            cash=cash, storage_capacity=storage_capacity
+        )
+        d_cash = cash - cash_before_cmd
         nodes.append(
             CausalNode(
                 id="command",
@@ -423,19 +411,13 @@ def resolve_turn(
         inventory = inventory_after
 
     elif command.type == "secure_route":
-        if route_established_before:
-            cmd_reason = "already_established"
-            d_cash = 0
-            # route_established stays True
-        else:
-            if cash >= ROUTE_ESTABLISH_COST:
-                cash -= ROUTE_ESTABLISH_COST
-                route_established = True
-                cmd_reason = "secure_route"
-                d_cash = -ROUTE_ESTABLISH_COST
-            else:
-                cmd_reason = "insufficient_cash_for_route"
-                d_cash = 0
+        cash_before_cmd = cash
+        cash, route_established, d_route, cmd_reason = resolve_secure_route(
+            cash=cash, route_established=route_established_before
+        )
+        # For this branch route_established_before is the before, but helper already handles
+        # route_established variable now holds after value
+        d_cash = cash - cash_before_cmd
         nodes.append(
             CausalNode(
                 id="command",

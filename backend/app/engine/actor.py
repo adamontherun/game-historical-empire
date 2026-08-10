@@ -222,3 +222,59 @@ def resolve_shipment(
     if inventory_final < 0:
         inventory_final = 0
     return effective, delivered, revenue, transport_cost, cash_delta, inventory_final, reason
+
+
+def resolve_expand_farm(
+    *,
+    cash: int,
+    farm_capacity: int,
+) -> tuple[int, int, int, str]:
+    """Shared expand_farm affordability/mutation.
+
+    Returns (cash_after, farm_after, farm_delta, reason_code).
+    """
+    if cash >= EXPAND_FARM_COST:
+        return (
+            cash - EXPAND_FARM_COST,
+            farm_capacity + EXPAND_FARM_DELTA,
+            EXPAND_FARM_DELTA,
+            "expand_farm",
+        )
+    return cash, farm_capacity, 0, "insufficient_cash_for_expand"
+
+
+def resolve_build_granary(
+    *,
+    cash: int,
+    storage_capacity: int,
+) -> tuple[int, int, int, str]:
+    """Shared build_granary affordability/mutation.
+
+    Returns (cash_after, storage_after, storage_delta, reason_code).
+    """
+    if cash >= BUILD_GRANARY_COST:
+        return (
+            cash - BUILD_GRANARY_COST,
+            storage_capacity + BUILD_GRANARY_DELTA,
+            BUILD_GRANARY_DELTA,
+            "build_granary",
+        )
+    return cash, storage_capacity, 0, "insufficient_cash_for_granary"
+
+
+def resolve_secure_route(
+    *,
+    cash: int,
+    route_established: bool,
+) -> tuple[int, bool, int, str]:
+    """Shared secure_route affordability/mutation.
+
+    Returns (cash_after, route_after, delta, reason_code).
+    Delta is 1 if newly established else 0.
+    Reasons: secure_route, already_established, insufficient_cash_for_route.
+    """
+    if route_established:
+        return cash, True, 0, "already_established"
+    if cash >= ROUTE_ESTABLISH_COST:
+        return cash - ROUTE_ESTABLISH_COST, True, 1, "secure_route"
+    return cash, False, 0, "insufficient_cash_for_route"

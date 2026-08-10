@@ -15,17 +15,19 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from app.domain.types import InventoryState, PlayerCommand, WorldCondition
+from app.domain.types import InventoryState, Money, PlayerCommand, Quantity, WorldCondition
 from app.engine.actor import (
     BUILD_GRANARY_COST,
-    BUILD_GRANARY_DELTA,
     EXPAND_FARM_COST,
     EXPAND_FARM_DELTA,
     ROUTE_ESTABLISH_COST,
     YIELD_PER_CAPACITY,
     compute_farm_output,
     cost_for_quantity,
+    resolve_build_granary,
     resolve_buy,
+    resolve_expand_farm,
+    resolve_secure_route,
     resolve_shipment,
     resolve_storage_settlement,
     value_for,
@@ -37,6 +39,23 @@ RivalId = Literal["mira", "daran"]
 CommandType = Literal[
     "expand_farm", "build_granary", "buy_grain", "hold", "secure_route", "ship_grain"
 ]
+ExposureTag = Literal["farm_penalize", "farm_reward"]
+
+
+class RivalPreferences(BaseModel):
+    """Immutable preference vector — bps per command, frozen so profile cannot mutate."""
+
+    model_config = ConfigDict(frozen=True)
+
+    expand_farm: int = Field(ge=0, description="Pref bps for expand_farm")
+    build_granary: int = Field(ge=0, description="Pref bps for build_granary")
+    buy_grain: int = Field(ge=0, description="Pref bps for buy_grain")
+    hold: int = Field(ge=0, description="Pref bps for hold")
+    secure_route: int = Field(ge=0, description="Pref bps for secure_route")
+    ship_grain: int = Field(ge=0, description="Pref bps for ship_grain")
+
+    def get(self, key: str, default: int = 10000) -> int:
+        return getattr(self, key, default) if hasattr(self, key) else default
 
 
 class RivalProfile(BaseModel):
@@ -45,15 +64,10 @@ class RivalProfile(BaseModel):
     model_config = ConfigDict(frozen=True)
 
     id: RivalId = Field(description="Rival identity")
-    preferences_bps: dict[str, int] = Field(
-        description="Preference per command type in bps (10_000 = 100%)"
-    )
-    risk_cash_floor: int = Field(description="Cash floor for risk penalty")
-    risk_penalty_bps: int = Field(
-        description="Risk multiplier when cash would drop below floor (e.g. 8000 = -20%)"
-    )
-    # Exposure tweak tag for bespoke logic in scoring
-    exposure_tag: str = Field(description="farm_penalize or farm_reward")
+    preferences_bps: RivalPreferences = Field(description="Preference per command type in bps")
+    risk_cash_floor: Money = Field(description="Cash floor for risk penalty")
+    risk_penalty_bps: int = Field(description="Risk multiplier when cash would drop below floor")
+    exposure_tag: ExposureTag = Field(description="farm_penalize or farm_reward")
 
 
 class RivalState(BaseModel):
@@ -61,10 +75,10 @@ class RivalState(BaseModel):
 
     model_config = ConfigDict(frozen=True)
 
-    cash: int = Field(ge=0, description="Rival cash")
+    cash: Money = Field(description="Rival cash")
     inventory: InventoryState = Field(description="Rival grain inventory")
-    farm_capacity: int = Field(ge=0, description="Farm capacity")
-    storage_capacity: int = Field(ge=0, description="Storage capacity")
+    farm_capacity: Quantity = Field(description="Farm capacity")
+    storage_capacity: Quantity = Field(description="Storage capacity")
     route_established: bool = Field(description="River route established for rival")
 
 
@@ -78,6 +92,7 @@ class RivalTurnResult(BaseModel):
     command: PlayerCommand = Field(description="Chosen command")
     after: RivalState = Field(description="State after turn")
     headline: str = Field(description="Truthful headline derived from resolved outcome")
+    reason_code: str = Field(description="Machine reason code from resolved execution")
     cash_delta: int = Field(description="after.cash - before.cash")
     inventory_delta: int = Field(description="after.inventory.grain - before.inventory.grain")
     cash_effect: int = Field(description="Same as cash_delta for accounting parity")
@@ -95,23 +110,22 @@ class RivalTurnResult(BaseModel):
 
 
 # Preference tables — 10_000 = 100%, integer bps
-# Mira is farm-averse, Daran farm-hungry — integer bps preserves determinism.
-MIRA_PREFERENCES: dict[str, int] = {
-    "expand_farm": 4500,
-    "build_granary": 15000,
-    "buy_grain": 13000,
-    "hold": 10000,
-    "secure_route": 14500,
-    "ship_grain": 12000,
-}
-DARAN_PREFERENCES: dict[str, int] = {
-    "expand_farm": 16000,
-    "build_granary": 7000,
-    "buy_grain": 11000,
-    "hold": 10000,
-    "secure_route": 6000,
-    "ship_grain": 5000,
-}
+MIRA_PREFERENCES = RivalPreferences(
+    expand_farm=4500,
+    build_granary=15000,
+    buy_grain=13000,
+    hold=10000,
+    secure_route=14500,
+    ship_grain=12000,
+)
+DARAN_PREFERENCES = RivalPreferences(
+    expand_farm=16000,
+    build_granary=7000,
+    buy_grain=11000,
+    hold=10000,
+    secure_route=6000,
+    ship_grain=5000,
+)
 
 MIRA_PROFILE = RivalProfile(
     id="mira",
@@ -144,41 +158,51 @@ DARAN_START_STATE = RivalState(
     route_established=False,
 )
 
-# Headline templates — truthful, derived from resolved outcome
-HEADLINES_SUCCESS: dict[str, dict[str, str]] = {
+# Headline templates — truthful, derived from resolved reason_code (not bool success)
+# Every reason_code produced by shared actor primitives has a truthful mapping.
+# Partial successes (limited_by_capacity, ship_limited) still report shipped.
+HEADLINES_BY_REASON: dict[str, dict[str, str]] = {
     "mira": {
         "expand_farm": "Mira expanded her farm holdings.",
+        "insufficient_cash_for_expand": "Mira is short of cash after recent investments.",
         "build_granary": "Mira leased additional storage.",
+        "insufficient_cash_for_granary": "Mira is short of cash and could not lease storage.",
         "buy_grain": "Mira accumulated grain reserves.",
-        "hold": "Mira is conserving cash.",
+        "insufficient_cash": "Mira is short of cash and could not buy grain.",
+        "insufficient_storage": "Mira's granaries are full and could not buy more grain.",
+        "buy_grain_zero": "Mira tried to buy grain but could not.",
         "secure_route": "Mira secured capacity on the river route.",
+        "already_established": "Mira already has river access.",
+        "insufficient_cash_for_route": "Mira is short of cash and could not secure the river route.",
         "ship_grain": "Mira shipped grain to River Town.",
+        "limited_by_capacity": "Mira shipped grain to River Town.",
+        "ship_limited": "Mira shipped grain to River Town.",
+        "insufficient_inventory": "Mira wanted to ship grain but had insufficient grain.",
+        "insufficient_cash_for_transport": "Mira is short of cash for transport and could not ship.",
+        "no_route_access": "Mira wanted to ship grain but lacked route access.",
+        "hold": "Mira is conserving cash.",
+        "no_shipment": "Mira is conserving cash.",
     },
     "daran": {
         "expand_farm": "Daran bought another large tract of farmland.",
+        "insufficient_cash_for_expand": "Daran is short of cash after expanding aggressively.",
         "build_granary": "Daran added granary capacity.",
+        "insufficient_cash_for_granary": "Daran is short of cash and could not build a granary.",
         "buy_grain": "Daran stockpiled grain.",
-        "hold": "Daran held his position.",
+        "insufficient_cash": "Daran is short of cash and could not buy grain.",
+        "insufficient_storage": "Daran's granaries are full and could not buy more grain.",
+        "buy_grain_zero": "Daran tried to buy grain but could not.",
         "secure_route": "Daran secured river access.",
+        "already_established": "Daran already has river access.",
+        "insufficient_cash_for_route": "Daran is short of cash and could not secure the route.",
         "ship_grain": "Daran shipped grain to River Town.",
-    },
-}
-HEADLINES_BLOCKED: dict[str, dict[str, str]] = {
-    "mira": {
-        "expand_farm": "Mira is short of cash after recent investments.",
-        "build_granary": "Mira is short of cash and could not lease storage.",
-        "buy_grain": "Mira is short of cash and could not buy grain.",
-        "secure_route": "Mira is short of cash and could not secure the river route.",
-        "ship_grain": "Mira wanted to ship grain but lacked route access.",
-        "hold": "Mira is conserving cash.",
-    },
-    "daran": {
-        "expand_farm": "Daran is short of cash after expanding aggressively.",
-        "build_granary": "Daran is short of cash and could not build a granary.",
-        "buy_grain": "Daran is short of cash and could not buy grain.",
-        "secure_route": "Daran is short of cash and could not secure the route.",
-        "ship_grain": "Daran wanted to ship grain but lacked route access.",
+        "limited_by_capacity": "Daran shipped grain to River Town.",
+        "ship_limited": "Daran shipped grain to River Town.",
+        "insufficient_inventory": "Daran wanted to ship grain but had insufficient grain.",
+        "insufficient_cash_for_transport": "Daran is short of cash for transport and could not ship.",
+        "no_route_access": "Daran wanted to ship grain but lacked route access.",
         "hold": "Daran held his position.",
+        "no_shipment": "Daran held his position.",
     },
 }
 
@@ -239,21 +263,42 @@ def _expected_return(
     cap_route = obs.route_capacity
 
     if cmd_type == "expand_farm":
-        # 2 turns of harvest value minus cost
         est = (YIELD_PER_CAPACITY * EXPAND_FARM_DELTA * home // 1000 * 2) - EXPAND_FARM_COST
+        # Diminishing for Mira when storage is ample and no threat — farm scale less urgent
+        if profile.id == "mira" and obs.next_world_known is None:
+            farm_out, _, _ = compute_farm_output(cap, obs.world_now)
+            projected = inv + farm_out * 2
+            if projected < storage * 60 // 100:  # ample
+                est = (
+                    est * 35 // 100
+                )  # Mira values farm much less when not threatened and storage ample
         return max(0, est)
     if cmd_type == "build_granary":
         farm_out, _, _ = compute_farm_output(cap, obs.world_now)
-        tight = (inv + farm_out * 2) > storage
-        if profile.id == "mira":
-            base = 340 if tight else 160
+        projected = inv + farm_out * 2
+        # Strong diminishing marginal utility: once projected safely below storage, extra granary is low value
+        # Use integer thresholds to avoid float.
+        if projected > storage:
+            tier = "tight"
+        elif projected > storage * 85 // 100:
+            tier = "near_full"
+        elif projected > storage * 60 // 100:
+            tier = "mid"
         else:
-            base = 220 if tight else 30
+            tier = "ample"
+        if tier == "tight":
+            base = 340 if profile.id == "mira" else 220
+        elif tier == "near_full":
+            base = 180 if profile.id == "mira" else 90
+        elif tier == "mid":
+            base = 80 if profile.id == "mira" else 30
+        else:  # ample — safely below, very small diminishing return
+            base = 25 if profile.id == "mira" else 12
         if obs.next_world_known == "drought":
             if profile.id == "mira":
-                base = base * 14 // 10  # Mira +40% for threat
+                base = base * 14 // 10  # Mira +40% for threat (still small if ample)
             else:
-                base = base * 11 // 10  # Daran +10%
+                base = base * 11 // 10
         return max(0, base)
     if cmd_type == "buy_grain":
         space = max(0, storage - inv)
@@ -286,8 +331,18 @@ def _expected_return(
                 return max(0, 600)
             else:
                 return max(0, 120)
+        # Without threat, Mira still values route option modestly when storage is ample (flexibility)
+        # This lets trade identity show even without warning.
         if est_per <= 0:
-            est_per = 70 if profile.id == "mira" else 40
+            if profile.id == "mira":
+                # Ample storage → route more attractive than farm for Mira
+                farm_out, _, _ = compute_farm_output(cap, obs.world_now)
+                projected = inv + farm_out * 2
+                if projected < storage * 60 // 100:
+                    return max(0, 220)  # Mira values flexibility when not farm-constrained
+                est_per = 70
+            else:
+                est_per = 40
         return max(0, est_per * 2 - ROUTE_ESTABLISH_COST + (50 if profile.id == "mira" else 0))
     if cmd_type == "ship_grain":
         if not rival_state.route_established:
@@ -484,26 +539,13 @@ def choose_rival_command(
 
 def _headline_for(
     profile: RivalProfile,
-    command: PlayerCommand,
-    before: RivalState,
-    after: RivalState,
-    success: bool,
+    reason_code: str,
 ) -> str:
-    """Derive truthful headline from resolved outcome, not intent."""
+    """Derive truthful headline from reason_code, not bool success."""
     pid = profile.id
-    typ = command.type
-    # Special case: ship without route is blocked even if we tried to score it 0
-    if typ == "ship_grain" and not before.route_established:
-        return HEADLINES_BLOCKED[pid]["ship_grain"]
-    if not success:
-        # Generic blocked phrasing per type
-        blocked = HEADLINES_BLOCKED[pid].get(typ)
-        if blocked:
-            return blocked
-        return HEADLINES_BLOCKED[pid].get("hold", "Rival could not act.")
-    # Success path
-    success_map = HEADLINES_SUCCESS[pid]
-    return success_map.get(typ, f"{pid.title()} acted.")
+    return HEADLINES_BY_REASON[pid].get(
+        reason_code, HEADLINES_BY_REASON[pid].get("hold", "Rival acted.")
+    )
 
 
 def apply_rival_command(
@@ -534,89 +576,52 @@ def apply_rival_command(
     requested_qty = command.quantity if command.quantity is not None else 10
     requested_qty = int(requested_qty) if requested_qty is not None else 10
 
-    # Track success flag and intermediate values
-    success = True
     cash_after_cmd = cash
     inv_after_cmd = inv
-    # We need to know storage after command for settlement
     storage_after_cmd = storage
     farm_after_cmd = farm
     route_after = route_established
     cmd_reason = "hold"
-    # For buy, we need actual etc. For other commands, similar to turn.py
+    # For buy we track actual for later reason handling
+    buy_actual = 0
 
     if cmd_type == "expand_farm":
-        if cash >= EXPAND_FARM_COST:
-            cash_after_cmd = cash - EXPAND_FARM_COST
-            farm_after_cmd = farm + EXPAND_FARM_DELTA
-            cmd_reason = "expand_farm"
-            success = True
-        else:
-            cmd_reason = "insufficient_cash_for_expand"
-            success = False
-        # inventory unchanged
+        cash_after_cmd, farm_after_cmd, _delta, cmd_reason = resolve_expand_farm(
+            cash=cash, farm_capacity=farm
+        )
         inv_after_cmd = inv
     elif cmd_type == "build_granary":
-        if cash >= BUILD_GRANARY_COST:
-            cash_after_cmd = cash - BUILD_GRANARY_COST
-            storage_after_cmd = storage + BUILD_GRANARY_DELTA
-            cmd_reason = "build_granary"
-            success = True
-        else:
-            cmd_reason = "insufficient_cash_for_granary"
-            success = False
+        cash_after_cmd, storage_after_cmd, _delta, cmd_reason = resolve_build_granary(
+            cash=cash, storage_capacity=storage
+        )
         inv_after_cmd = inv
     elif cmd_type == "secure_route":
-        if route_established:
-            cmd_reason = "already_established"
-            success = False
-            # route stays True
-            route_after = True
-        else:
-            if cash >= ROUTE_ESTABLISH_COST:
-                cash_after_cmd = cash - ROUTE_ESTABLISH_COST
-                route_after = True
-                cmd_reason = "secure_route"
-                success = True
-            else:
-                cmd_reason = "insufficient_cash_for_route"
-                success = False
+        cash_after_cmd, route_after, _delta, cmd_reason = resolve_secure_route(
+            cash=cash, route_established=route_established
+        )
         inv_after_cmd = inv
     elif cmd_type == "buy_grain":
-        cash_after_cmd, inv_after_cmd, actual, cost, cmd_reason = resolve_buy(
+        cash_after_cmd, inv_after_cmd, buy_actual, _cost, cmd_reason = resolve_buy(
             cash=cash,
             price_milli=home_pre,
             storage_capacity=storage,
             inventory=inv,
             requested=requested_qty,
         )
-        # Success means actual>0 and not blocked by zero? Consider actual==0 as failure for headline
-        if actual <= 0:
-            success = False
-        else:
-            success = True
-        # storage unchanged (build would have changed but buy doesn't)
         storage_after_cmd = storage
         farm_after_cmd = farm
         route_after = route_established
     elif cmd_type == "ship_grain":
-        # Ship command doesn't change cash/inv at command phase; settlement will handle
-        # But we need to track that this is a ship intention; success depends on route etc.
-        # For scoring we already have established check in capital; but for execution check again
-        if not route_established:
-            success = False
-        else:
-            # success will be determined after shipment clamping (effective>0)
-            # keep as tentative True; adjust after
-            success = True  # will refine after shipment resolution
-        # No immediate cash/inventory change
+        # Ship intent — settlement will determine actual; keep cmd_reason as ship_grain for now
+        # Actual reason will be ship_reason after settlement; use placeholder
+        cmd_reason = "ship_grain" if route_established else "no_route_access"
         cash_after_cmd = cash
         inv_after_cmd = inv
         storage_after_cmd = storage
         farm_after_cmd = farm
         route_after = route_established
     else:  # hold or unknown
-        success = True
+        cmd_reason = "hold"
         cash_after_cmd = cash
         inv_after_cmd = inv
         storage_after_cmd = storage
@@ -662,16 +667,8 @@ def apply_rival_command(
             cash=cash_after_cmd,
             river_price=river_resolved,
         )
-        # Update success based on effective
-        if ship_effective <= 0:
-            success = False
-            # Map to blocked headline will be handled; reason already no_route/access etc but we have ship_reason
-            # If ship_reason is no_route_access keep blocked
-        else:
-            success = True
     elif cmd_type == "ship_grain" and not route_established:
-        success = False
-        ship_effective = 0
+        ship_reason = "no_route_access"
         inv_final = inv_final_pre_ship
 
     # Cash final: for ship, cash_after_ship = cash_after_cmd + trade_cash
@@ -712,9 +709,10 @@ def apply_rival_command(
 
     inventory_delta = after.inventory.grain - before.inventory.grain
 
-    # Headline — truthful from resolved after state vs before
-    # For blocked expand/build/ship, success flag already false
-    headline = _headline_for(profile, command, before, after, success)
+    # Headline — truthful from resolved reason_code, not bool success
+    # For ship commands the reason is ship_reason, otherwise cmd_reason
+    final_reason = ship_reason if cmd_type == "ship_grain" else cmd_reason
+    headline = _headline_for(profile, final_reason)
 
     return RivalTurnResult(
         rival_id=profile.id,
@@ -722,6 +720,7 @@ def apply_rival_command(
         command=command,
         after=after,
         headline=headline,
+        reason_code=final_reason,
         cash_delta=after.cash - before.cash,
         inventory_delta=inventory_delta,
         cash_effect=cash_effect,

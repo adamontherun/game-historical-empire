@@ -145,7 +145,7 @@ def test_rival_determinism_same_seed() -> None:
     assert s1.rival_history == s2.rival_history
     assert g1.rival_history == g2.rival_history
     assert s1.final_rivals == s2.final_rivals
-    # Different choices must diverge somewhere (rivals may still differ due to same observable? but player choice doesn't affect rival observable except via price? Actually price changes affect rival settlement but not choice much. At least history length same.)
+    # Different player choices must lead to different player histories; rivals remain deterministic per seed+turn
     g3 = FiveTurnGame(seed="det-rivals-001")
     diff_choices = [
         PlayerCommand(type="expand_farm"),
@@ -154,11 +154,10 @@ def test_rival_determinism_same_seed() -> None:
         PlayerCommand(type="hold"),
         PlayerCommand(type="hold"),
     ]
-    g3.run(diff_choices)
-    # Rivals deterministic given seed+turn, so same rival choices regardless of player choice on T1? But settlement uses resolved prices which differ, so rival after states will differ slightly. Check at least one rival after differs.
-    assert (
-        g1.rival_history != g3.rival_history or g1.rivals != g3.rivals or True
-    )  # trivially not same if player price differs leads to different rival wealth
+    s3 = g3.run(diff_choices)
+    assert s1.history != s3.history
+    # Rival settlement uses resolved prices, so at least one rival wealth differs after divergent player choice
+    assert s1.rival_history != s3.rival_history or s1.final_rivals != s3.final_rivals
 
 
 def test_rival_capital_constraints_via_shared_primitives() -> None:
@@ -482,6 +481,16 @@ def test_player_market_isolation() -> None:
     assert g.state.river_market.current_price == s.river_market.current_price
 
 
+def test_canonical_run_has_three_diffs() -> None:
+    """Canonical hold-5 run must have ≥3 turns where Mira/Daran choose different types."""
+    game = FiveTurnGame(seed="demo-seed-001")
+    game.run([PlayerCommand(type="hold") for _ in range(5)])
+    diffs = sum(1 for m, d in game.rival_history if m.command.type != d.command.type)
+    assert diffs >= 3, (
+        f"expected ≥3 diff turns in canonical run, got {diffs}: {[(m.command.type, d.command.type) for m, d in game.rival_history]}"
+    )
+
+
 def test_no_float_in_rival_scoring() -> None:
     """Enforce integer discipline — no float in rivals module source."""
     import pathlib
@@ -495,13 +504,28 @@ def test_no_float_in_rival_scoring() -> None:
 
 
 def test_structured_threat_not_prose_parsing() -> None:
-    """Rival scoring must not parse signal strings."""
-    import pathlib
-
-    text = pathlib.Path("backend/app/engine/rivals.py").read_text()
-    assert "signal" not in text.lower() or "signal_text" not in text  # no signal parsing
-    # Ensure scoring uses next_world_known
-    assert "next_world_known" in text
+    """Rival scoring must depend on structured next_world_known, not prose signal."""
+    # Structural: ObservableContext has no signal field
+    assert "signal" not in ObservableContext.model_fields
+    assert "next_world_known" in ObservableContext.model_fields
+    # Behavioral: same prices/state but different next_world_known must change at least one score
+    base_state = RivalState(
+        cash=800,
+        inventory=InventoryState(grain=20),
+        farm_capacity=10,
+        storage_capacity=200,
+        route_established=False,
+    )
+    obs_none = _obs(turn=2, world_now="normal", next_known=None, home=5000, river=6200)
+    obs_drought = _obs(turn=2, world_now="normal", next_known="drought", home=5000, river=6200)
+    # Mira's build_granary score must increase when threat is drought
+    s_none = score_rival_command(
+        MIRA_PROFILE, base_state, PlayerCommand(type="build_granary"), obs_none
+    )
+    s_drought = score_rival_command(
+        MIRA_PROFILE, base_state, PlayerCommand(type="build_granary"), obs_drought
+    )
+    assert s_drought > s_none, "structured threat must affect scoring, not prose"
 
 
 def test_rival_state_has_no_headline() -> None:

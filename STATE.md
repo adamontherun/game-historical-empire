@@ -83,15 +83,15 @@ make format-check      # = ruff format --check backend  (27 already formatted)
 
 ```
 uv sync --project backend  → Resolved 15 packages, 0 errors
-pytest -v                  → 109 passed (8 core + 7 rounding + 11 determinism + 2 purity/sanity + 15 kernel + 7 invariants + 12 causal_trace + 4 explanation + 13 two_markets_route + 17 five_turn_prototype + 13 deterministic_rivals [profiles differ identical state 2+ diffs Mira storage, determinism, capital via shared primitives, no-money with revaluation, behavioral warning prep vs farm, fingerprint across contexts, headlines derived visible T2+, same-rules, market isolation, no float, structured threat, no headline in state, exact-tie rng])
+pytest -v                  → 110 passed (96 prior +14 with canonical 5/5 diff) (8 core +7 rounding+11 determinism+2 purity/sanity+15 kernel+7 invariants+12 causal_trace+4 explanation+13 two_markets_route+17 five_turn_prototype+14 deterministic_rivals [profiles differ identical, determinism with divergence, capital via shared primitives expand/build/secure/buy/ship, no-money with revaluation incl. price, behavioral warning prep vs farm, fingerprint, headlines derived via reason_code (insufficient_storage vs cash, already_established, insufficient_inventory vs no_route_access), same-rules, market isolation, structured threat via next_world_known, canonical 5/5 diffs, no float, RivalState Money/Quantity strict, RivalPreferences frozen, exact-tie rng])
 ruff check backend         → All checks passed
 ruff format --check backend→ 27 files already formatted
 pyright                    → 0 errors, 0 warnings
 demo                       → normal 4545 vs drought 5714, trace supply 100+60-90→70 drought_reduced_availability
-prototype hold 5           → hold,hold,hold,hold,hold prints 5× 6 MONTHS LATER + MIRA/DARAN headlines each turn, ends STRATEGIC SUMMARY with T1..5 Rivals lines and final rivals Mira 0/255/5/450 Daran 100/200/32/200 (diff 3/5 Mira granary×3 vs Daran farm×2, warning T3 Mira granary vs Daran granary but prep boost verified via scores)
-prototype verbose          → adds RIVAL DETAILS per turn
+prototype hold 5           → hold×5 prints 5× 6 MONTHS LATER + MIRA/DARAN headlines each turn, ends STRATEGIC SUMMARY with 5/5 diffs: T1 Mira secure_route (already has trade) vs Daran expand_farm, T2 Mira build_granary vs Daran expand_farm, T3 Mira buy_grain vs Daran build_granary, T4 Mira build_granary vs Daran hold, T5 Mira ship_grain vs Daran hold, final rivals Mira 217/255/5/350 Daran 100/200/32/200 (Mira diversified: route+granary+buy+ship, Daran farm-heavy; diminishing granary prevents 4× build spending all cash)
+prototype verbose          → adds RIVAL DETAILS per turn with reason_code
 cli parse                  → parse_choice("buy 20") -> buy_grain qty 20
-actor primitives           → compute_farm_output/resolve_buy/resolve_storage_settlement/resolve_shipment share single source; turn.py and rivals.py both call same; costs 500/300/400/800 parity
+actor primitives           → compute_farm_output/resolve_buy/resolve_storage_settlement/resolve_shipment/resolve_expand_farm/resolve_build_granary/resolve_secure_route single source; turn.py and rivals.py both call same; costs 500/300/400/800 parity, no duplicated economy
 ```
 
 Cache provenance fixed in YOLO (`~/.cache/uv/sdists-v9/.git` removed, `uv cache prune`), no `UV_CACHE_DIR` workaround needed. `.git/refs` provenance cleared for branch creation.
