@@ -554,4 +554,7 @@ def test_buy_quantity_split_no_false_harvest_story() -> None:
 
 
 def test_turn_order_includes_valuation() -> None:
-    assert TURN_ORDER == "command -> production -> supply -> price -> settlement -> valuation"
+    assert (
+        TURN_ORDER
+        == "command -> production -> home_supply -> river_supply -> home_price -> river_price -> settlement -> route_settlement -> valuation"
+    )
