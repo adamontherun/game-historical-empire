@@ -78,10 +78,13 @@ def default_start_state(seed: str = "seed-001", version: str = "1.0") -> GameSta
     idle accumulates 270 over 5 turns so 400 never binds, 130 does; 130 chosen as
     widest-margin point in sweep 100-150 where hold rank ≥3 with 8.6% margin,
     ratio 1.02, price 3876-8535; 100 gave rank2, 115-120 <5%, 125 6.6%, 135 9.1% but
-    130 is rounder and >5% threshold). Route: capacity 60 (was 20 — lets route carry
-    real cargo vs farm 50-150/turn), transport 300 (was 800 — leaves real margin
+    130 is rounder and >5% threshold). Route: capacity 20 (reverted from 60 — R3:
+    route repays at 20 with transport 300, +174 on 400 cost; 60 gave +280 but
+    strains price-taking approximation), transport 300 (was 800 — leaves real margin
     after toll while preserving margin-negative at drought peak). Tuned with
-    competent policies to clear hold rank ≥3 with >5% margin.
+    competent policies to clear hold rank ≥3 with >5% margin. Price-taking boundary:
+    player sales/shipments are price-taking; endogenous price impact deferred to
+    Section 14.
     """
     return GameState(
         turn=0,
@@ -112,7 +115,7 @@ def default_start_state(seed: str = "seed-001", version: str = "1.0") -> GameSta
         ),
         route=RouteState(
             transport_cost_per_unit=300,
-            capacity=60,
+            capacity=20,
             reliability_bps=10000,
             established=False,
             delay_turns=0,

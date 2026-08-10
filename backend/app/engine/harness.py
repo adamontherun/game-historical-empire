@@ -35,6 +35,13 @@ POLICY_IDS: tuple[str, ...] = (
     "random_legal",
 )
 
+INTENTIONAL_POLICY_IDS: tuple[str, ...] = (
+    "production_heavy",
+    "storage_heavy",
+    "trade_heavy",
+    "cash_preserving",
+)
+
 
 def _can_afford(cash: int, cost: int) -> bool:
     return cash >= cost
@@ -70,26 +77,30 @@ def policy_production_heavy(
 
 
 def policy_storage_heavy(state: GameState, turn_idx: int, seed: str, version: str) -> PlayerCommand:
-    """Storage: build granary, buy scaled to cash+headroom pre-drought, sell at peak.
+    """Storage: build on overflow, buy only into headroom harvest will not claim.
 
-    Strategy: expand storage early, then deploy cash into grain while price is low
-    (buying as much as headroom and cash allow), hold through drought, then sell
-    large into the price peak (turn 4) to capture arbitrage. Selling at turn 3
-    would be too early (price not yet peaked), so hold then.
+    Strategy: granary stores free harvest that would otherwise be wasted
+    (capped_by_storage) rather than purchased grain (~2.6/unit vs ~8.5/unit).
+    Build only when incoming harvest would overflow current storage; buy only
+    into space that harvest will not fill (headroom = storage - (inventory+harvest)).
+    Sell large at price peak (turn 4). No constant tuning needed.
     """
-    if turn_idx == 0 and _can_afford(state.player.cash, BUILD_GRANARY_COST):
-        return PlayerCommand(type="build_granary")  # type: ignore[arg-type]
-    if turn_idx in (1, 2):
+    from app.engine.actor import YIELD_PER_CAPACITY
+
+    harvest = state.player.farm_capacity * YIELD_PER_CAPACITY
+    # Build when harvest would overflow and still turns remain to benefit (turn<4)
+    if turn_idx < 4 and state.player.inventory.grain + harvest > state.player.storage_capacity:
+        if _can_afford(state.player.cash, BUILD_GRANARY_COST):
+            return PlayerCommand(type="build_granary")  # type: ignore[arg-type]
+    # Buy only into headroom harvest will not claim
+    headroom = state.player.storage_capacity - (state.player.inventory.grain + harvest)
+    if headroom > 0 and turn_idx in (1, 2):
         price = state.market.current_price
-        space = state.player.storage_capacity - state.player.inventory.grain
-        if space <= 0 or price <= 0:
-            return PlayerCommand(type="hold")  # type: ignore[arg-type]
         max_affordable = ((state.player.cash + 1) * 1000 - 1) // price if price > 0 else 0
-        target = min(space, max_affordable)
+        target = min(headroom, max_affordable)
         actual = min(target, 80) if target > 10 else target
-        if actual <= 0:
-            return PlayerCommand(type="hold")  # type: ignore[arg-type]
-        return PlayerCommand(type="buy_grain", quantity=actual)  # type: ignore[arg-type]
+        if actual > 0:
+            return PlayerCommand(type="buy_grain", quantity=actual)  # type: ignore[arg-type]
     if turn_idx == 4 and state.player.inventory.grain > 0:
         qty = min(state.player.inventory.grain, 150)
         if qty > 0:
@@ -203,6 +214,47 @@ POLICY_FUNCS: dict[str, Callable[[GameState, int, str, str], PlayerCommand]] = {
 }
 
 
+def _policy_trade_heavy_no_route(
+    state: GameState, turn_idx: int, seed: str, version: str
+) -> PlayerCommand:
+    """Matched control: identical to trade_heavy but never secures route."""
+    # Never secure route; otherwise same ship-when-profitable logic (which will be no-op)
+    if state.route.established and state.player.inventory.grain > 0:
+        margin = (
+            state.river_market.current_price
+            - state.route.transport_cost_per_unit
+            - state.market.current_price
+        )
+        if margin > 0:
+            cost_per = state.route.transport_cost_per_unit
+            if cost_per <= 0:
+                affordable_ship = state.player.inventory.grain
+            else:
+                affordable_ship = ((state.player.cash + 1) * 1000 - 1) // cost_per
+            ship_qty = min(
+                state.player.inventory.grain,
+                state.route.capacity,
+                affordable_ship,
+            )
+            if ship_qty > 0:
+                return PlayerCommand(type="ship_grain", quantity=ship_qty)  # type: ignore[arg-type]
+    if turn_idx in (1, 2):
+        price = state.market.current_price
+        space = state.player.storage_capacity - state.player.inventory.grain
+        if space > 0 and price > 0:
+            max_affordable = ((state.player.cash + 1) * 1000 - 1) // price if price > 0 else 0
+            target = min(space, max_affordable)
+            actual = min(target, 80) if target > 10 else target
+            if actual > 0:
+                return PlayerCommand(type="buy_grain", quantity=actual)  # type: ignore[arg-type]
+        return PlayerCommand(type="hold")  # type: ignore[arg-type]
+    if turn_idx == 4 and state.player.inventory.grain > 0:
+        qty = min(state.player.inventory.grain, 80)
+        if qty > 0:
+            return PlayerCommand(type="sell_grain", quantity=qty)  # type: ignore[arg-type]
+    return PlayerCommand(type="hold")  # type: ignore[arg-type]
+
+
 # ---------------------------------------------------------------------------
 # Batch models
 # ---------------------------------------------------------------------------
@@ -240,7 +292,7 @@ class PolicyAggregate(BaseModel):
     median_wealth: int
     min_wealth: int
     max_wealth: int
-    win_rate: float
+    win_rate_bps: int
     median_cash_low: int
     median_peak_inventory: int
     price_min: int
@@ -258,16 +310,25 @@ class BatchResult(BaseModel):
     overall_price_max: int
     global_max_swing: int
     any_negative_state: bool
-    # Gates (reported, not hard assert on first land)
+    # Gates
     dominant_gate_pass: bool
     dead_gate_pass: bool
     price_gate_pass: bool
     negativity_gate_pass: bool
     hold_not_top_gate_pass: bool
-    median_ratio: float
+    median_ratio_bps: int
     dominant_reason: str
     dead_reason: str
     hold_not_top_reason: str
+    # Route incremental (matched control)
+    trade_wealth: int
+    trade_without_route_wealth: int
+    route_incremental_value: int
+    route_incremental_value_bps_of_cost: int
+    # Tie handling
+    tied_best_count: int
+    # Overall median for dead/dominant integer math
+    overall_median: int
 
 
 def _wealth(state: GameState) -> int:
@@ -278,12 +339,9 @@ def run_batch(config: BatchConfig) -> BatchResult:
     """Run batch — deterministic, pure, no global random."""
     seeds = [f"{config.seed_prefix}-{i:04d}" for i in range(config.n_seeds)]
     per_seed: list[SeedResult] = []
-    # also collect per-seed best for win_rate
     wins: Counter[str] = Counter()
-    # first pass: collect all
+    tied_best_count = 0
     for seed in seeds:
-        # For each policy, run game
-        seed_best: tuple[str, int] | None = None
         seed_results: list[SeedResult] = []
         for pid in config.policy_ids:
             func = POLICY_FUNCS[pid]
@@ -293,7 +351,6 @@ def run_batch(config: BatchConfig) -> BatchResult:
                 start_state=default_start_state(seed, config.version),
             )
             choices: list[str] = []
-            # Run 5 turns via policy
             for turn_idx in range(5):
                 cmd = func(game.state, turn_idx, seed, config.version)
                 choices.append(
@@ -301,10 +358,8 @@ def run_batch(config: BatchConfig) -> BatchResult:
                 )
                 game.submit(cmd)
             summary = game.summary()
-            # prices
             home_series = tuple(h.next_state.market.current_price for h in game.history)
             river_series = tuple(h.next_state.river_market.current_price for h in game.history)
-            # largest swing = max abs wealth_delta per turn
             swings = [abs(h.player_outcome.wealth_delta) for h in game.history]
             largest = max(swings) if swings else 0
             sr = SeedResult(
@@ -322,41 +377,21 @@ def run_batch(config: BatchConfig) -> BatchResult:
                 choices=tuple(choices),
             )
             seed_results.append(sr)
-            if seed_best is None or sr.final_wealth > seed_best[1]:
-                seed_best = (pid, sr.final_wealth)
-            # check negativity across history (also via summary but do per-turn)
-            # per_seed negativity is captured later via BatchResult overall
             per_seed.append(sr)
-        # record win for best on this seed
-        if seed_best is not None:
-            # tie broken by first max (POLICY_IDS order) — deterministic
-            # But we already picked first max encountered in POLICY_IDS order, so stable
-            wins[seed_best[0]] += 1
-        # handle ties: if multiple policies tie for max wealth, wins already first; we want to ensure tie-breaking is stable
-        # So we should recompute wins with tie-break by POLICY_IDS order
+        # Determine unique winner and ties for this seed
         max_wealth = max(r.final_wealth for r in seed_results)
-        # find first pid in POLICY_IDS order that has max
-        for pid in config.policy_ids:
-            for r in seed_results:
-                if r.policy_id == pid and r.final_wealth == max_wealth:
-                    # adjust wins: remove previous and add tie-correct
-                    # We already incremented wins[seed_best[0]]; if that was not tie-correct, fix
-                    # Simpler: just correct by decrementing previous and incrementing tie winner
-                    if pid != seed_best[0]:  # type: ignore[arg-type]
-                        wins[seed_best[0]] -= 1  # type: ignore[index]
-                        wins[pid] += 1
-                    break
-            if any(r.policy_id == pid and r.final_wealth == max_wealth for r in seed_results):
-                break
+        best_ids = [r.policy_id for r in seed_results if r.final_wealth == max_wealth]
+        if len(best_ids) == 1:
+            wins[best_ids[0]] += 1
+        else:
+            tied_best_count += 1
 
     # aggregates
     aggregates: list[PolicyAggregate] = []
-    # collect overall price bounds
     all_home_prices = [p for r in per_seed for p in r.price_home_series]
     overall_price_min = min(all_home_prices) if all_home_prices else 0
     overall_price_max = max(all_home_prices) if all_home_prices else 0
     global_max_swing = max((r.largest_swing for r in per_seed), default=0)
-    # negativity check
     any_negative = False
     for r in per_seed:
         if r.final_cash < 0 or r.final_grain < 0:
@@ -365,12 +400,10 @@ def run_batch(config: BatchConfig) -> BatchResult:
             if p <= 0:
                 any_negative = True
 
-    # per-policy aggregates
     sorted_wealths: dict[str, list[int]] = {pid: [] for pid in config.policy_ids}
     for r in per_seed:
         sorted_wealths[r.policy_id].append(r.final_wealth)
 
-    # compute median helpers
     for pid in config.policy_ids:
         ws = sorted(sorted_wealths[pid])
         n = len(ws)
@@ -378,8 +411,8 @@ def run_batch(config: BatchConfig) -> BatchResult:
         mean = sum(ws) // n if n else 0
         min_w = min(ws) if ws else 0
         max_w = max(ws) if ws else 0
-        win_rate = wins.get(pid, 0) / config.n_seeds if config.n_seeds else 0.0
-        # median cash_low / peak
+        # win_rate_bps integer: unique wins *10000 // n_seeds
+        win_bps = (wins.get(pid, 0) * 10_000 // config.n_seeds) if config.n_seeds else 0
         cash_lows = sorted([r.cash_low for r in per_seed if r.policy_id == pid])
         peaks = sorted([r.peak_inventory for r in per_seed if r.policy_id == pid])
         median_cash_low = cash_lows[len(cash_lows) // 2] if cash_lows else 0
@@ -402,7 +435,7 @@ def run_batch(config: BatchConfig) -> BatchResult:
                 median_wealth=median,
                 min_wealth=min_w,
                 max_wealth=max_w,
-                win_rate=win_rate,
+                win_rate_bps=win_bps,
                 median_cash_low=median_cash_low,
                 median_peak_inventory=median_peak,
                 price_min=price_min,
@@ -412,20 +445,24 @@ def run_batch(config: BatchConfig) -> BatchResult:
             )
         )
 
-    # Gates
-    # dominant: max_median / second_max < 1.60
+    # Gates — integer bps math, no floats
+    # Build median lookup
+    median_by_id = {a.policy_id: a.median_wealth for a in aggregates}
+    # Dominant: top median vs second top <1.60  => top*10000 < second*16000
     medians_sorted = sorted([a.median_wealth for a in aggregates], reverse=True)
-    median_ratio = (
-        (medians_sorted[0] / medians_sorted[1])
-        if len(medians_sorted) >= 2 and medians_sorted[1] != 0
-        else 999.0
-    )
-    dominant_pass = median_ratio < 1.60
-    dominant_reason = (
-        f"median_ratio {median_ratio:.2f} {'PASS' if dominant_pass else 'FAIL'} (threshold <1.60)"
-    )
+    if len(medians_sorted) >= 2 and medians_sorted[1] != 0:
+        median_ratio_bps = medians_sorted[0] * 10_000 // medians_sorted[1]
+        dominant_pass = medians_sorted[0] * 10_000 < medians_sorted[1] * 16_000
+    else:
+        median_ratio_bps = 99_999
+        dominant_pass = False
+    # Format ratio deterministically from bps
+    ratio_int = median_ratio_bps // 10_000
+    ratio_frac = median_ratio_bps % 10_000
+    # Keep two decimal display but from integer
+    dominant_reason = f"median_ratio {ratio_int}.{ratio_frac:04d} ({median_ratio_bps} bps) {'PASS' if dominant_pass else 'FAIL'} (threshold <1.60 = 16000 bps)"
 
-    # dead: every non-random median >= 0.70 * overall median
+    # Dead: overall median of all medians (including random) — integer
     all_medians = sorted([a.median_wealth for a in aggregates])
     overall_median = all_medians[len(all_medians) // 2] if all_medians else 0
     dead_pass = True
@@ -433,35 +470,71 @@ def run_batch(config: BatchConfig) -> BatchResult:
     for a in aggregates:
         if a.policy_id == "random_legal":
             continue
-        if overall_median and a.median_wealth < 0.70 * overall_median:
+        # integer: a.median*10000 >= overall*7000
+        if overall_median and a.median_wealth * 10_000 < overall_median * 7_000:
             dead_pass = False
             dead_reasons.append(
-                f"{a.policy_id} median {a.median_wealth} < 0.70*overall {overall_median}"
+                f"{a.policy_id} median {a.median_wealth} < 0.70*overall {overall_median} (bps check {a.median_wealth * 10_000} < {overall_median * 7_000})"
             )
     dead_reason = "PASS" if dead_pass else "; ".join(dead_reasons) if dead_reasons else "FAIL"
 
-    # price gate
+    # Price gate
     price_pass = True
     for a in aggregates:
         if a.price_min < 2000 or a.price_max > 9000:
             price_pass = False
             break
-    # also check envelope: per-turn move <= 20% +1 (allow rounding)
-    # we check in gate but also report overall price range
 
-    # hold rank ≤3 gate: cash_preserving must rank no higher than 3rd of 5
-    hold_median = next((a.median_wealth for a in aggregates if a.policy_id == "cash_preserving"), 0)
-    max_median = max((a.median_wealth for a in aggregates), default=0)
-    max_policy = next((a.policy_id for a in aggregates if a.median_wealth == max_median), "")
-    # Count how many policies strictly beat hold
-    beat_hold = sum(1 for a in aggregates if a.median_wealth > hold_median)
-    # rank = beat_hold +1 (1 = top). Require rank >=3 => beat_hold >=2
-    hold_not_top_pass = beat_hold >= 2
-    rank = beat_hold + 1
-    hold_not_top_reason = f"cash {hold_median} rank {rank}/5 vs max {max_median} ({max_policy}) {'PASS' if hold_not_top_pass else 'FAIL'} — cash must rank ≥3 (≥2 policies beat it)"
+    # Hold rank over INTENTIONAL policies only, material 5%
+    # Require >=2 of 3 active (prod,stor,trade) beat hold by >=5% => active*10000 >= hold*10500
+    hold_median = median_by_id.get("cash_preserving", 0)
+    active_ids = ("production_heavy", "storage_heavy", "trade_heavy")
+    active_beats = 0
+    for pid in active_ids:
+        active_med = median_by_id.get(pid, 0)
+        if hold_median and active_med * 10_000 >= hold_median * 10_500:
+            active_beats += 1
+    # Rank among intentional 4
+    intentional_medians = [(pid, median_by_id[pid]) for pid in INTENTIONAL_POLICY_IDS]
+    intentional_medians_sorted = sorted(intentional_medians, key=lambda x: -x[1])
+    rank = next(
+        (i for i, (pid, _) in enumerate(intentional_medians_sorted, 1) if pid == "cash_preserving"),
+        1,
+    )
+    max_intentional_median = intentional_medians_sorted[0][1] if intentional_medians_sorted else 0
+    max_intentional_pid = intentional_medians_sorted[0][0] if intentional_medians_sorted else ""
+    hold_not_top_pass = active_beats >= 2
+    hold_not_top_reason = (
+        f"cash {hold_median} rank {rank}/4 intentional vs max {max_intentional_median} ({max_intentional_pid}) "
+        f"{'PASS' if hold_not_top_pass else 'FAIL'} — {active_beats}/3 active beat hold by ≥5% "
+        f"(need ≥2, hold rank ≥3 among 4); tied_best {tied_best_count}"
+    )
 
-    # negativity gate
     negativity_pass = not any_negative
+
+    # Route incremental via matched control: trade_heavy vs trade_heavy_no_route
+    # Run trade_without_route across same seeds to get median
+    trade_without_wealths: list[int] = []
+    for seed in seeds:
+        game = FiveTurnGame(
+            seed=seed,
+            version=config.version,
+            start_state=default_start_state(seed, config.version),
+        )
+        for turn_idx in range(5):
+            cmd = _policy_trade_heavy_no_route(game.state, turn_idx, seed, config.version)
+            game.submit(cmd)
+        trade_without_wealths.append(game.summary().final_wealth)
+    trade_without_sorted = sorted(trade_without_wealths)
+    n_t = len(trade_without_sorted)
+    trade_without_median = (
+        trade_without_sorted[n_t // 2]
+        if n_t % 2 == 1
+        else (trade_without_sorted[n_t // 2 - 1] + trade_without_sorted[n_t // 2]) // 2
+    )
+    trade_median = median_by_id.get("trade_heavy", 0)
+    route_inc = trade_median - trade_without_median
+    route_bps = (route_inc * 10_000 // ROUTE_ESTABLISH_COST) if ROUTE_ESTABLISH_COST else 0
 
     return BatchResult(
         config=config,
@@ -476,10 +549,16 @@ def run_batch(config: BatchConfig) -> BatchResult:
         price_gate_pass=price_pass,
         negativity_gate_pass=negativity_pass,
         hold_not_top_gate_pass=hold_not_top_pass,
-        median_ratio=median_ratio,
+        median_ratio_bps=median_ratio_bps,
         dominant_reason=dominant_reason,
         dead_reason=dead_reason,
         hold_not_top_reason=hold_not_top_reason,
+        trade_wealth=trade_median,
+        trade_without_route_wealth=trade_without_median,
+        route_incremental_value=route_inc,
+        route_incremental_value_bps_of_cost=route_bps,
+        tied_best_count=tied_best_count,
+        overall_median=overall_median,
     )
 
 
@@ -492,12 +571,12 @@ def format_markdown(result: BatchResult) -> str:
     lines.append(f"Config: prefix={result.config.seed_prefix} version={result.config.version}")
     lines.append("")
     lines.append(
-        "| policy | n | win_rate | median_wealth | mean_wealth | median_cash_low | price_range | bankrupt |"
+        "| policy | n | win_rate_bps | median_wealth | mean_wealth | median_cash_low | price_range | bankrupt |"
     )
     lines.append("|---|---|---|---|---|---|---|---|")
     for a in result.aggregates:
         lines.append(
-            f"| {a.policy_id} | {a.n} | {a.win_rate:.2%} | {a.median_wealth} | {a.mean_wealth} | {a.median_cash_low} | {a.price_min}-{a.price_max} | {a.bankrupt_count} |"
+            f"| {a.policy_id} | {a.n} | {a.win_rate_bps} | {a.median_wealth} | {a.mean_wealth} | {a.median_cash_low} | {a.price_min}-{a.price_max} | {a.bankrupt_count} |"
         )
     lines.append("")
     lines.append(
@@ -511,10 +590,14 @@ def format_markdown(result: BatchResult) -> str:
         f"Dead gate (median ≥0.70*overall): {result.dead_reason} — {'PASS' if result.dead_gate_pass else 'FAIL'}"
     )
     lines.append(
-        f"Hold-not-top gate (cash not max median): {result.hold_not_top_reason} — {'PASS' if result.hold_not_top_gate_pass else 'FAIL'}"
+        f"Hold-not-top gate (cash rank ≥3 intentional, ≥2×5% beats): {result.hold_not_top_reason} — {'PASS' if result.hold_not_top_gate_pass else 'FAIL'}"
     )
     lines.append(f"Price gate ([2000,9000]): {'PASS' if result.price_gate_pass else 'FAIL'}")
     lines.append(f"Negativity gate (no <0): {'PASS' if result.negativity_gate_pass else 'FAIL'}")
+    lines.append(
+        f"Route incremental: trade {result.trade_wealth} vs without {result.trade_without_route_wealth} → {result.route_incremental_value} ({result.route_incremental_value_bps_of_cost} bps of {ROUTE_ESTABLISH_COST} cost)"
+    )
+    lines.append(f"Tied best count: {result.tied_best_count}")
     lines.append("")
     lines.append(
         "Note: deterministic policies are seed-invariant on fixed authored arc; seed variation comes from random_legal only."
@@ -531,6 +614,7 @@ def to_json(result: BatchResult) -> str:
             "price_max": result.overall_price_max,
             "global_max_swing": result.global_max_swing,
             "any_negative_state": result.any_negative_state,
+            "overall_median": result.overall_median,
         },
         "gates": {
             "dominant_pass": result.dominant_gate_pass,
@@ -538,10 +622,15 @@ def to_json(result: BatchResult) -> str:
             "price_pass": result.price_gate_pass,
             "negativity_pass": result.negativity_gate_pass,
             "hold_not_top_pass": result.hold_not_top_gate_pass,
-            "median_ratio": result.median_ratio,
+            "median_ratio_bps": result.median_ratio_bps,
             "dominant_reason": result.dominant_reason,
             "dead_reason": result.dead_reason,
             "hold_not_top_reason": result.hold_not_top_reason,
+            "trade_wealth": result.trade_wealth,
+            "trade_without_route_wealth": result.trade_without_route_wealth,
+            "route_incremental_value": result.route_incremental_value,
+            "route_incremental_value_bps_of_cost": result.route_incremental_value_bps_of_cost,
+            "tied_best_count": result.tied_best_count,
         },
         "per_seed": [r.model_dump() for r in result.per_seed],
     }
