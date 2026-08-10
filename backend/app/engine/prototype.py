@@ -148,14 +148,15 @@ EIGHT_TURN_LIMIT: int = 5 + EPILOGUE_TURNS  # 8
 def derive_legacies(summary: StrategicSummary) -> tuple[str, ...]:
     """Derive legacies deterministically from final agricultural state.
 
-    Four legacies per design direction §3 / review §5-6.
-    - granary_expertise: final_storage >=180
-    - river_contracts: route_established
-    - land_network: final_farm >=15 (deliberately weakest)
-    - crisis_reputation: inventory_at_drought >=80 and cash_low >=300 (exposure+survival)
+    Three legacies — crisis_reputation dropped because it was a constant (40/40 on all
+    deterministic policies at any threshold that keeps ~25-40% overall; inventory_at_drought
+    is fixed per policy: production 130, storage 180, trade 110, cash 130 — so any threshold
+    either keeps 4/4 or 3/4 or 1/4, never a discriminating 2/4, and cash_low >=300 is always true).
+    Three real legacies beat four where one is a baseline.
+    - granary_expertise: final_storage >=180 (inert in new regime — deliberately not craft bonus)
+    - river_contracts: route_established (grants +2 labour — the disruption)
+    - land_network: final_farm >=15 (weak +15 grain vs labour×10)
     """
-    from app.engine.actor import CRISIS_INVENTORY_THRESHOLD
-
     leg: list[str] = []
     fs = summary.final_state
     if fs.player.storage_capacity >= 180:
@@ -164,26 +165,6 @@ def derive_legacies(summary: StrategicSummary) -> tuple[str, ...]:
         leg.append("river_contracts")
     if fs.player.farm_capacity >= 15:
         leg.append("land_network")
-    # Crisis: need inventory at drought entry
-    inventory_at_drought = None
-    if len(summary.history) >= 3:
-        # after turn 2 (warning) is before drought (turn 3)
-        inventory_at_drought = (
-            summary.history[1].next_state.player.inventory.grain
-            if len(summary.history) > 1
-            else fs.player.inventory.grain
-        )
-        # More precise: use history[2] if available (after warning), else fallback
-        if len(summary.history) >= 3:
-            inventory_at_drought = summary.history[2].next_state.player.inventory.grain
-    else:
-        inventory_at_drought = fs.player.inventory.grain
-    if (
-        inventory_at_drought is not None
-        and inventory_at_drought >= CRISIS_INVENTORY_THRESHOLD
-        and summary.cash_low >= 300
-    ):
-        leg.append("crisis_reputation")
     return tuple(leg)
 
 
@@ -532,11 +513,13 @@ class EightTurnGame:
         if self._disable_demand_shift and "disable_demand_shift" not in leg:
             leg.append("disable_demand_shift")
         self._legacies = tuple(leg)
-        # Compute starting labour: base 1 for all (legacies affect efficiency/price, not labour count)
-        # Granary gives efficiency, Crisis gives hire discount, River gives price, Land gives grain — none add labour
-        # This keeps labour bottleneck uniform so extra grain from storage/land cannot be converted beyond cap,
-        # making Land Network deliberately weak and preventing storage from dominating via extra labour.
+        # Compute starting labour: base 1 for all; river_contracts grants +2 (trade_heavy only)
+        # This is the disruption: scarce labour goes to the strategy that did NOT dominate agriculture.
+        # Granary NOT giving labour/efficiency — mastery of old bottleneck does not transfer.
+        # Land Network remains weak (+15 grain vs labour×10 cap).
         base_labour = 1
+        if "river_contracts" in self._legacies:
+            base_labour += 2
         # Apply to state: copy with legacies and labour, and preserve other fields
         agri_state = self._agri.state
         new_player = PlayerState(

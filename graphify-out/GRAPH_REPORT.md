@@ -1,7 +1,7 @@
 # Graph Report - game-historical-empire  (2026-08-10)
 
 ## Corpus Check
-- 137 files · ~203,219 words
+- 137 files · ~203,034 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
@@ -10,7 +10,7 @@
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `0dd95a95`
+- Built from commit: `0a237bad`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
@@ -29,7 +29,7 @@
 - Section 8 plan — consolidated review (round 2, against Rev 3)
 - Historical Empire — Agent Guide
 - graphify reference: extra exports and benchmark
-- Section 12 — BLOCKED — AWAITING HUMAN PLAYTEST (2026-08-10) — Run-record instrumentation
+- Section 13 — IN PROGRESS — City & Craft Transition Epilogue (2026-08-10)
 - graphify reference: extra exports and benchmark
 - graphify reference: query, path, explain
 - graphify reference: query, path, explain
@@ -94,7 +94,7 @@
 - Section 10 — Minimal FastAPI Boundary — Plan
 - InventoryState
 - SHOULD-FIX
-- cli.py
+- typescript
 - Section 8 implementation — consolidated review (round 3, against commit 28a0963)
 - test_rounding.py
 - Section 10 plan — consolidated review (round 2)
@@ -127,7 +127,7 @@
 - eslint-plugin-react-hooks
 - test_explanation.py
 - @playwright/test
-- prettier
+- cli.py
 - Section 13 — Design Direction (Claude, design authority)
 - @testing-library/user-event
 - @types/node
@@ -135,11 +135,11 @@
 - Section 13 — City & Craft Transition Epilogue — Plan
 - @vitejs/plugin-react
 - commit.test.tsx
-- SECTION 20 — Visual Asset System and Polish
+- test_invariants.py
 - rivals.py
 - @testing-library/jest-dom
 - default_start_state
-- test_invariants.py
+- SECTION 20 — Visual Asset System and Polish
 - Part VIII — Agent Guardrails
 - test_no_float_in_rival_scoring
 - test_rival_state_has_no_headline
@@ -222,9 +222,9 @@ Nodes (16): 10. API Contract (from Section 10, for reference), 11. Frontend Rule
 Cohesion: 0.22
 Nodes (8): graphify reference: extra exports and benchmark, Step 6b - Wiki (only if --wiki flag), Step 7 - Neo4j export (only if --neo4j or --neo4j-push flag), Step 7a - FalkorDB export (only if --falkordb or --falkordb-push flag), Step 7b - SVG export (only if --svg flag), Step 7c - GraphML export (only if --graphml flag), Step 7d - MCP server (only if --mcp flag), Step 8 - Token reduction benchmark (only if total_words > 5000)
 
-### Community 16 - "Section 12 — BLOCKED — AWAITING HUMAN PLAYTEST (2026-08-10) — Run-record instrumentation"
+### Community 16 - "Section 13 — IN PROGRESS — City & Craft Transition Epilogue (2026-08-10)"
 Cohesion: 0.20
-Nodes (9): Boundaries, Decisions relevant, Intentionally missing, Last known green, Next milestone, Normal verification, Section 12 — BLOCKED — AWAITING HUMAN PLAYTEST (2026-08-10) — Run-record instrumentation, STATE — Historical Empire (+1 more)
+Nodes (9): Boundaries, Decisions relevant, Intentionally missing, Last known green, Next milestone, Normal verification, Section 13 — IN PROGRESS — City & Craft Transition Epilogue (2026-08-10), STATE — Historical Empire (+1 more)
 
 ### Community 17 - "graphify reference: extra exports and benchmark"
 Cohesion: 0.22
@@ -450,10 +450,6 @@ Nodes (33): InventoryState, Player inventory — grain for Sections 2-4, finishe
 Cohesion: 0.08
 Nodes (23): Audit — Sections 1–10, Consolidated Review Round 1, B1 — `make type` has never run pyright in strict mode. The type gate is not the gate we think it is., B2 — The API hides legal moves from the player. `choices_for` models the coming harvest for `buy` and ignores it for `ship`, under-offering in both directions., B3 — Two acceptance tests are non-falsifiable. Both survive deletion of the feature they name., B4 — Rival headlines report total failure on partial fills. The rival sold, and the game says it didn't., BLOCKING, Explicitly checked and found clean, How to read this (+15 more)
 
-### Community 81 - "cli.py"
-Cohesion: 0.23
-Nodes (14): format_market_pulse(), format_player_state(), format_rivals(), format_route_state(), main(), parse_choice(), parse_choices_arg(), Thin CLI for the five-turn headless prototype — Section 6. Pure I/O around… (+6 more)
-
 ### Community 82 - "Section 8 implementation — consolidated review (round 3, against commit 28a0963)"
 Cohesion: 0.22
 Nodes (8): Closeout (unchanged from F5), G1 — Remove the `PressureState | str` legacy shim (BLOCKING), G2 — Work Plan §6 (CLI + StrategicSummary stage display) was never implemented (BLOCKING), G3 — STATE.md contains a provably false provenance claim (BLOCKING), G4 — DECISIONS.md 012 contradicts its own rationale (BLOCKING), G5 — Pressure node label should derive from stage, not title (should-fix), G6 — Prefer a `mode="before"` validator over `object.__setattr__` (should-fix, minor), Section 8 implementation — consolidated review (round 3, against commit 28a0963)
@@ -499,8 +495,8 @@ Cohesion: 0.20
 Nodes (9): 1. What is settled — keep as planned, 2. BLOCKING — the AC1 control arm is testing the wrong thing, 3. RULING — Q5 (demand decay): keep the curve, and stop treating it as taste, 4. RULING — Q6 (`hire_labour`): ship it, capped at 1/turn, and it consumes the turn, 5. SHOULD-FIX — Crisis Reputation currently rewards passivity, not crisis, 6. SHOULD-FIX — state the labour cap interaction with Land Network explicitly, 7. Not asked for, 8. Instruction to Muse (+1 more)
 
 ### Community 93 - "harness.py"
-Cohesion: 0.15
-Nodes (16): _can_afford(), policy_cash_preserving(), policy_production_heavy(), policy_random_legal(), policy_storage_heavy(), policy_trade_heavy(), _policy_trade_heavy_no_route(), PolicyAggregate (+8 more)
+Cohesion: 0.14
+Nodes (19): BatchResult, _can_afford(), format_markdown(), policy_cash_preserving(), policy_production_heavy(), policy_random_legal(), policy_storage_heavy(), policy_trade_heavy() (+11 more)
 
 ### Community 96 - "MarketState"
 Cohesion: 0.15
@@ -540,7 +536,7 @@ Nodes (17): 1. Where to store the sequence, 2. Run-record format, 3. Completion 
 
 ### Community 105 - "devDependencies"
 Cohesion: 0.12
-Nodes (17): eslint, devDependencies, eslint, globals, @testing-library/react, @types/react, typescript, typescript-eslint (+9 more)
+Nodes (17): eslint, devDependencies, eslint, globals, prettier, @testing-library/react, @types/react, typescript-eslint (+9 more)
 
 ### Community 106 - "scripts"
 Cohesion: 0.17
@@ -566,6 +562,10 @@ Nodes (8): 1. Before you start, 2. The three questions, 3. Observation sheet, 4.
 Cohesion: 0.33
 Nodes (8): Section 4 — multi-step drought to wealth chain tests., Same command, different world should produce different driver impacts., Drought chain must be structurally present via parent_ids and exact wealth math., _state(), test_concise_le_three_full_trace_preserved(), test_drought_to_wealth_structural_chain_exact(), test_normal_vs_drought_different_drivers(), test_story_drivers_cover_wealth_chain()
 
+### Community 114 - "cli.py"
+Cohesion: 0.27
+Nodes (11): format_market_pulse(), format_player_state(), format_rivals(), format_route_state(), main(), parse_choice(), parse_choices_arg(), Thin CLI for the five-turn headless prototype — Section 6. Pure I/O around… (+3 more)
+
 ### Community 115 - "Section 13 — Design Direction (Claude, design authority)"
 Cohesion: 0.22
 Nodes (8): 1. The thesis, stated operationally, 2. Lowest-complexity mechanic that delivers it, 3. Legacies — earned, deterministic, and one must bite, 4. AC1 must be MEASURED, not argued, 5. Scope boundary — engine first, minimal UI reuse, 6. Turn budget, 7. What is out of scope, Section 13 — Design Direction (Claude, design authority)
@@ -574,9 +574,9 @@ Nodes (8): 1. The thesis, stated operationally, 2. Lowest-complexity mechanic th
 Cohesion: 0.05
 Nodes (40): 0. Reading list (what this plan rests on), 10. Risks / Rollback, 11. Open Questions, 12. Self-grill, 1. Goal, 2. AC1 / AC2 measurement design — fixed before any run, 3. Success Criteria, 4. Context and Current Facts (+32 more)
 
-### Community 125 - "SECTION 20 — Visual Asset System and Polish"
-Cohesion: 0.40
-Nodes (5): Acceptance criteria, Goal, In scope, SECTION 20 — Visual Asset System and Polish, Stop condition
+### Community 125 - "test_invariants.py"
+Cohesion: 0.31
+Nodes (10): _bounded_price(), Bound movement toward target_price within max_movement_bps of current., Integer-safe target price from supply/demand., _target_price(), Invariant and property tests for Section 3 — AC #2, #4., test_bounded_price_monotonic_with_supply(), test_demand_unchanged_cannot_reduce_target_when_supply_falls(), test_price_stays_positive_extreme() (+2 more)
 
 ### Community 129 - "rivals.py"
 Cohesion: 0.13
@@ -586,9 +586,9 @@ Nodes (25): compute_farm_output(), cost_for_quantity(), Cost in Money for quanti
 Cohesion: 0.18
 Nodes (13): _epilogue_command(), format_four_arm(), FourArmResult, _median(), BaseModel, Four-arm epilogue harness — Section 13 AC1 measurement. Arms (paired, same…, Uniform epilogue policy: craft if possible, else sell finished, else sell…, run_four_arm() (+5 more)
 
-### Community 132 - "test_invariants.py"
-Cohesion: 0.31
-Nodes (10): _bounded_price(), Bound movement toward target_price within max_movement_bps of current., Integer-safe target price from supply/demand., _target_price(), Invariant and property tests for Section 3 — AC #2, #4., test_bounded_price_monotonic_with_supply(), test_demand_unchanged_cannot_reduce_target_when_supply_falls(), test_price_stays_positive_extreme() (+2 more)
+### Community 132 - "SECTION 20 — Visual Asset System and Polish"
+Cohesion: 0.40
+Nodes (5): Acceptance criteria, Goal, In scope, SECTION 20 — Visual Asset System and Polish, Stop condition
 
 ### Community 133 - "Part VIII — Agent Guardrails"
 Cohesion: 0.40
@@ -602,11 +602,11 @@ Nodes (5): 31. Do Not Build Ahead, 32. Do Not Rewrite Working Systems Without Ev
 ## Suggested Questions
 _Questions this graph is uniquely positioned to answer:_
 
-- **Why does `PlayerCommand` connect `PlayerCommand` to `MarketState`, `rivals.py`, `test_pressure_arc.py`, `default_start_state`, `turn.py`, `mappers.py`, `test_five_turn_prototype.py`, `test_balance_harness.py`, `GameState`, `test_causal_trace.py`, `test_invariants.py`, `FiveTurnGame`, `InventoryState`, `test_explanation.py`, `cli.py`, `test_two_markets_route.py`, `test_api.py`, `harness.py`?**
+- **Why does `PlayerCommand` connect `PlayerCommand` to `MarketState`, `rivals.py`, `test_pressure_arc.py`, `default_start_state`, `turn.py`, `mappers.py`, `test_five_turn_prototype.py`, `test_balance_harness.py`, `GameState`, `test_causal_trace.py`, `FiveTurnGame`, `InventoryState`, `test_explanation.py`, `cli.py`, `test_invariants.py`, `test_api.py`, `test_two_markets_route.py`, `harness.py`?**
   _High betweenness centrality (0.032) - this node is a cross-community bridge._
 - **Why does `FiveTurnGame` connect `FiveTurnGame` to `MarketState`, `test_pressure_arc.py`, `PlayerCommand`, `default_start_state`, `test_five_turn_prototype.py`, `mappers.py`, `test_balance_harness.py`, `GameState`, `InventoryState`, `cli.py`, `test_two_markets_route.py`, `test_api.py`, `harness.py`?**
   _High betweenness centrality (0.023) - this node is a cross-community bridge._
-- **Why does `resolve_turn()` connect `PlayerCommand` to `MarketState`, `test_pressure_arc.py`, `rivals.py`, `test_five_turn_prototype.py`, `turn.py`, `mappers.py`, `test_invariants.py`, `GameState`, `test_causal_trace.py`, `test_balance_harness.py`, `InventoryState`, `test_explanation.py`, `test_rounding.py`, `test_two_markets_route.py`, `test_api.py`?**
+- **Why does `resolve_turn()` connect `PlayerCommand` to `MarketState`, `test_pressure_arc.py`, `rivals.py`, `test_five_turn_prototype.py`, `turn.py`, `mappers.py`, `GameState`, `test_causal_trace.py`, `test_balance_harness.py`, `InventoryState`, `test_explanation.py`, `test_rounding.py`, `test_two_markets_route.py`, `test_api.py`, `test_invariants.py`?**
   _High betweenness centrality (0.017) - this node is a cross-community bridge._
 - **Are the 16 inferred relationships involving `PlayerCommand` (e.g. with `GameSession` and `FourArmResult`) actually correct?**
   _`PlayerCommand` has 16 INFERRED edges - model-reasoned connections that need verification._

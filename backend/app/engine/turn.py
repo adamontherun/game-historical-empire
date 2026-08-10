@@ -627,9 +627,9 @@ def resolve_turn(
     elif command.type == "craft_goods":
         requested = command.quantity if command.quantity is not None else 10
         requested = int(requested)
-        # Determine efficiency — Granary Expertise extra yield if in legacies or storage>=180
-        has_granary = "granary_expertise" in state.legacies or before_storage >= 180
-        eff_num = 4 if has_granary else 3
+        # Granary does NOT improve conversion — old mastery does not transfer.
+        # Keep efficiency uniform 3/10 for all; labour count is the lever (river_contracts gives +2)
+        eff_num = 3
         eff_den = 10
         # Use shared primitive
         from app.engine.actor import resolve_craft as _resolve_craft

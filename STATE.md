@@ -4,20 +4,21 @@
 
 ## Section 13 — IN PROGRESS — City & Craft Transition Epilogue (2026-08-10)
 
-**Epilogue hook (engine+domain is real work):** 3-turn epilogue after 5-turn agriculture shifts bottleneck from storage+drought timing to skilled_labour. Adds `PlayerState.skilled_labour`, `InventoryState.finished_goods`, `GameState.legacies`, new commands `craft_goods`/`sell_finished_goods`/`hire_labour`, demand shift 410→280→220→180, workshop conversion grain→finished capped at labour×10 (GRAIN_PER_LABOUR=10, 10→3), finished price 9500 (+800 with River Contracts), Land Network +15 grain/turn deliberately weak vs labour cap, Crisis Reputation requires exposure+survival (inventory_at_drought≥80 and cash_low≥300), hire_labour +1/turn consuming turn, Control C (demand OFF) and Control L (legacies OFF) for four-arm AC1.
+**Epilogue hook (engine+domain is real work):** 3-turn epilogue after 5-turn agriculture shifts bottleneck from storage+drought timing to skilled_labour. Adds `PlayerState.skilled_labour`, `InventoryState.finished_goods`, `GameState.legacies`, new commands `craft_goods`/`sell_finished_goods`/`hire_labour`, demand shift 410→280→220→180, workshop conversion grain→finished capped at labour×10 (GRAIN_PER_LABOUR=10, 10→3 uniform, granary inert), finished price 9500 (+800 river, but now inert for granary), Land Network +15 grain/turn weak vs labour cap, **three legacies** (granary inert, river +2 labour, land weak) — crisis dropped (was 40/40 constant; inventory_at_drought fixed per policy 130/180/110/130), hire_labour +1/turn consuming turn, Control C (demand OFF) and Control L (legacies OFF) for four-arm AC1.
 
-**Four-arm harness (n=200, prefix fourarm-final):**
+**Four-arm harness (n=200, prefix final-required, required changes applied):**
 ```
-Arm A (5 turns agri): storage_heavy 2345, production_heavy 2290, trade_heavy 2241, cash_preserving 2109, random 1468
-Arm B (8 full):       storage_heavy 2526, production_heavy 2271, trade_heavy 2219, cash 1653, random 1089
-Control C (demand OFF): storage 3836, trade 2959, production 2322, cash 2393, random 1287
-Control L (legacies OFF): storage 2526, trade 2212, production 2271, cash 1653, random 1085
-P_agri=storage_heavy rank A1 B1 C1 L1 lead_A 55 lead_B 255 lead_C 877 contraction_B -364% contraction_C -1495%
+Arm A (5 turns agri): storage_heavy 2345, production_heavy 2290, trade_heavy 2241, cash_preserving 2109, random 1195
+Arm B (8 full, river +2 labour, granary inert, 3 legacies): storage_heavy 2497, production_heavy 2271, trade_heavy 2405, cash 1653, random 962
+Control C (demand OFF): storage 3807, trade 3145, production 2322, cash 2393, random 1100
+Control L (legacies OFF): storage 2497, trade 2212, production 2271, cash 1653, random 952
+P_agri=storage_heavy rank A1 B1 C1 L1 lead_A 55 lead_B 92 lead_C 662 contraction_B -68% contraction_C -1104%
 AC1 B pass (rank≥2 or C≥40): False  Control C pass: False  AC1 credible (B and not C): False — FAIL
-Net-positive guard (some B>A): True best_gain 181 — PASS (storage +181)
-Ratios bps: A 10240 B 11122
+Net-positive guard (some B>A): True best_gain 164 — PASS (trade 2241→2405 +164, storage 2345→2497 +152)
+Ratios bps: A 10240 B 10382
+Legacies per policy (deterministic): production (land), storage (granary), trade (river), cash ()
 ```
-AC1 FAIL: P_agri (storage_heavy) remains rank1 in B, contraction negative (lead grew). Demand shift does hurt (C vs B: storage 3836→2526 -1310), but not enough to reorder. Net-positive holds. Per review, this means demand decay is doing work finished-goods upside should do — fix is stronger craft payoff, not gentler collapse. Report is honest; do not reword criterion. EightTurnGame+TURN_LIMIT 8, but API still serves FiveTurnGame (5) for e2e stability; epilogue via direct engine harness.
+AC1 FAIL: P_agri remains rank1, lead grew 55→92. River +2 labour triples channel (90 vs 30 grain over epilogue) but trade had least grain after agri (80 vs storage 110) and farm production is capped, so extra labour is grain-limited. Demand shift hurts storage most (3807→2497 -1310) but not enough to flip. Net-positive holds. Per review, next lever is not price (lever is labour count) but making channel larger via more grain stock for river or making raw price lower; both already at limits, so report FAIL honestly. Do not reword. API still serves FiveTurnGame (5) for e2e stability; epilogue via harness.
 
 ### What exists
 

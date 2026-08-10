@@ -40,8 +40,8 @@
     "semantic_hash": "79fb1a94c42d32e68ee6a881643adb44"
   },
   "backend/app/engine/turn.py": {
-    "mtime": 1786390463.4099405,
-    "ast_hash": "c323e8459350ddfc762c303a3332af09",
+    "mtime": 1786390880.3549066,
+    "ast_hash": "d9493ed30ffe7f56778084da78dd7c9c",
     "semantic_hash": ""
   },
   "backend/pyproject.toml": {
@@ -220,8 +220,8 @@
     "semantic_hash": ""
   },
   "STATE.md": {
-    "mtime": 1786389358.039548,
-    "ast_hash": "228558f7660b8fa1af86eb6fac9b2005",
+    "mtime": 1786390986.4885924,
+    "ast_hash": "dc1bb19e78de34f5d880b406059295aa",
     "semantic_hash": ""
   },
   "backend/AGENTS.md": {
@@ -265,8 +265,8 @@
     "semantic_hash": ""
   },
   "backend/app/engine/prototype.py": {
-    "mtime": 1786390172.254935,
-    "ast_hash": "441eb4350aac4c5fc45396018481fe3b",
+    "mtime": 1786390932.2758303,
+    "ast_hash": "e39af70f863e978fa9a2ec93f9b474a4",
     "semantic_hash": ""
   },
   "backend/tests/test_five_turn_prototype.py": {
