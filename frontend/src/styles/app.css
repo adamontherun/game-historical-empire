@@ -129,6 +129,7 @@ button {
   flex-direction: column;
   gap: 12px;
   padding: 12px;
+  padding-bottom: 84px;
 }
 
 /* empire tableau — 3 independent rows per R1, no arrows */
@@ -295,10 +296,11 @@ button {
 .commit-bar {
   position: sticky;
   bottom: 0;
+  z-index: 5;
   padding: 12px;
-  background: linear-gradient(to top, var(--page-ground), rgba(245, 237, 224, 0));
+  background: var(--page-ground);
   border-top: 1px solid var(--page-rule);
-  backdrop-filter: blur(6px);
+  box-shadow: 0 -4px 12px rgba(31, 26, 20, 0.08);
 }
 .commit-btn {
   width: 100%;

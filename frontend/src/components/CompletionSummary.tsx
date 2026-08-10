@@ -27,7 +27,7 @@ export function CompletionSummary({ game, onPlayAgain }: { game: GameView; onPla
         <div data-testid="final-grain">Grain {c.final_grain}</div>
         {c.final_rival_headlines ? (
           <div data-testid="final-rivals">
-            Rivals · Mira: {c.final_rival_headlines.mira} / Daran: {c.final_rival_headlines.daran}
+            Rivals · {c.final_rival_headlines.mira} / {c.final_rival_headlines.daran}
           </div>
         ) : null}
       </div>

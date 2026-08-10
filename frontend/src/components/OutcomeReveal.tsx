@@ -47,8 +47,8 @@ export function OutcomeReveal({
       {visibleBeats >= 1 ? (
         <div className="reveal-beat" data-reveal-beat="1" data-testid="beat-world">
           <div className="beat-label">World</div>
-          <div className="beat-value">
-            {outcome.world} · {outcome.pressure_stage}
+          <div className="beat-value" style={{ textTransform: "capitalize" }}>
+            {outcome.pressure_stage.replace(/_/g, " ")}
           </div>
         </div>
       ) : null}
@@ -57,18 +57,21 @@ export function OutcomeReveal({
         <div className="reveal-beat" data-reveal-beat="2" data-testid="beat-numbers">
           <div className="beat-label">Numbers</div>
           <div className="beat-value num">
-            Wealth {signedMoney(outcome.wealth_delta)} · Grain {outcome.inventory_delta > 0 ? `+${outcome.inventory_delta}` : String(outcome.inventory_delta)} · Home
-            price {signedPricePerUnit(outcome.price_delta)} / grain
-          </div>
-          <div style={{ fontSize: 11, color: "var(--ink-soft)", marginTop: 4 }}>
-            Home price {signedPricePerUnit(outcome.price_delta)} / grain (R6)
+            {(() => {
+              const parts: string[] = [];
+              if (outcome.wealth_delta !== 0) parts.push(`Wealth ${signedMoney(outcome.wealth_delta)}`);
+              if (outcome.inventory_delta !== 0)
+                parts.push(`Grain ${outcome.inventory_delta > 0 ? `+${outcome.inventory_delta}` : String(outcome.inventory_delta)}`);
+              if (outcome.price_delta !== 0) parts.push(`Home price ${signedPricePerUnit(outcome.price_delta)} / grain`);
+              return parts.length > 0 ? parts.join(" · ") : "No change";
+            })()}
           </div>
         </div>
       ) : null}
 
       {visibleBeats >= 3 ? (
         <div className="reveal-beat" data-reveal-beat="3" data-testid="beat-drivers">
-          <div className="beat-label">Top drivers (≤3)</div>
+          <div className="beat-label">Top drivers</div>
           <div className="driver-list">
             {outcome.drivers.map((d) => {
               const positive = d.impact_money > 0;
@@ -109,8 +112,8 @@ export function OutcomeReveal({
           <div className="beat-label">Rivals this turn</div>
           {rival ? (
             <>
-              <div className="rival-line">Mira: {rival.mira}</div>
-              <div className="rival-line">Daran: {rival.daran}</div>
+              <div className="rival-line">{rival.mira}</div>
+              <div className="rival-line">{rival.daran}</div>
             </>
           ) : (
             <div style={{ fontSize: 13 }}>Mira and Daran acted after your first decision</div>

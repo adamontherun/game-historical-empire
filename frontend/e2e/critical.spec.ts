@@ -34,9 +34,11 @@ test.describe("critical path", () => {
     await expect(page.getByTestId("decision-block").locator("table")).toHaveCount(0);
     // 6 verb cards at start (B1 correct count)
     await expect(page.getByTestId("verb-hold")).toBeVisible();
+    // B1 verbatim — unconditional at turn 0 where buy is guaranteed (55/110)
+    await expect(page.locator('[data-testid^="qty-buy_grain:"]')).toHaveCount(2);
     // empire tableau initial
     await expect(page.getByTestId("empire-tableau")).toBeVisible();
-    // first decision screenshot
+    // first decision screenshot — must not show Commit covering a card (I1)
     await page.screenshot({ path: path.resolve("e2e/screenshots/first-decision.png"), fullPage: true });
 
     // S2: expand_farm then build_granary early to cross two thresholds for AC5
@@ -60,10 +62,13 @@ test.describe("critical path", () => {
     await expect(page.getByTestId("reveal-continue")).toBeVisible();
     await page.getByTestId("reveal-continue").click();
 
-    // Turn 1: early_dry — should have rival headlines now
+    // Turn 1: early_dry — should have rival headlines now (I6: verbatim, no "Mira:" prefix stutter)
     await expect(page.getByTestId("turn-label")).toContainText("Turn 2 of 5");
-    await expect(page.getByTestId("rivals-strip")).toContainText("Mira:");
-    await expect(page.getByTestId("rivals-strip")).toContainText("Daran:");
+    await expect(page.getByTestId("rivals-strip")).toContainText("Mira");
+    await expect(page.getByTestId("rivals-strip")).toContainText("Daran");
+    // ensure no stutter "Mira: Mira"
+    await expect(page.getByTestId("rivals-strip")).not.toContainText("Mira: Mira");
+    await expect(page.getByTestId("rivals-strip")).not.toContainText("Daran: Daran");
     // verify tableau changed after expand — B9 exact
     const afterExpandTier = await page.getByTestId("tier-estate").textContent();
     expect(afterExpandTier).not.toEqual(tierEstateBefore);
@@ -85,16 +90,8 @@ test.describe("critical path", () => {
     await expect(page.getByTestId("tier-storage")).toContainText("Storage 180");
     await page.screenshot({ path: path.resolve("e2e/screenshots/drought-warning.png"), fullPage: true });
 
-    // Turn 2 commit: buy or hold — use buy if available
-    const buyBtn = page.getByTestId("verb-buy_grain");
-    if (await buyBtn.isVisible()) {
-      await buyBtn.click();
-      // B1: quantity toggle shows verbatim payload values — at least two options visible
-      // buy_grain has two quantities, check toggle exists
-      await expect(page.locator('[data-testid^="qty-buy_grain:"]')).toHaveCount(2);
-    } else {
-      await page.getByTestId("verb-hold").click();
-    }
+    // Turn 2 commit: hold (buy not guaranteed after granary with full storage, so we hold)
+    await page.getByTestId("verb-hold").click();
     await page.getByTestId("commit").click();
     await expect(page.getByTestId("outcome-reveal")).toHaveAttribute("data-reveal-state", "complete", { timeout: 10000 });
     await page.getByTestId("reveal-continue").click();
@@ -128,7 +125,7 @@ test.describe("critical path", () => {
     // B6: hold cost 0 must be visible, sell cost null must not show Cost
     await page.getByTestId("verb-hold").click();
     await expect(page.getByTestId("verb-hold")).toContainText("Cost: 0 coins");
-    // sell has no cost line — check only one Cost visible for hold vs sell
+    await expect(page.getByTestId("verb-sell_grain")).not.toContainText("Cost:");
     // commit final turn — B2: fifth reveal before completion
     await page.getByTestId("commit").click();
     await expect(page.getByTestId("outcome-reveal")).toHaveAttribute("data-reveal-state", "complete", { timeout: 10000 });
@@ -145,10 +142,10 @@ test.describe("critical path", () => {
     await expect(page.getByTestId("final-estate")).toContainText("Storage");
     await expect(page.getByTestId("run-record")).toBeVisible();
     await expect(page.getByTestId("final-rivals")).toBeVisible();
-    await expect(page.getByTestId("footer-debug")).toContainText("seed");
-    await expect(page.getByTestId("footer-debug")).toContainText("rules");
-    // also completion seed·rules
+    // I9: seed·rules shown only inside completion card (completion-seed), not duplicated in footer
     await expect(page.getByTestId("completion-seed")).toContainText("seed");
+    await expect(page.getByTestId("completion-seed")).toContainText("rules");
+    await expect(page.getByTestId("footer-debug")).toHaveCount(0);
     await page.screenshot({ path: path.resolve("e2e/screenshots/final-summary.png"), fullPage: true });
 
     // B8: controlled race — exactly one POST while pending, disabled while pending
@@ -158,7 +155,8 @@ test.describe("critical path", () => {
     await page.getByTestId("begin-btn").click();
     await expect(page.getByTestId("turn-label")).toContainText("Turn 1 of 5");
 
-    // set up deferred route gate (B8 controlled race)
+    // I5/B8: honest committingRef guard — two clicks dispatched synchronously before React re-renders disabled
+    // .click() on a disabled button does not dispatch, so the second click must be in the same tick while still enabled
     let resolveGate!: () => void;
     const gate = new Promise<void>((res) => (resolveGate = res));
     let requestCount = 0;
@@ -168,22 +166,21 @@ test.describe("critical path", () => {
       await route.continue().catch(() => {});
     });
     await page.getByTestId("verb-hold").click();
-    // fire first click — request will be held at gate
-    const commitBtn = page.getByTestId("commit");
-    await commitBtn.click();
-    // commit button should be disabled while pending (isPending + committingRef)
-    await expect(commitBtn).toBeDisabled();
-    // try second click via JS (bypasses disabled) — committingRef must still block
+    // fire two clicks synchronously in one evaluate — second must be blocked by committingRef, not just disabled
     await page.evaluate(() => {
       const btn = document.querySelector('[data-testid="commit"]') as HTMLButtonElement;
-      if (btn) btn.click();
+      if (btn) {
+        btn.click();
+        btn.click();
+      }
     });
+    // commit button should become disabled while pending
+    await expect(page.getByTestId("commit")).toBeDisabled();
     // release gate and wait for response
     resolveGate();
     await page.waitForResponse((resp) => resp.url().includes("/choices/") && resp.request().method() === "POST", {
       timeout: 10000,
     });
-    // wait for reveal — do not unroute before continue completes
     await expect(page.getByTestId("outcome-reveal")).toHaveAttribute("data-reveal-state", "complete", { timeout: 10000 });
     expect(requestCount).toBe(1);
     await page.unroute("**/api/v1/games/*/choices/*");
@@ -228,7 +225,8 @@ test.describe("critical path", () => {
     await page.getByTestId("commit").click();
     await expect(page.getByTestId("outcome-reveal")).toHaveAttribute("data-reveal-state", "complete", { timeout: 10000 });
     await page.getByTestId("reveal-continue").click();
-    await expect(page.getByTestId("rivals-strip")).toContainText("Mira:");
-    await expect(page.getByTestId("rivals-strip")).toContainText("Daran:");
+    await expect(page.getByTestId("rivals-strip")).toContainText("Mira");
+    await expect(page.getByTestId("rivals-strip")).toContainText("Daran");
+    await expect(page.getByTestId("rivals-strip")).not.toContainText("Mira: Mira");
   });
 });

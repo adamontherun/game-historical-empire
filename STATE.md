@@ -111,29 +111,29 @@ docs/plans/2026-08-10-section-11-review-round-1.md        # consolidated review 
 ### Normal verification
 
 ```bash
-make test              # 150 passed, 1 warning in 1.97s
+make test              # 150 passed, 1 warning in 2.04s
 make lint              # All checks passed!
 make type              # 0 errors, 0 warnings, 0 informations — 38 files analyzed (strict app + standard tests via executionEnvironments)
 make format-check      # 39 files already formatted
 make front-type        # tsc --noEmit — 0 errors
 make front-lint        # eslint . --ext .ts,.tsx — 0 problems
-make front-test        # vitest run — 5 passed (5), 23 passed (23)
+make front-test        # vitest run — 5 passed (5), 26 passed (26)
 make check-all         # backend + frontend gates green — check-all: backend + frontend gates green
 # e2e (via make front-e2e / npx playwright test)
-# — 8 passed (4 mobile + 4 desktop, 45.4s) — includes full 5-turn mobile with 4 screenshots, desktop smoke, AC2 no table, AC4 rivals, B8 deferred gate (requestCount 1, disabled while pending), no waitForTimeout, console+pageerror zero
+# — 8 passed (4 mobile + 4 desktop, 44.5s) — full 5-turn mobile (expand→granary, 4 screenshots I1 opaque, no overlap), desktop smoke, AC2 no table, AC4 rivals verbatim (I6), B1 unconditional buy, B6 sell no Cost, B8 synchronous double-click committingRef (I5, requestCount 1), no waitForTimeout, console+pageerror zero
 ```
 
 ### Last known green
 
 ```
-pytest 150 passed in 1.97s (1 warning: StarletteDeprecationWarning)
+pytest 150 passed in 2.04s (1 warning: StarletteDeprecationWarning)
 ruff check All checks passed!
 pyright 0 errors, 0 warnings, 0 informations — 38 files analyzed (strict app + standard tests via executionEnvironments)
 ruff format --check 39 files already formatted
 tsc --noEmit — 0 errors
 eslint — 0 problems (no-restricted-syntax for /1000 and /10000 outside format.ts, no waitForTimeout)
-vitest — 5 passed (5), 23 passed (23)
-playwright — 8 passed (4 mobile 390×844 + 4 desktop 1280×800) — 45.4s — screenshots: first-decision.png, drought-warning.png (turn 2 worsening_dry), drought-reveal.png (after turn 3: header aftermath vs reveal drought), final-summary.png (turn 5 R10)
+vitest — 5 passed (5), 26 passed (26) — including B4 App revision 7 vs turn 2 (I2) and B7 impact_money vs impact_bps (I3) mutation-proven
+playwright — 8 passed (4 mobile 390×844 + 4 desktop 1280×800) — 44.5s — screenshots: first-decision.png (I1 no overlap), drought-warning.png (turn 2 worsening_dry), drought-reveal.png (after turn 3: header aftermath vs reveal drought, B3), final-summary.png (turn 5 R10, I9 no duplicate seed·rules)
 check-all: backend + frontend gates green
 ```
 

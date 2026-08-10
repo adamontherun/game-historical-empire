@@ -57,22 +57,35 @@ export function DecisionBlock({
           const selected = isSelectedGroup(g);
           const effId = effectiveId(g);
           const effChoice = g.choices.find((c) => c.id === effId) ?? g.choices[0];
-          // When user clicks verb card, select effective choice
           return (
-            <div key={g.kind}>
+            <div
+              key={g.kind}
+              className="verb-card"
+              data-testid={`verb-${g.kind}`}
+              data-selected={selected ? "true" : "false"}
+              data-kind={g.kind}
+              onClick={() => onSelect(effId)}
+              role="button"
+              style={{ cursor: "pointer" }}
+            >
               <button
-                className="verb-card"
-                data-testid={`verb-${g.kind}`}
-                data-selected={selected ? "true" : "false"}
-                data-kind={g.kind}
-                onClick={() => onSelect(effId)}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onSelect(effId);
+                }}
+                style={{
+                  all: "unset",
+                  display: "block",
+                  width: "100%",
+                  cursor: "pointer",
+                  textAlign: "left",
+                }}
+                data-testid={`verb-btn-${g.kind}`}
               >
-                <div className="verb-card-title">{g.kind}</div>
-                <div className="verb-card-label">{effChoice.label}</div>
+                <div className="verb-card-title">{effChoice.label}</div>
                 {effChoice.cost !== null ? (
                   <div className="verb-card-cost num">Cost: {effChoice.cost} coins</div>
                 ) : null}
-                {/* cost 0 must show — check !== null not truthiness per B6 */}
               </button>
               {g.choices.length > 1 ? (
                 <div className="quantity-toggle" data-testid={`qty-toggle-${g.kind}`}>

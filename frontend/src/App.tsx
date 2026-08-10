@@ -134,7 +134,6 @@ export default function App() {
     return (
       <div data-pressure={displayPressure} className="shell">
         <CompletionSummary game={game} onPlayAgain={handlePlayAgain} />
-        <FooterDebug seed={game.run_seed} rules={game.ruleset_version} />
         {toast ? (
           <div data-testid="toast" style={{ padding: 12, color: "var(--drought)" }}>
             {toast}

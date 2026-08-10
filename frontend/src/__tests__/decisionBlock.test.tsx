@@ -69,8 +69,8 @@ describe("DecisionBlock", () => {
     expect(screen.getByTestId("verb-buy_grain")).toBeInTheDocument();
     expect(screen.getByTestId("verb-sell_grain")).toBeInTheDocument();
     expect(screen.getByTestId("verb-ship_grain")).toBeInTheDocument();
-    // 6 verb cards
-    const verbs = screen.getAllByTestId(/^verb-/);
+    // 6 verb cards (outer divs only, not inner verb-btn-*)
+    const verbs = screen.getAllByTestId(/^verb-(?!btn-)/);
     expect(verbs).toHaveLength(6);
   });
 });

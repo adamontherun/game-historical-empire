@@ -15,10 +15,10 @@ export function RivalsStrip({ headlines }: { headlines: RivalHeadlines | null })
     <div className="card rivals-strip" data-testid="rivals-strip">
       <div className="section-label">Rivals</div>
       <div className="rival-line" data-testid="rival-mira">
-        Mira: {headlines.mira}
+        {headlines.mira}
       </div>
       <div className="rival-line" data-testid="rival-daran" style={{ marginTop: 6 }}>
-        Daran: {headlines.daran}
+        {headlines.daran}
       </div>
     </div>
   );
