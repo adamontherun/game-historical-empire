@@ -45,8 +45,8 @@
     "semantic_hash": "79fb1a94c42d32e68ee6a881643adb44"
   },
   "backend/app/engine/turn.py": {
-    "mtime": 1786328587.7810519,
-    "ast_hash": "7df95b7ad547b44a2ebc3f46b33eea31",
+    "mtime": 1786328595.5626602,
+    "ast_hash": "6a7bfd98b81d260bbe1ca5191c0cd579",
     "semantic_hash": ""
   },
   "backend/pyproject.toml": {

@@ -1,7 +1,7 @@
 # Graph Report - game-historical-empire  (2026-08-09)
 
 ## Corpus Check
-- 61 files · ~88,309 words
+- 61 files · ~88,306 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
