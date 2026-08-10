@@ -7,7 +7,7 @@ AC4: three strategies diverge
 AC5: drought rewards preparation
 AC6: top causes understandable
 AC7: concise strategic summary
-Plus supply semantics stock-drained gate.
+Plus supply semantics signal-drained gate (availability signal, not physical stock).
 """
 
 from __future__ import annotations
@@ -88,13 +88,12 @@ def test_determinism_same_seed_same_choices_same_final_state() -> None:
     assert s3.final_state != s1.final_state or s3.final_wealth != s1.final_wealth
 
 
-def test_supply_semantics_is_stock_drained_by_demand() -> None:
-    """Gate for KDR #5: supply is stock drained by demand each turn."""
+def test_supply_semantics_is_signal_drained_by_demand() -> None:
+    """Gate for KDR #5: supply is an availability signal drained by demand each turn."""
     # Use a controlled state: supply 100, demand 90, farm 10 => 100 harvest normal
     state = default_start_state(seed="supply-semantics", version="1.0")
-    # Override to known values via manual GameState
     # Use the default start state's market: supply 100 demand 90
-    # For normal: stock_next = 100 + 100 -90 =110
+    # For normal: signal_next = 100 + 100 -90 =110
     # For drought: 100+60-90=70
     normal = resolve_turn(state, _hold(), "normal", state.to_turn_context())
     drought = resolve_turn(state, _hold(), "drought", state.to_turn_context())
@@ -350,7 +349,7 @@ def test_signals_truthful_about_mechanics() -> None:
     # The five signals must not claim demand rises or harvest differs except where world differs
     # Check that only T4 is drought, others normal — so signals claiming "strong harvest" for T2
     # would be false. Our revised signals claim "Repeated harvests have left grain abundant"
-    # which is true via stock accumulation, not per-turn harvest difference.
+    # which is true via signal accumulation, not per-turn harvest difference.
     assert TURN_SPECS[0].world == "normal"
     assert TURN_SPECS[1].world == "normal"
     assert TURN_SPECS[2].world == "normal"
@@ -381,3 +380,28 @@ def test_available_commands_include_all_verbs() -> None:
     cmds = game.available_commands()
     for verb in ("hold", "expand_farm", "build_granary", "buy_grain", "secure_route", "ship_grain"):
         assert verb in cmds
+
+
+def test_strategic_summary_shows_true_initial_prices() -> None:
+    """Regression: summary must show true initial Home/River prices, not Turn-1-after prices."""
+    game = FiveTurnGame(seed="summary-price-seed")
+    # Run 5 holds - prices will move: initial 5000/5200, T1 after 4545/6240, final 4545 etc but initial must be 5000
+    game.run([_hold()] * 5)
+    summary = game.summary()
+    # initial_state prices are the true start (5000/5200)
+    assert summary.initial_state.market.current_price == 5000
+    assert summary.initial_state.river_market.current_price == 5200
+    # history[0] is Turn1 after, which is different (4545 under normal)
+    assert (
+        summary.history[0].next_state.market.current_price
+        != summary.initial_state.market.current_price
+    )
+    # format() must use true initial, not history[0]
+    formatted = summary.format()
+    # Check that the home price trajectory in the formatted summary starts with 5000
+    assert "home price: 5000 →" in formatted
+    assert "river price: 5200 →" in formatted
+    # And that it does NOT start with the Turn1 after price 4545 as initial
+    # The first price before arrow should be the initial, not 4545
+    # Ensure the summary's initial_state is accessible and correct
+    assert summary.initial_state.turn == 0

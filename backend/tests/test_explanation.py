@@ -189,7 +189,7 @@ def test_normal_vs_drought_different_drivers() -> None:
     price_drought = next(n for n in drought.causal_trace.nodes if n.id == "price").after
     assert price_normal is not None and price_drought is not None
     assert price_drought >= price_normal
-    # Also verify supply stock is lower under drought due to smaller harvest drain
+    # Also verify supply availability signal is lower under drought due to smaller harvest
     supply_normal = next(n for n in normal.causal_trace.nodes if n.id == "supply").after
     supply_drought = next(n for n in drought.causal_trace.nodes if n.id == "supply").after
     assert supply_normal is not None and supply_drought is not None

@@ -1,11 +1,11 @@
 # Graph Report - game-historical-empire  (2026-08-09)
 
 ## Corpus Check
-- 57 files · ~78,122 words
+- 57 files · ~78,257 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
-- 769 nodes · 1204 edges · 69 communities (59 shown, 10 thin omitted)
+- 772 nodes · 1213 edges · 69 communities (59 shown, 10 thin omitted)
 - Extraction: 98% EXTRACTED · 2% INFERRED · 0% AMBIGUOUS · INFERRED: 29 edges (avg confidence: 0.52)
 - Token cost: 0 input · 0 output
 
@@ -26,7 +26,7 @@
 - Section 5 — Two Markets and One Trade Route — Plan
 - test_sanity.py
 - historical-empire-backend
-- turn.py
+- .edges
 - Historical Empire — Agent Guide
 - graphify reference: extra exports and benchmark
 - Section 6 — COMPLETE (2026-08-09)
@@ -84,10 +84,10 @@
 - SECTION 20 — Visual Asset System and Polish
 
 ## God Nodes (most connected - your core abstractions)
-1. `resolve_turn()` - 77 edges
+1. `resolve_turn()` - 78 edges
 2. `PlayerCommand` - 66 edges
 3. `GameState` - 42 edges
-4. `FiveTurnGame` - 36 edges
+4. `FiveTurnGame` - 37 edges
 5. `MarketState` - 32 edges
 6. `InventoryState` - 31 edges
 7. `PlayerState` - 30 edges
@@ -96,16 +96,16 @@
 10. `RouteState` - 16 edges
 
 ## Surprising Connections (you probably didn't know these)
-- `CausalNode` --uses--> `GameState`  [INFERRED]
-  backend/app/domain/trace.py → backend/app/domain/types.py
-- `CausalTrace` --uses--> `GameState`  [INFERRED]
-  backend/app/domain/trace.py → backend/app/domain/types.py
-- `DomainEffect` --uses--> `GameState`  [INFERRED]
-  backend/app/domain/trace.py → backend/app/domain/types.py
-- `OutcomeDriver` --uses--> `GameState`  [INFERRED]
-  backend/app/domain/trace.py → backend/app/domain/types.py
-- `PlayerOutcome` --uses--> `GameState`  [INFERRED]
-  backend/app/domain/trace.py → backend/app/domain/types.py
+- `FiveTurnGame` --uses--> `TurnResolution`  [INFERRED]
+  backend/app/engine/prototype.py → backend/app/domain/trace.py
+- `FiveTurnGame` --uses--> `InventoryState`  [INFERRED]
+  backend/app/engine/prototype.py → backend/app/domain/types.py
+- `FiveTurnGame` --uses--> `PlayerState`  [INFERRED]
+  backend/app/engine/prototype.py → backend/app/domain/types.py
+- `FiveTurnGame` --uses--> `MarketState`  [INFERRED]
+  backend/app/engine/prototype.py → backend/app/domain/types.py
+- `FiveTurnGame` --uses--> `RouteState`  [INFERRED]
+  backend/app/engine/prototype.py → backend/app/domain/types.py
 
 ## Import Cycles
 - None detected.
@@ -113,12 +113,12 @@
 ## Communities (69 total, 10 thin omitted)
 
 ### Community 0 - "resolve_turn"
-Cohesion: 0.10
-Nodes (48): PlayerCommand, Player turn command — one major action per turn (Sections 3–5)., Resolve one deterministic turn. Order is explicit: command -> production ->…, resolve_turn(), _base_state(), Section 3 kernel tests — AC #1,3,4,5,6., test_build_granary_increases_storage(), test_buy_beyond_cash_is_clamped() (+40 more)
+Cohesion: 0.06
+Nodes (75): PlayerCommand, Player turn command — one major action per turn (Sections 3–5)., _affordable_quantity(), _cost_for_quantity(), Resolve one deterministic turn. Order is explicit: command -> production ->…, Cost in Money for quantity at price_milli (milliunits per unit). Floor division…, Max quantity affordable at price_milli with cash, floored cost., Inventory value in Money at price_milli. (+67 more)
 
 ### Community 1 - "GameState"
-Cohesion: 0.10
-Nodes (47): GameState, InventoryState, MarketState, OperationState, PlayerState, BaseModel, Canonical economic types for Sections 2-5. Integer-only canonical state per…, River Route — single route between Home Valley and River Town (Section 5).… (+39 more)
+Cohesion: 0.07
+Nodes (66): Domain package — re-exports canonical types., CausalNode, CausalTrace, DomainEffect, OutcomeDriver, PlayerOutcome, BaseModel, Causal trace, domain effects, and player outcome for Sections 4–5. Structural… (+58 more)
 
 ### Community 2 - "test_determinism.py"
 Cohesion: 0.11
@@ -126,7 +126,7 @@ Nodes (28): Engine package — deterministic RNG and rounding., derive_seed(), m
 
 ### Community 3 - "FiveTurnGame"
 Cohesion: 0.08
-Nodes (31): format_market_pulse(), format_player_state(), format_route_state(), main(), parse_choice(), parse_choices_arg(), Thin CLI for the five-turn headless prototype — Section 6. Pure I/O around…, Parse a single choice token like 'hold', 'buy 20', 'ship_grain:10', '4'. (+23 more)
+Nodes (34): format_market_pulse(), format_player_state(), format_route_state(), main(), parse_choice(), parse_choices_arg(), Thin CLI for the five-turn headless prototype — Section 6. Pure I/O around…, Parse a single choice token like 'hold', 'buy 20', 'ship_grain:10', '4'. (+26 more)
 
 ### Community 4 - "What You Must Do When Invoked"
 Cohesion: 0.08
@@ -134,7 +134,7 @@ Nodes (24): For /graphify add and --watch, For /graphify query, For the commit h
 
 ### Community 5 - "test_invariants.py"
 Cohesion: 0.11
-Nodes (28): apply_basis_points(), clamp_non_negative(), div_round_half_up(), mul_basis_points(), Deterministic integer rounding helpers for canonical economic math. All…, Multiply value by basis points (10_000 = 100%) with floor division.…, Alias for mul_basis_points — semantic for price adjustments., Integer division rounding half away from zero for positive denominators. For… (+20 more)
+Nodes (27): apply_basis_points(), clamp_non_negative(), div_round_half_up(), mul_basis_points(), Deterministic integer rounding helpers for canonical economic math. All…, Multiply value by basis points (10_000 = 100%) with floor division.…, Alias for mul_basis_points — semantic for price adjustments., Integer division rounding half away from zero for positive denominators. For… (+19 more)
 
 ### Community 6 - "Plan — Section 1: Repository Contract and Walking Skeleton"
 Cohesion: 0.10
@@ -148,9 +148,9 @@ Nodes (24): For /graphify add and --watch, For /graphify query, For the commit h
 Cohesion: 0.11
 Nodes (18): 1. Confirm workspace & branch → unblocks all edits, 2. Domain — add River Town and River Route types, keep Home alias, 3. Trace — add route/trade/river kinds, keep DAG validators compatible, 4. Engine — resolve two prices + route settlement, keep Home chain exact, 5. CLI — show both market pulses and route status, 6. Tests — prove AC 1–6 and preserve Section 3–4 invariants, 7. Docs & handoff, Constraints And Non-goals (+10 more)
 
-### Community 13 - "turn.py"
-Cohesion: 0.06
-Nodes (49): Domain package — re-exports canonical types., CausalNode, CausalTrace, DomainEffect, OutcomeDriver, PlayerOutcome, BaseModel, Causal trace, domain effects, and player outcome for Sections 4–5. Structural… (+41 more)
+### Community 13 - ".edges"
+Cohesion: 0.33
+Nodes (4): Deprecated string view — derived from drivers for backward compat., Derived edges as (parent, child) tuples from parent_ids., CausalEdge, computed_field
 
 ### Community 14 - "Historical Empire — Agent Guide"
 Cohesion: 0.12
@@ -348,11 +348,11 @@ Nodes (5): Acceptance criteria, Goal, In scope, SECTION 20 — Visual Asset Syst
 ## Suggested Questions
 _Questions this graph is uniquely positioned to answer:_
 
-- **Why does `resolve_turn()` connect `resolve_turn` to `GameState`, `test_determinism.py`, `FiveTurnGame`, `test_invariants.py`, `turn.py`?**
-  _High betweenness centrality (0.045) - this node is a cross-community bridge._
-- **Why does `PlayerCommand` connect `resolve_turn` to `GameState`, `test_invariants.py`, `FiveTurnGame`, `turn.py`?**
-  _High betweenness centrality (0.022) - this node is a cross-community bridge._
-- **Why does `rng_for()` connect `test_determinism.py` to `resolve_turn`, `turn.py`?**
+- **Why does `resolve_turn()` connect `resolve_turn` to `GameState`, `test_determinism.py`, `FiveTurnGame`, `test_invariants.py`?**
+  _High betweenness centrality (0.046) - this node is a cross-community bridge._
+- **Why does `PlayerCommand` connect `resolve_turn` to `GameState`, `FiveTurnGame`, `test_invariants.py`?**
+  _High betweenness centrality (0.021) - this node is a cross-community bridge._
+- **Why does `rng_for()` connect `test_determinism.py` to `resolve_turn`, `GameState`?**
   _High betweenness centrality (0.014) - this node is a cross-community bridge._
 - **Are the 3 inferred relationships involving `PlayerCommand` (e.g. with `FiveTurnGame` and `StrategicSummary`) actually correct?**
   _`PlayerCommand` has 3 INFERRED edges - model-reasoned connections that need verification._

@@ -43,7 +43,7 @@ class TurnSpec(BaseModel):
 
 # Truthful signals — each describes actual mechanics, not imaginary deltas.
 # T1 demand is high (starting state's demand), T2 surplus is emergent from
-# stock + harvest > demand, T3 warning precedes T4 drought, T4 is the
+# signal + harvest > demand, T3 warning precedes T4 drought, T4 is the
 # actual world change, T5 is aftermath.
 TURN_SPECS: tuple[TurnSpec, ...] = (
     TurnSpec(
@@ -75,9 +75,9 @@ TURN_SPECS: tuple[TurnSpec, ...] = (
 
 
 def default_start_state(seed: str = "seed-001", version: str = "1.0") -> GameState:
-    """Tuned start state for 5-turn legibility under stock-drained supply.
+    """Tuned start state for 5-turn legibility under availability-drained signal.
 
-    Home Valley: supply 100, demand 90 (so stock 100+100-90=110 surplus weak),
+    Home Valley: supply 100, demand 90 (so signal 100+100-90=110 surplus weak),
     River Town: supply 80, demand 130 (shortage high price), route 800/20/10000.
     Player: cash 1000, grain 20, farm 10, storage 200 (larger to avoid
     immediate cap and let farm expansion be useful).
@@ -129,6 +129,7 @@ class StrategicSummary(BaseModel):
 
     model_config = ConfigDict(frozen=True)
 
+    initial_state: GameState
     final_state: GameState
     history: tuple[TurnResolution, ...]
     final_wealth: int
@@ -152,10 +153,10 @@ class StrategicSummary(BaseModel):
             f"  final grain: {self.final_state.player.inventory.grain}  farm: {self.final_state.player.farm_capacity}  storage: {self.final_state.player.storage_capacity}"
         )
         lines.append(
-            f"  home price: {self.history[0].next_state.market.current_price if self.history else '?'} → {self.final_state.market.current_price}"
+            f"  home price: {self.initial_state.market.current_price} → {self.final_state.market.current_price}"
         )
         lines.append(
-            f"  river price: {self.history[0].next_state.river_market.current_price if self.history else '?'} → {self.final_state.river_market.current_price}"
+            f"  river price: {self.initial_state.river_market.current_price} → {self.final_state.river_market.current_price}"
         )
         # per-turn highlights
         for i, res in enumerate(self.history):
@@ -276,6 +277,7 @@ class FiveTurnGame:
         # also check sum of wealth deltas equals total (allow for rounding? should be exact via wealth nodes)
         # we keep computed total as ground truth
         return StrategicSummary(
+            initial_state=self._initial_state,
             final_state=self._state,
             history=tuple(self._history),
             final_wealth=final_wealth,

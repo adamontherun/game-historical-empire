@@ -21,7 +21,7 @@ backend/
       rng.py                 # derive_seed/make_rng/rng_for — JSON canonical -> blake2b
       rounding.py            # mul_basis_points/apply_basis_points/div_round_half_up/clamp_non_negative
       turn.py                # resolve_turn — Section 6 signal fix: Home signal_next = max(0, signal+farm_output-demand) (signal/index not physical stock, price on signal_next, demand node added as parent of supply & price_pressure, River stable, drought→farm_output→signal→price, exact wealth with ship)
-      prototype.py           # FiveTurnGame(state, history, turn_limit=5, TURN_SPECS[5]{world,signal,title truthful}, default_start_state(seed, version) Home 100/90/5000 River 80/130/5200 route 800/20/10000 storage 200, turn==0 enforced, submit()->resolve_turn, run(choices)->summary, StrategicSummary{final_state, history, final_wealth, initial_wealth, wealth_delta_total, cash_low, peak_inventory, is_complete, format()} + demand in graph)
+      prototype.py           # FiveTurnGame(state, history, turn_limit=5, TURN_SPECS[5]{world,signal,title truthful}, default_start_state(seed, version) Home 100/90/5000 River 80/130/5200 route 800/20/10000 storage 200, turn==0 enforced, submit()->resolve_turn, run(choices)->summary, StrategicSummary{initial_state, final_state, history, final_wealth, initial_wealth, wealth_delta_total, cash_low, peak_inventory, is_complete, format() true initial 5000→final} + demand in graph)
       cli.py                 # Thin CLI: interactive + --choices non-interactive (parse_choice), per-turn display turn/signal/player HOME/RIVER ROUTE choices, after-commit 6 MONTHS LATER wealth/inventory/price WHY? drivers, --verbose full trace, ends STRATEGIC SUMMARY (duplicate Home price line removed)
       demo.py                # Single-turn demo tuned Home demand 90 (was 120) so normal 4545 vs drought 5714 visibly differ (was both 6000 cap), proves causality
   tests/
@@ -51,7 +51,7 @@ docs/plans/
   2026-08-09-section-3-grain-market-kernel.md
   2026-08-09-section-4-causal-explanation.md  # exact valuation, tuples, story drivers
   2026-08-09-section-5-two-markets-route.md  # two markets + route, emergent arbitrage
-  2026-08-09-section-6-five-turn-prototype.md  # Rev2: stock-drained supply, truthful signals, fixed strategies, no seed-divergence, no cross-seed dominance
+  2026-08-09-section-6-five-turn-prototype.md  # Rev2: signal-drained supply, truthful signals, fixed strategies, no seed-divergence, no cross-seed dominance (plus review fixes: signal/index not stock, demand in graph, non-dominance, turn0, summary true initial price, demo tuned)
 frontend/                    # placeholder for Section 11
 docs/
 ```
@@ -70,7 +70,7 @@ docs/
 
 ```bash
 uv sync --project backend
-make test              # = uv run --project backend pytest -v  (95 passed: 79 prior + 16 new)
+make test              # = uv run --project backend pytest -v  (96 passed: 79 prior + 17 new)
 make lint              # = ruff check backend  (All checks passed)
 make type              # = pyright  (0 errors)
 make format-check      # = ruff format --check backend  (24 already formatted)
@@ -80,13 +80,13 @@ make format-check      # = ruff format --check backend  (24 already formatted)
 
 ```
 uv sync --project backend  → Resolved 15 packages, 0 errors
-pytest -v                  → 95 passed (8 core + 7 rounding + 11 determinism + 2 purity/sanity + 15 kernel + 7 invariants + 12 causal_trace + 4 explanation + 13 two_markets_route + 16 five_turn_prototype [exactly5, noninteractive, determinism same+diff, supply signal drained 110/70 demand in graph, three strategies diverge >10% farm 548 vs storage 1746 vs trade 1510, non-dominance hold vs storage/trade, drought rewards prep 130 vs -9, each turn chain demand→supply→price, turn0 enforced, summary STRATEGIC SUMMARY, run requires 5, CLI parse, signals truthful, titles])
+pytest -v                  → 96 passed (8 core + 7 rounding + 11 determinism + 2 purity/sanity + 15 kernel + 7 invariants + 12 causal_trace + 4 explanation + 13 two_markets_route + 17 five_turn_prototype [exactly5, noninteractive, determinism same+diff, supply signal drained 110/70 demand in graph, three strategies diverge >10% farm 548 vs storage 1746 vs trade 1510, non-dominance hold vs storage/trade, drought rewards prep 130 vs -9, each turn chain demand→supply→price, turn0 enforced, demand in graph, summary true initial 5000→4545 not turn1 4545, summary regression, run requires 5, CLI parse, signals truthful, titles])
 ruff check backend         → All checks passed
 ruff format --check backend→ 24 files already formatted
 pyright                    → 0 errors, 0 warnings
-demo                       → uv run --project backend python backend/app/engine/demo.py --world drought --command hold  now Home supply 100->40 (drought, 100+60-120=40) vs normal 100->80, price 5000->6000 both capped, wealth +380 vs +500, trace supply node 100+60-120->40 reason drought_reduced_stock
-prototype hold 5           → uv run --project backend python backend/app/cli.py --seed demo-seed-001 --choices hold,hold,hold,hold,hold  prints INITIAL/5× TURN (1 A Growing Settlement signal high demand, 2 Surplus abundant weak, 3 Warning dry, 4 Drought cuts output, 5 Aftermath) with 6 MONTHS LATER wealth/inventory/price WHY? drivers, ends STRATEGIC SUMMARY 5 turns wealth 1100->1909 delta +809 (hold) vs farm 548 vs storage 1746 vs trade 1510 spreads >10%
-prototype verbose          → same --verbose adds FULL CAUSAL TRACE (world->farm_output->supply(100+100-90->110)->price_pressure->target->price->shipment->cash/inventory->quantity->price revaluation->wealth) + DOMAIN EFFECTS
+demo                       → uv run --project backend python backend/app/engine/demo.py --world drought --command hold  Home availability 100+60-90→70 price 5000→5714 wealth +357 vs normal 100+100-90→110 price 5000→4545 wealth +354, trace supply node Regional availability 100+60-90→70 reason drought_reduced_availability (vs harvest_added_to_availability), supply lower under drought
+prototype hold 5           → uv run --project backend python backend/app/cli.py --seed demo-seed-001 --choices hold,hold,hold,hold,hold  prints INITIAL (5000/5200) /5× TURN (1 A Growing Settlement signal high demand, 2 Surplus abundant weak, 3 Warning dry, 4 Drought cuts output, 5 Aftermath) with 6 MONTHS LATER wealth/inventory/price WHY? drivers, ends STRATEGIC SUMMARY true initial 5000→4545 river 5200→6825 5 turns wealth 1100→1909 delta +809 (hold) vs farm 548 vs storage 1746 vs trade 1510 spreads >10%
+prototype verbose          → same --verbose adds FULL CAUSAL TRACE (world->farm_output->demand/home_demand->supply(100+100-90→110 availability_drained_by_demand/harvest_added_to_availability)->price_pressure(demand+supply)->target->price->shipment->cash/inventory->quantity->price revaluation->wealth) + DOMAIN EFFECTS
 cli parse                  → parse_choice("buy 20") -> buy_grain qty 20, parse_choices_arg("hold,buy 20,hold,ship 10,hold") len 5
 ```
 
@@ -103,7 +103,7 @@ Cache provenance fixed in YOLO (`~/.cache/uv/sdists-v9/.git` removed, `uv cache 
 - Section 3: `TURN_ORDER` explicit, drought reduces yield not price, buy clamped, integer price via basis points
 - Section 4: exact wealth decomposition at old vs new price, immutable tuples for causal DAG, allowed roots world/command, story drivers as causal paths ranked by exact wealth-bps, filtered zero stories, RNG ownership validated, concise/verbose CLI
 - Section 5: `market` stays Home alias + `river_market` + `route:RouteState`; `transport_cost_per_unit` in milliunits (800) comparable to price 5000; `TURN_ORDER` extended with `home_supply/river_supply/home_price/river_price/route_settlement`; river supply stable for divergence; `secure_route`/`ship_grain` with capacity/inventory/cash clamping; wealth with ship `purchase+harvest+ship+price+cash` exact; drivers include `trade_arbitrage` net with `arbitrage_margin` at resolved prices (reliability `delivered = effective * reliability_bps //10000`, default 10000, `delay_turns` constrained 0, `cash_after_trade`/`inventory_after_trade` nodes, `price_value_effect` parents `inventory_after_trade+price`); optional staleness deferred; regression: resolved Home price correctly flips arbitrage (5.00→6.00 vs 6.24 gives -6 not +4)
-- Section 6: Home supply is **stock drained by demand** `next = max(0, stock + farm_output - demand)` (price on next stock, surplus raises stock and depresses price, drought drains and raises price); River supply stable; `FiveTurnGame` owns `GameState`+`history` outside canonical state, calls `resolve_turn` once per turn with validated `rng_context`, enforces exactly 5 submissions, `TURN_SPECS` hardcoded 5 truthful signals (T1 high demand, T2 abundant weak surplus emergent, T3 warning, T4 drought, T5 aftermath); start state Home 100/90/5000 River 80/130/5200 storage 200 cash 1000 grain 20 farm 10 route 800/20/10000; CLI `backend/app/cli.py` thin (interactive + --choices non-interactive, shows turn/signal/player cash/grain/farm/storage HOME/RIVER pulse ROUTE choices, after-commit 6 MONTHS LATER wealth/inventory/price WHY? ≤3 drivers, ends STRATEGIC SUMMARY); determinism is choices-based, no seed-divergence or cross-seed dominance asserted; three corrected policies (farm expand×2+hold×3, storage build+buy20+hold×3, trade secure+build+hold+ship10×2) diverge >10% and drought rewards prep
+- Section 6: Home supply is **availability signal drained by demand** `signal_next = max(0, signal + farm_output - demand)` (price on signal_next, surplus raises signal and depresses price, drought lowers signal and raises price, not a conserved physical stock); River signal stable; `FiveTurnGame` owns `GameState`+`history` outside canonical state, calls `resolve_turn` once per turn with validated `rng_context`, enforces exactly 5 submissions with `turn==0`, `TURN_SPECS` hardcoded 5 truthful signals (T1 high demand, T2 abundant weak surplus emergent, T3 warning, T4 drought, T5 aftermath); start state Home 100/90/5000 River 80/130/5200 storage 200 cash 1000 grain 20 farm 10 route 800/20/10000; CLI `backend/app/cli.py` thin (interactive + --choices non-interactive, shows turn/signal/player cash/grain/farm/storage HOME/RIVER pulse ROUTE choices, after-commit 6 MONTHS LATER wealth/inventory/price WHY? ≤3 drivers, ends STRATEGIC SUMMARY with true initial→final price trajectory); determinism is choices-based, no seed-divergence; three corrected policies + hold diverge with tradeoffs and drought rewards prep, demand in causal graph
 
 ### Intentionally missing (do not build early)
 
@@ -111,7 +111,7 @@ Rivals Mira/Daran (Section 7), pressure arc (Section 8), balance harness (Sectio
 
 ### Follow-up obligations
 
-Section 6 follow-ups resolved: supply semantics defined as stock drained by demand (bounded, price on stock, surplus truthful, no monotonic accumulation), signals truthful, strategies legal and distinct, determinism via choices.
+Section 6 follow-ups resolved: supply semantics defined as availability signal drained by demand (bounded, price on signal, surplus truthful, no monotonic accumulation, not physical stock), demand in causal graph, signals truthful, strategies legal and distinct, turn0 enforced, summary true initial→final price, determinism via choices.
 
 ### Next milestone
 

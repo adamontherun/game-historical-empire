@@ -1,16 +1,16 @@
 # Graph Report - game-historical-empire  (2026-08-09)
 
 ## Corpus Check
-- 57 files · ~78,257 words
+- 57 files · ~78,517 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
-- 772 nodes · 1213 edges · 69 communities (59 shown, 10 thin omitted)
+- 774 nodes · 1217 edges · 68 communities (58 shown, 10 thin omitted)
 - Extraction: 98% EXTRACTED · 2% INFERRED · 0% AMBIGUOUS · INFERRED: 29 edges (avg confidence: 0.52)
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `fffa1b98`
+- Built from commit: `cb2b2bf3`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
@@ -20,7 +20,6 @@
 - test_determinism.py
 - FiveTurnGame
 - What You Must Do When Invoked
-- test_invariants.py
 - Plan — Section 1: Repository Contract and Walking Skeleton
 - What You Must Do When Invoked
 - Section 5 — Two Markets and One Trade Route — Plan
@@ -87,7 +86,7 @@
 1. `resolve_turn()` - 78 edges
 2. `PlayerCommand` - 66 edges
 3. `GameState` - 42 edges
-4. `FiveTurnGame` - 37 edges
+4. `FiveTurnGame` - 38 edges
 5. `MarketState` - 32 edges
 6. `InventoryState` - 31 edges
 7. `PlayerState` - 30 edges
@@ -110,31 +109,27 @@
 ## Import Cycles
 - None detected.
 
-## Communities (69 total, 10 thin omitted)
+## Communities (68 total, 10 thin omitted)
 
 ### Community 0 - "resolve_turn"
 Cohesion: 0.06
-Nodes (75): PlayerCommand, Player turn command — one major action per turn (Sections 3–5)., _affordable_quantity(), _cost_for_quantity(), Resolve one deterministic turn. Order is explicit: command -> production ->…, Cost in Money for quantity at price_milli (milliunits per unit). Floor division…, Max quantity affordable at price_milli with cash, floored cost., Inventory value in Money at price_milli. (+67 more)
+Nodes (74): PlayerCommand, Player turn command — one major action per turn (Sections 3–5)., _affordable_quantity(), _cost_for_quantity(), Resolve one deterministic turn. Order is explicit: command -> production ->…, Cost in Money for quantity at price_milli (milliunits per unit). Floor division…, Max quantity affordable at price_milli with cash, floored cost., Inventory value in Money at price_milli. (+66 more)
 
 ### Community 1 - "GameState"
-Cohesion: 0.07
-Nodes (66): Domain package — re-exports canonical types., CausalNode, CausalTrace, DomainEffect, OutcomeDriver, PlayerOutcome, BaseModel, Causal trace, domain effects, and player outcome for Sections 4–5. Structural… (+58 more)
+Cohesion: 0.06
+Nodes (77): Domain package — re-exports canonical types., CausalNode, CausalTrace, DomainEffect, OutcomeDriver, PlayerOutcome, BaseModel, Causal trace, domain effects, and player outcome for Sections 4–5. Structural… (+69 more)
 
 ### Community 2 - "test_determinism.py"
-Cohesion: 0.11
-Nodes (28): Engine package — deterministic RNG and rounding., derive_seed(), make_rng(), Deterministic RNG substreams via stable hash. Spec: never use global random…, Derive deterministic int seed from key material via BLAKE2b. Canonical…, Create isolated random.Random from int seed — no global state. Args: seed: Int…, Convenience: derive seed from key material and return Random. Args: run_seed:…, rng_for() (+20 more)
+Cohesion: 0.07
+Nodes (45): Engine package — deterministic RNG and rounding., derive_seed(), make_rng(), Deterministic RNG substreams via stable hash. Spec: never use global random…, Derive deterministic int seed from key material via BLAKE2b. Canonical…, Create isolated random.Random from int seed — no global state. Args: seed: Int…, Convenience: derive seed from key material and return Random. Args: run_seed:…, rng_for() (+37 more)
 
 ### Community 3 - "FiveTurnGame"
 Cohesion: 0.08
-Nodes (34): format_market_pulse(), format_player_state(), format_route_state(), main(), parse_choice(), parse_choices_arg(), Thin CLI for the five-turn headless prototype — Section 6. Pure I/O around…, Parse a single choice token like 'hold', 'buy 20', 'ship_grain:10', '4'. (+26 more)
+Nodes (36): format_market_pulse(), format_player_state(), format_route_state(), main(), parse_choice(), parse_choices_arg(), Thin CLI for the five-turn headless prototype — Section 6. Pure I/O around…, Parse a single choice token like 'hold', 'buy 20', 'ship_grain:10', '4'. (+28 more)
 
 ### Community 4 - "What You Must Do When Invoked"
 Cohesion: 0.08
 Nodes (24): For /graphify add and --watch, For /graphify query, For the commit hook and native AGENTS.md integration, For --update and --cluster-only, /graphify, Honesty Rules, Interpreter guard for subcommands, Part A - Structural extraction for code files (+16 more)
-
-### Community 5 - "test_invariants.py"
-Cohesion: 0.11
-Nodes (27): apply_basis_points(), clamp_non_negative(), div_round_half_up(), mul_basis_points(), Deterministic integer rounding helpers for canonical economic math. All…, Multiply value by basis points (10_000 = 100%) with floor division.…, Alias for mul_basis_points — semantic for price adjustments., Integer division rounding half away from zero for positive denominators. For… (+19 more)
 
 ### Community 6 - "Plan — Section 1: Repository Contract and Walking Skeleton"
 Cohesion: 0.10
@@ -348,10 +343,10 @@ Nodes (5): Acceptance criteria, Goal, In scope, SECTION 20 — Visual Asset Syst
 ## Suggested Questions
 _Questions this graph is uniquely positioned to answer:_
 
-- **Why does `resolve_turn()` connect `resolve_turn` to `GameState`, `test_determinism.py`, `FiveTurnGame`, `test_invariants.py`?**
+- **Why does `resolve_turn()` connect `resolve_turn` to `GameState`, `test_determinism.py`, `FiveTurnGame`?**
   _High betweenness centrality (0.046) - this node is a cross-community bridge._
-- **Why does `PlayerCommand` connect `resolve_turn` to `GameState`, `FiveTurnGame`, `test_invariants.py`?**
-  _High betweenness centrality (0.021) - this node is a cross-community bridge._
+- **Why does `PlayerCommand` connect `resolve_turn` to `GameState`, `FiveTurnGame`?**
+  _High betweenness centrality (0.022) - this node is a cross-community bridge._
 - **Why does `rng_for()` connect `test_determinism.py` to `resolve_turn`, `GameState`?**
   _High betweenness centrality (0.014) - this node is a cross-community bridge._
 - **Are the 3 inferred relationships involving `PlayerCommand` (e.g. with `FiveTurnGame` and `StrategicSummary`) actually correct?**

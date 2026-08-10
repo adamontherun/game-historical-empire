@@ -712,7 +712,7 @@ def resolve_turn(
         )
 
     # Emit demand signal nodes (stable inputs) — Section 6 causal graph fix
-    # Home demand directly causes stock changes and price pressure
+    # Home demand directly causes availability signal changes and price pressure
     nodes.append(
         CausalNode(
             id="demand",
@@ -769,24 +769,24 @@ def resolve_turn(
         )
     )
 
-    # 3. Home Supply — stock drained by consumption (Section 6 semantics)
-    # MarketState.supply is stock at start; next stock = max(0, stock + farm_output - demand)
+    # 3. Home Supply — availability signal drained by demand (Section 6 semantics)
+    # MarketState.supply is an availability signal/index at start; next signal = max(0, signal + farm_output - demand)
     supply_before_harvest = before_supply
     next_supply = clamp_non_negative(supply_before_harvest + farm_output - before_demand)
     supply_delta = next_supply - before_supply
-    # Reason reflects whether stock grew (surplus) or shrank (shortage)
+    # Reason reflects whether signal grew (surplus) or shrank (shortage)
     if next_supply > before_supply:
-        supply_reason = "harvest_added_to_stock"
+        supply_reason = "harvest_added_to_availability"
     elif next_supply < before_supply:
-        supply_reason = "stock_drained_by_consumption"
+        supply_reason = "availability_drained_by_demand"
     else:
-        supply_reason = "stock_unchanged"
+        supply_reason = "availability_unchanged"
     if world == "drought" and next_supply < before_supply:
-        supply_reason = "drought_reduced_stock"
+        supply_reason = "drought_reduced_availability"
     nodes.append(
         CausalNode(
             id="supply",
-            label=f"Regional stock {before_supply}+{farm_output}-{before_demand}→{next_supply}",
+            label=f"Regional availability {before_supply}+{farm_output}-{before_demand}→{next_supply}",
             kind="supply",
             before=before_supply,
             after=next_supply,
@@ -799,7 +799,7 @@ def resolve_turn(
     nodes.append(
         CausalNode(
             id="home_supply",
-            label=f"Home Valley stock {before_supply}+{farm_output}-{before_demand}→{next_supply}",
+            label=f"Home Valley availability {before_supply}+{farm_output}-{before_demand}→{next_supply}",
             kind="supply",
             before=before_supply,
             after=next_supply,
