@@ -378,5 +378,10 @@
     "mtime": 1786380586.2436142,
     "ast_hash": "c9a041acb7dc2f0d89c93ccd6679b840",
     "semantic_hash": ""
+  },
+  "docs/plans/2026-08-10-section-10-fastapi-boundary.md": {
+    "mtime": 1786380758.2906315,
+    "ast_hash": "92cb4c179bb8da04adf2b4131cf27047",
+    "semantic_hash": ""
   }
 }
