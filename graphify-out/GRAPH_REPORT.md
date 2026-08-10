@@ -5,28 +5,28 @@
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
-- 888 nodes · 1540 edges · 70 communities (60 shown, 10 thin omitted)
-- Extraction: 97% EXTRACTED · 3% INFERRED · 0% AMBIGUOUS · INFERRED: 53 edges (avg confidence: 0.51)
+- 890 nodes · 1467 edges · 71 communities (60 shown, 11 thin omitted)
+- Extraction: 96% EXTRACTED · 4% INFERRED · 0% AMBIGUOUS · INFERRED: 52 edges (avg confidence: 0.58)
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `17b3ca61`
+- Built from commit: `78d73e7b`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
 ## Community Hubs (Navigation)
-- PlayerCommand
-- test_causal_trace.py
-- test_determinism.py
+- resolve_turn
+- turn.py
+- test_invariants.py
 - FiveTurnGame
 - What You Must Do When Invoked
-- InventoryState
+- RivalState
 - Plan — Section 1: Repository Contract and Walking Skeleton
 - What You Must Do When Invoked
 - Section 5 — Two Markets and One Trade Route — Plan
 - test_sanity.py
 - historical-empire-backend
-- test_invariants.py
+- .edges
 - Historical Empire — Agent Guide
 - graphify reference: extra exports and benchmark
 - Section 7 — COMPLETE (2026-08-09)
@@ -80,62 +80,63 @@
 - SECTION 4 — Causal Explanation and Outcome Model
 - Part VIII — Agent Guardrails
 - SECTION 8 — Pressure-Driven Event Arc
-- turn.py
+- actor.py
 - SECTION 20 — Visual Asset System and Polish
+- BaseModel
 - Section 7 — Deterministic Rivals — Plan (Rev 2)
 
 ## God Nodes (most connected - your core abstractions)
-1. `PlayerCommand` - 88 edges
-2. `resolve_turn()` - 85 edges
-3. `FiveTurnGame` - 55 edges
-4. `InventoryState` - 50 edges
-5. `GameState` - 42 edges
-6. `MarketState` - 32 edges
+1. `resolve_turn()` - 83 edges
+2. `PlayerCommand` - 66 edges
+3. `FiveTurnGame` - 48 edges
+4. `GameState` - 42 edges
+5. `MarketState` - 32 edges
+6. `InventoryState` - 31 edges
 7. `PlayerState` - 30 edges
-8. `RivalState` - 30 edges
-9. `apply_rival_command()` - 25 edges
-10. `ObservableContext` - 19 edges
+8. `RivalState` - 28 edges
+9. `StrategicSummary` - 18 edges
+10. `_base_state()` - 18 edges
 
 ## Surprising Connections (you probably didn't know these)
-- `CausalNode` --uses--> `GameState`  [INFERRED]
-  backend/app/domain/trace.py → backend/app/domain/types.py
-- `CausalTrace` --uses--> `GameState`  [INFERRED]
-  backend/app/domain/trace.py → backend/app/domain/types.py
-- `DomainEffect` --uses--> `GameState`  [INFERRED]
-  backend/app/domain/trace.py → backend/app/domain/types.py
-- `OutcomeDriver` --uses--> `GameState`  [INFERRED]
-  backend/app/domain/trace.py → backend/app/domain/types.py
-- `PlayerOutcome` --uses--> `GameState`  [INFERRED]
-  backend/app/domain/trace.py → backend/app/domain/types.py
+- `FiveTurnGame` --uses--> `RivalState`  [INFERRED]
+  backend/app/engine/prototype.py → backend/app/engine/rivals.py
+- `FiveTurnGame` --uses--> `RivalTurnResult`  [INFERRED]
+  backend/app/engine/prototype.py → backend/app/engine/rivals.py
+- `FiveTurnGame` --uses--> `ObservableContext`  [INFERRED]
+  backend/app/engine/prototype.py → backend/app/engine/rivals.py
+- `FiveTurnGame` --uses--> `SettlementContext`  [INFERRED]
+  backend/app/engine/prototype.py → backend/app/engine/rivals.py
+- `FiveTurnGame` --uses--> `TurnResolution`  [INFERRED]
+  backend/app/engine/prototype.py → backend/app/domain/trace.py
 
 ## Import Cycles
 - None detected.
 
-## Communities (70 total, 10 thin omitted)
+## Communities (71 total, 11 thin omitted)
 
-### Community 0 - "PlayerCommand"
-Cohesion: 0.07
-Nodes (59): PlayerCommand, Player turn command — one major action per turn (Sections 3–5)., WorldCondition, Resolve one deterministic turn. Order is explicit: command -> production ->…, resolve_turn(), Rivals must not mutate shared market availability — player supply same as…, test_player_market_isolation(), Section 4 — multi-step drought to wealth chain tests. (+51 more)
-
-### Community 1 - "test_causal_trace.py"
+### Community 0 - "resolve_turn"
 Cohesion: 0.06
-Nodes (42): Domain package — re-exports canonical types., CausalNode, CausalTrace, DomainEffect, OutcomeDriver, PlayerOutcome, BaseModel, Causal trace, domain effects, and player outcome for Sections 4–5. Structural… (+34 more)
+Nodes (71): PlayerCommand, Player turn command — one major action per turn (Sections 3–5)., WorldCondition, Resolve one deterministic turn. Order is explicit: command -> production ->…, resolve_turn(), _base_state(), Section 4 — causal trace hardening, exact wealth decomposition, and story…, Wealth delta must equal cash + purchase + harvest + price effects exactly. (+63 more)
 
-### Community 2 - "test_determinism.py"
-Cohesion: 0.11
-Nodes (28): Engine package — deterministic RNG and rounding., derive_seed(), make_rng(), Deterministic RNG substreams via stable hash. Spec: never use global random…, Derive deterministic int seed from key material via BLAKE2b. Canonical…, Create isolated random.Random from int seed — no global state. Args: seed: Int…, Convenience: derive seed from key material and return Random. Args: run_seed:…, rng_for() (+20 more)
+### Community 1 - "turn.py"
+Cohesion: 0.08
+Nodes (56): Domain package — re-exports canonical types., CausalNode, CausalTrace, DomainEffect, OutcomeDriver, PlayerOutcome, BaseModel, Causal trace, domain effects, and player outcome for Sections 4–5. Structural… (+48 more)
+
+### Community 2 - "test_invariants.py"
+Cohesion: 0.06
+Nodes (55): Engine package — deterministic RNG and rounding., derive_seed(), make_rng(), Deterministic RNG substreams via stable hash. Spec: never use global random…, Derive deterministic int seed from key material via BLAKE2b. Canonical…, Create isolated random.Random from int seed — no global state. Args: seed: Int…, Convenience: derive seed from key material and return Random. Args: run_seed:…, rng_for() (+47 more)
 
 ### Community 3 - "FiveTurnGame"
-Cohesion: 0.05
-Nodes (46): format_market_pulse(), format_player_state(), format_rivals(), format_route_state(), main(), parse_choice(), parse_choices_arg(), Thin CLI for the five-turn headless prototype — Section 6. Pure I/O around… (+38 more)
+Cohesion: 0.07
+Nodes (38): format_market_pulse(), format_player_state(), format_rivals(), format_route_state(), main(), parse_choice(), parse_choices_arg(), Thin CLI for the five-turn headless prototype — Section 6. Pure I/O around… (+30 more)
 
 ### Community 4 - "What You Must Do When Invoked"
 Cohesion: 0.08
 Nodes (24): For /graphify add and --watch, For /graphify query, For the commit hook and native AGENTS.md integration, For --update and --cluster-only, /graphify, Honesty Rules, Interpreter guard for subcommands, Part A - Structural extraction for code files (+16 more)
 
-### Community 5 - "InventoryState"
-Cohesion: 0.07
-Nodes (74): GameState, InventoryState, MarketState, OperationState, PlayerState, BaseModel, Canonical economic types for Sections 2-5. Integer-only canonical state per…, River Route — single route between Home Valley and River Town (Section 5).… (+66 more)
+### Community 5 - "RivalState"
+Cohesion: 0.06
+Nodes (75): _next_world_known_for_turn(), BaseModel, WorldCondition, Five-turn headless prototype — Section 7 with deterministic rivals.…, Wealth = cash + inventory value at Home price (milli)., Structured threat known at turn idx (pre-turn). Section 7: only T3 (idx=2,…, Concise end-of-run summary — both human and structured (now with rivals)., Build pre-turn observable context for rival choice (structured, not prose). (+67 more)
 
 ### Community 6 - "Plan — Section 1: Repository Contract and Walking Skeleton"
 Cohesion: 0.10
@@ -149,9 +150,9 @@ Nodes (24): For /graphify add and --watch, For /graphify query, For the commit h
 Cohesion: 0.11
 Nodes (18): 1. Confirm workspace & branch → unblocks all edits, 2. Domain — add River Town and River Route types, keep Home alias, 3. Trace — add route/trade/river kinds, keep DAG validators compatible, 4. Engine — resolve two prices + route settlement, keep Home chain exact, 5. CLI — show both market pulses and route status, 6. Tests — prove AC 1–6 and preserve Section 3–4 invariants, 7. Docs & handoff, Constraints And Non-goals (+10 more)
 
-### Community 13 - "test_invariants.py"
-Cohesion: 0.11
-Nodes (27): apply_basis_points(), clamp_non_negative(), div_round_half_up(), mul_basis_points(), Deterministic integer rounding helpers for canonical economic math. All…, Multiply value by basis points (10_000 = 100%) with floor division.…, Alias for mul_basis_points — semantic for price adjustments., Integer division rounding half away from zero for positive denominators. For… (+19 more)
+### Community 13 - ".edges"
+Cohesion: 0.33
+Nodes (4): Deprecated string view — derived from drivers for backward compat., Derived edges as (parent, child) tuples from parent_ids., CausalEdge, computed_field
 
 ### Community 14 - "Historical Empire — Agent Guide"
 Cohesion: 0.12
@@ -333,9 +334,9 @@ Nodes (5): 31. Do Not Build Ahead, 32. Do Not Rewrite Working Systems Without Ev
 Cohesion: 0.40
 Nodes (5): Acceptance criteria, Goal, In scope, SECTION 8 — Pressure-Driven Event Arc, Stop condition
 
-### Community 67 - "turn.py"
-Cohesion: 0.09
-Nodes (43): affordable_quantity(), compute_farm_output(), cost_for_quantity(), Shared actor-level economic primitives — Section 7 extraction. Single source of…, Settle harvest into inventory with storage cap. Returns…, Resolve ship_grain settlement with shared clamping. Uses pre-turn…, Shared expand_farm affordability/mutation. Returns (cash_after, farm_after,…, Cost in Money for quantity at price_milli (milliunits per unit). Floor division… (+35 more)
+### Community 67 - "actor.py"
+Cohesion: 0.10
+Nodes (21): affordable_quantity(), compute_farm_output(), cost_for_quantity(), Shared actor-level economic primitives — Section 7 extraction. Single source of…, Settle harvest into inventory with storage cap. Returns…, Resolve ship_grain settlement with shared clamping. Uses pre-turn…, Shared expand_farm affordability/mutation. Returns (cash_after, farm_after,…, Cost in Money for quantity at price_milli (milliunits per unit). Floor division… (+13 more)
 
 ### Community 68 - "SECTION 20 — Visual Asset System and Polish"
 Cohesion: 0.40
@@ -346,24 +347,24 @@ Cohesion: 0.10
 Nodes (20): 1 — Extract shared actor primitives (behavior-preserving, no market/trace change), 2 — Rival profile/state/result types, 3 — Integer scoring & deterministic choice, 4 — Rival execution via shared primitives + truthful headlines, 5 — Prototype integration with corrected timing, 6 — Structured threat plumbing, 7 — CLI reveal, 8 — Tests (behavioral, not scripted) (+12 more)
 
 ## Knowledge Gaps
-- **402 isolated node(s):** `historical-empire-backend`, `Usage`, `What graphify is for`, `Step 0 - GitHub repos and multi-path merge (only if a URL or several paths)`, `Step 1 - Ensure graphify is installed` (+397 more)
+- **402 isolated node(s):** `What exists`, `Boundaries`, `Normal verification`, `Last known green`, `Decisions relevant to future work` (+397 more)
   These have ≤1 connection - possible missing edges or undocumented components.
-- **10 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
+- **11 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
 
 ## Suggested Questions
 _Questions this graph is uniquely positioned to answer:_
 
-- **Why does `resolve_turn()` connect `PlayerCommand` to `test_causal_trace.py`, `test_determinism.py`, `turn.py`, `FiveTurnGame`, `InventoryState`, `test_invariants.py`?**
-  _High betweenness centrality (0.045) - this node is a cross-community bridge._
-- **Why does `PlayerCommand` connect `PlayerCommand` to `test_causal_trace.py`, `turn.py`, `FiveTurnGame`, `InventoryState`, `test_invariants.py`?**
-  _High betweenness centrality (0.037) - this node is a cross-community bridge._
-- **Why does `FiveTurnGame` connect `FiveTurnGame` to `PlayerCommand`, `test_causal_trace.py`, `InventoryState`?**
-  _High betweenness centrality (0.021) - this node is a cross-community bridge._
-- **Are the 9 inferred relationships involving `PlayerCommand` (e.g. with `FiveTurnGame` and `StrategicSummary`) actually correct?**
-  _`PlayerCommand` has 9 INFERRED edges - model-reasoned connections that need verification._
+- **Why does `resolve_turn()` connect `resolve_turn` to `turn.py`, `test_invariants.py`, `FiveTurnGame`, `actor.py`, `RivalState`?**
+  _High betweenness centrality (0.052) - this node is a cross-community bridge._
+- **Why does `PlayerCommand` connect `resolve_turn` to `turn.py`, `test_invariants.py`, `FiveTurnGame`, `RivalState`?**
+  _High betweenness centrality (0.027) - this node is a cross-community bridge._
+- **Why does `FiveTurnGame` connect `FiveTurnGame` to `resolve_turn`, `turn.py`, `RivalState`?**
+  _High betweenness centrality (0.025) - this node is a cross-community bridge._
+- **Are the 3 inferred relationships involving `PlayerCommand` (e.g. with `FiveTurnGame` and `StrategicSummary`) actually correct?**
+  _`PlayerCommand` has 3 INFERRED edges - model-reasoned connections that need verification._
 - **Are the 11 inferred relationships involving `FiveTurnGame` (e.g. with `TurnResolution` and `GameState`) actually correct?**
   _`FiveTurnGame` has 11 INFERRED edges - model-reasoned connections that need verification._
-- **Are the 9 inferred relationships involving `InventoryState` (e.g. with `FiveTurnGame` and `StrategicSummary`) actually correct?**
-  _`InventoryState` has 9 INFERRED edges - model-reasoned connections that need verification._
 - **Are the 9 inferred relationships involving `GameState` (e.g. with `CausalNode` and `CausalTrace`) actually correct?**
   _`GameState` has 9 INFERRED edges - model-reasoned connections that need verification._
+- **Are the 3 inferred relationships involving `MarketState` (e.g. with `FiveTurnGame` and `StrategicSummary`) actually correct?**
+  _`MarketState` has 3 INFERRED edges - model-reasoned connections that need verification._
