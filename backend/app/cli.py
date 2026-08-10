@@ -103,9 +103,14 @@ def format_route_state(game: FiveTurnGame) -> str:
     return f"established={r.established} cost/unit {r.transport_cost_per_unit} capacity {r.capacity} reliability {r.reliability_bps} bps"
 
 
+def format_rivals(game: FiveTurnGame) -> str:
+    mira, daran = game.rivals
+    return f"Mira cash {mira.cash} grain {mira.inventory.grain} farm {mira.farm_capacity} storage {mira.storage_capacity} route={mira.route_established} | Daran cash {daran.cash} grain {daran.inventory.grain} farm {daran.farm_capacity} storage {daran.storage_capacity} route={daran.route_established}"
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
-        description="Historical Empire — Five-Turn Headless Prototype (Section 6)"
+        description="Historical Empire — Five-Turn Headless Prototype with Rivals (Section 7)"
     )
     parser.add_argument("--seed", default="seed-001", help="run seed")
     parser.add_argument("--version", default="1.0", help="ruleset version")
@@ -182,6 +187,12 @@ def main(argv: list[str] | None = None) -> int:
                     )
             else:
                 print("  WHY? (no material drivers)")
+            # Rivals — derived headlines from structured history
+            headlines = game.current_rival_headlines()
+            if headlines:
+                mira_h, daran_h = headlines
+                print(f"  MIRA — {mira_h}")
+                print(f"  DARAN — {daran_h}")
             if args.verbose:
                 print("\n  FULL CAUSAL TRACE")
                 for n in res.causal_trace.nodes:
@@ -193,6 +204,14 @@ def main(argv: list[str] | None = None) -> int:
                     print(
                         f"    {e.metric}: {e.before}->{e.after} ({e.delta:+}) reason={e.reason_code}"
                     )
+                # Verbose rival details
+                if game.rival_history:
+                    mira_r, daran_r = game.rival_history[-1]
+                    print("  RIVAL DETAILS")
+                    for rr in (mira_r, daran_r):
+                        print(
+                            f"    {rr.rival_id} cmd={rr.command.type} cash {rr.before.cash}->{rr.after.cash} inv {rr.before.inventory.grain}->{rr.after.inventory.grain} wealth {rr.wealth_delta:+} headline={rr.headline!r}"
+                        )
         # Summary
         summary = game.summary()
         print("\n" + summary.format())
@@ -200,7 +219,7 @@ def main(argv: list[str] | None = None) -> int:
 
     # Interactive path
     print("=" * 60)
-    print("Historical Empire — Five-Turn Headless Prototype")
+    print("Historical Empire — Five-Turn Headless Prototype with Rivals")
     print(f"Seed: {args.seed}  Version: {args.version}")
     print("=" * 60)
     print(
@@ -209,6 +228,7 @@ def main(argv: list[str] | None = None) -> int:
     print(
         "You make one major action per turn. Type number 1-6 or name like 'hold', 'buy 20', 'ship 10'. Ctrl+D to quit."
     )
+    print("Rivals Mira and Daran act each turn — watch their headlines after each reveal.")
     while not game.is_complete:
         spec = game.current_spec()
         assert spec is not None
@@ -257,6 +277,12 @@ def main(argv: list[str] | None = None) -> int:
             f"  Home price now {res.next_state.market.current_price}  River now {res.next_state.river_market.current_price}"
         )
         print(f"  Player now {format_player_state(game)}")
+        # Rivals
+        headlines = game.current_rival_headlines()
+        if headlines:
+            mira_h, daran_h = headlines
+            print(f"  MIRA — {mira_h}")
+            print(f"  DARAN — {daran_h}")
         if res.player_outcome.drivers:
             print("  WHY? (top drivers)")
             for j, d in enumerate(res.player_outcome.drivers, 1):
@@ -267,6 +293,10 @@ def main(argv: list[str] | None = None) -> int:
             print("\n  FULL CAUSAL TRACE")
             for n in res.causal_trace.nodes:
                 print(f"    [{n.id}] {n.label} reason={n.reason_code}")
+            if game.rival_history:
+                mira_r, daran_r = game.rival_history[-1]
+                print(f"  RIVAL: Mira {mira_r.headline}")
+                print(f"  RIVAL: Daran {daran_r.headline}")
 
     summary = game.summary()
     print("\n" + summary.format())

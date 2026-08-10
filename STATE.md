@@ -2,9 +2,9 @@
 
 > Handoff snapshot for Muse / human. Concise and current, not a history log.
 
-## Section 6 — COMPLETE (2026-08-09)
+## Section 7 — COMPLETE (2026-08-09)
 
-**Five-turn headless prototype (with review fixes):** Deterministic 5-turn terminal game (`FiveTurnGame` + `TURN_SPECS` 5-element authored arc) on Section 5 kernel with **signal/index supply semantics** (`signal_next = max(0, signal + farm_output - demand)` for Home, not a conserved physical stock — farm_output also enters player inventory without conservation, deferred to §14), grain only, Home Valley (market alias, signal 100→110→120 surplus weak) + River Town (80 stable, price 5200→6240→6825 shortage) + River Route (800/20/10000), commands hold/expand_farm/build_granary/buy_grain/secure_route/ship_grain (one per turn, exactly 5, `start_state.turn==0` enforced), causal graph now includes `demand`/`home_demand` nodes (parents of `supply`/`home_supply` and `price_pressure`/`home_price_pressure`), truthful signals, outcome reveal ≤3 drivers, strategic summary. Deterministic choices-based, three corrected policies + hold diverge with **tradeoffs** (no single policy dominates all metrics — hold wins final wealth 1909, storage peak 250, trade T4 +143), drought rewards preparation (storage T4 +130 vs farm -9), no DB/LLM/rivals.
+**Deterministic rivals (Rev2 — shared primitives, structured threat, integer scoring):** Mira (storage/trade/flexible, farm-averse, moderate risk, reacts early) and Daran (farmland scale, farm-hungry, aggressive, vulnerable) via **integer/bps scoring** `score = expected_return × pref_bps × capital_bps × risk_bps × exposure_bps` with deterministic `rng_for` tie-break only on exact integer equality, **session-owned** inside `FiveTurnGame` (not in canonical `GameState`, isolated supply), **shared actor primitives** extracted to `actor.py` (`compute_farm_output`, `resolve_buy`, `resolve_storage_settlement`, `resolve_shipment`, `value_for`/`cost_for_quantity`) called by both `turn.py` and `rivals.py` so costs/clamping cannot diverge, **two-phase timing** (rivals choose from pre-turn observable `ObservableContext{world_now, next_world_known, home_price_pre…}`, then player `resolve_turn` resolves markets, then rivals settle with `buy@pre_home`, `shipment@resolved_river`, `valuation@resolved_home`), **structured threat** `next_world_known` (T3 warning → drought) not prose parsing, `RivalProfile` vs `RivalState` separation with identical-state personality tests, `RivalTurnResult{before, command, after, headline, cash/quantity/price/wealth deltas}` history `tuple[tuple[Mira,Daran],5]` with derived `rival_headlines_history`, wealth `cash+quantity+price` with price revaluation, truthful headlines derived from resolved outcome, at least one headline per turn after first, legible fingerprint across contexts.
 
 ### What exists
 
@@ -13,84 +13,88 @@ backend/
   app/
     __init__.py
     domain/
-      __init__.py            # re-exports CausalEdge/OutcomeDriver + types+RouteState
-      types.py               # Money/... + GameState(player, market:Home, river_market, route:RouteState)+RouteState+PlayerCommand(secure_route/ship_grain) (frozen, ge=0)
-      trace.py               # CausalNode(parent_ids:tuple)/CausalTrace(nodes:tuple, edges)/DomainEffect/OutcomeDriver/PlayerOutcome(drivers:tuple, top_drivers computed)/TurnResolution (frozen, validators: demand kind added)
+      __init__.py            # re-exports + types+RouteState
+      types.py               # Money/... + GameState(Home+river+route)+RouteState+PlayerCommand(6 verbs) frozen ge=0
+      trace.py               # CausalNode(tuple parents)/CausalTrace/OutcomeDriver/PlayerOutcome/TurnResolution frozen
     engine/
-      __init__.py            # re-exports RNG + rounding + resolve_turn/TURN_ORDER
+      __init__.py            # re-exports RNG+rounding+resolve_turn/TURN_ORDER
       rng.py                 # derive_seed/make_rng/rng_for — JSON canonical -> blake2b
-      rounding.py            # mul_basis_points/apply_basis_points/div_round_half_up/clamp_non_negative
-      turn.py                # resolve_turn — Section 6 signal fix: Home signal_next = max(0, signal+farm_output-demand) (signal/index not physical stock, price on signal_next, demand node added as parent of supply & price_pressure, River stable, drought→farm_output→signal→price, exact wealth with ship)
-      prototype.py           # FiveTurnGame(state, history, turn_limit=5, TURN_SPECS[5]{world,signal,title truthful}, default_start_state(seed, version) Home 100/90/5000 River 80/130/5200 route 800/20/10000 storage 200, turn==0 enforced, submit()->resolve_turn, run(choices)->summary, StrategicSummary{initial_state, final_state, history, final_wealth, initial_wealth, wealth_delta_total, cash_low, peak_inventory, is_complete, format() true initial 5000→final} + demand in graph)
-      cli.py                 # Thin CLI: interactive + --choices non-interactive (parse_choice), per-turn display turn/signal/player HOME/RIVER ROUTE choices, after-commit 6 MONTHS LATER wealth/inventory/price WHY? drivers, --verbose full trace, ends STRATEGIC SUMMARY (duplicate Home price line removed)
-      demo.py                # Single-turn demo tuned Home demand 90 (was 120) so normal 4545 vs drought 5714 visibly differ (was both 6000 cap), proves causality
+      rounding.py            # mul_basis_points/div_round_half_up/clamp_non_negative
+      actor.py               # NEW shared primitives: YIELD_PER_CAPACITY/DROUGHT_BPS/COSTS + compute_farm_output/resolve_buy/resolve_storage_settlement/resolve_shipment/value_for/cost_for_quantity (single source, integer, re-exported by turn.py)
+      turn.py                # resolve_turn — now calls actor primitives (command->production->home_supply->river_supply->home_price->river_price->settlement->route_settlement->valuation); keeps market+trace, wealth exact with ship
+      rivals.py              # NEW deterministic rivals: RivalProfile(farm-averse/hungry prefs bps)/RivalState(cash/inventory/farm/storage/route, no headline)/RivalTurnResult(before/command/after/headline/cash/qty/price/wealth deltas)/ObservableContext/SettlementContext + integer/bps scoring (expected_return×pref×capital×risk×exposure, threat boost T3→drought, exact-tie rng_for) + apply_rival_command via actor primitives + truthful headlines; MIRA_START 1200/25/5/250/DARAN 1400/15/12/150
+      prototype.py           # FiveTurnGame(state, history, rival_history, turn_limit=5, TURN_SPECS[5] truthful, default_start_state Home 100/90/5000 River 80/130/5200 route 800/20/10000 storage200, turn==0 enforced, _observable_for/_next_world_known_for_turn(T3→drought), two-phase submit(choose pre→resolve player→settle rivals at pre/resolved prices), run->summary, StrategicSummary{history, rival_history, final_rivals, final_wealth, cash_low, peak, format() with T Rivals lines} + _wealth)
+      cli.py                 # Thin CLI: interactive + --choices non-interactive, per-turn display turn/signal/player HOME/RIVER ROUTE, after-commit 6 MONTHS LATER wealth/inventory/price WHY? drivers + MIRA/DARAN headlines (derived), --verbose adds rival details, ends STRATEGIC SUMMARY with rival lines
+      demo.py                # Single-turn demo (demand 90)
   tests/
     test_sanity.py
     test_engine_purity.py
     test_core_types.py
     test_determinism.py
     test_rounding.py
-    test_turn_kernel.py      # AC #1,3,4,5,6 + blocker 2 + TURN_ORDER->home_supply->river_supply->home_price->river_price->route_settlement->valuation
-    test_invariants.py       # monotonic price, no negatives, positive price
-    test_causal_trace.py     # exact wealth decomposition, immutable tuples, DAG, drivers, wealth-bps
-    test_explanation.py      # drought→wealth chain, price node >= not price_value_effect (inventory diff)
-    test_two_markets_route.py # Section 5 AC1-6
-    test_five_turn_prototype.py # Section 6 AC1-7: exactly5, noninteractive, determinism choices, supply signal drained (110/70), three strategies diverge >10%, non-dominance (hold wins wealth 1909 but storage peak 250 trade T4 143), drought rewards prep (+130 vs -9), each turn chain world->farm_output->supply(demand)->price(demand), turn0 enforced, demand in graph, summary STRATEGIC SUMMARY, CLI parse, signals truthful, titles
-  pyproject.toml             # uv project: pytest + ruff + pyright (strict) + pydantic>=2.7
+    test_turn_kernel.py
+    test_invariants.py
+    test_causal_trace.py
+    test_explanation.py
+    test_two_markets_route.py
+    test_five_turn_prototype.py
+    test_deterministic_rivals.py # NEW Section 7 AC1-6: profiles differ under identical state (≥2 diffs, Mira storage> Daran, Daran farm> Mira), determinism same seed, capital via shared primitives (zero-cash hold, no negatives, cost parity, buy cap, ship cap), no-money-creation with price revaluation (wealth==cash+qty+price, hold 20 grain 5000→6000 qty120 price120), behavioral preparation vs concentration (Mira prep > baseline +40% on warning, Mira prep>farm, Daran farm>prep), fingerprint across 5 contexts (surplus/warning/drought/lowcash/tight), headlines derived & visible after first (len5, T2+ non-empty, truthful expand+10/cash-500 etc), execution same rules, market isolation (player supply same as raw resolve_turn 5 holds), no float, structured threat not prose, RivalState no headline, exact-tie rng
+  pyproject.toml             # uv project: pytest + ruff + pyright strict + pydantic>=2.7
   uv.lock
   .venv/
 Makefile
 .gitignore
 .python-version              # 3.12 (root only)
 AGENTS.md / backend/AGENTS.md / frontend/AGENTS.md
-DECISIONS.md (001-010)
-BUILD_SPEC.md Status: Sections 1-6 COMPLETE
+DECISIONS.md (001-011)
+BUILD_SPEC.md Status: Sections 1-7 COMPLETE
 docs/plans/
   2026-08-09-section-1-walking-skeleton.md
   2026-08-09-section-2-core-types.md
   2026-08-09-section-3-grain-market-kernel.md
-  2026-08-09-section-4-causal-explanation.md  # exact valuation, tuples, story drivers
-  2026-08-09-section-5-two-markets-route.md  # two markets + route, emergent arbitrage
-  2026-08-09-section-6-five-turn-prototype.md  # Rev2: signal-drained supply, truthful signals, fixed strategies, no seed-divergence, no cross-seed dominance (plus review fixes: signal/index not stock, demand in graph, non-dominance, turn0, summary true initial price, demo tuned)
+  2026-08-09-section-4-causal-explanation.md
+  2026-08-09-section-5-two-markets-route.md
+  2026-08-09-section-6-five-turn-prototype.md  # Rev2
+  2026-08-09-section-7-deterministic-rivals.md  # Rev2 shared primitives, two-phase timing, bps integer, structured threat, profile vs state, full history with revaluation
 frontend/                    # placeholder for Section 11
 docs/
 ```
 
 ### Boundaries
 
-- `backend/app/engine` and `backend/app/domain` are pure: no `fastapi`, `sqlalchemy`, `httpx`, `asyncpg`, `openai`, `clerk`. Enforced by AST rglob test on engine/domain only (cli.py at top-level app is not checked, but also imports only stdlib+domain+engine). `pydantic` allowed for validated canonical types. `engine/turn.py` imports only `domain` + `rng`/`rounding`; `engine/prototype.py` imports only `domain` + `turn`.
-- Canonical state is frozen with immutable tuples: `parent_ids: tuple[str,...]`, `nodes: tuple[CausalNode,...]`, `drivers: tuple[OutcomeDriver,...]`, `causal_node_ids: tuple[str,...]` — no mutable lists inside frozen models, DAG is authoritative.
-- Home market is `market` alias with supply as **market-availability signal/index** `signal_next = max(0, signal + farm_output - demand)` (not a conserved physical stock; farm_output also enters player inventory without conservation, deferred to §14); price set on `signal_next` via `_target_price` guard, so surplus (farm > demand) raises signal and depresses price, drought drains signal and raises price. Demand is now explicit in causal graph: `demand`/`home_demand` nodes (Δ0, kind demand) are parents of `supply`/`home_supply` and `price_pressure`/`home_price_pressure` (farm_output+demand→supply→price). River signal stable (80) so divergence remains emergent. `RouteState` unchanged (800/20/10000, established, delay 0).
-- Five-turn orchestration is pure: `FiveTurnGame` holds `GameState` + `history: tuple[TurnResolution,5]` and calls `resolve_turn` exactly once per submit with `rng_context = state.to_turn_context()` validated inside turn; enforces `start_state.turn==0` else ValueError for exactly-five invariant; no DB, no copy of kernel logic, history not stored inside GameState (frozen). `TURN_SPECS` is hardcoded 5-element list: T1 normal "The growing settlement keeps food demand high.", T2 normal "Repeated harvests have left grain abundant and prices weak.", T3 normal "Dry weather suggests the next harvest may be threatened.", T4 drought "Drought cuts farm output — regional supply tightens.", T5 normal "Markets adjust to the drought's aftermath." — all truthful (T2 surplus emergent from signal accumulation).
-- Wealth remains exact: `_value(qty,price)=qty*price//1000`, `wealth_before=cash+value`, `quantity_value_effect=purchase+harvest+ship`, `price_value_effect=value(final,price_after)-value(final,price_before)`, `cash_effect=cash_after-cash_before`, `wealth_delta=cash+quantity+price`. Drivers are exact partitions ranked by `impact_bps=abs(impact)*10000//max(wealth_before,1)` desc then id, ≤3, filtered zero.
-- Determinism is choices-based: same `run_seed`+`version`+`choices[5]` → same history/summary; different choices diverge; different seeds with same choices may be identical until a seeded mechanic exists (Section 8) — Section 6 proves tradeoffs via non-dominance test (no single policy dominates all metrics: hold wins wealth/cash, storage peak, trade T4).
-- `backend/pyproject.toml` single project, no `fastapi`/`sqlalchemy` until Section 10. Ruff/pyright scoped to `backend`.
+- `backend/app/engine` and `backend/app/domain` are pure: no `fastapi`, `sqlalchemy`, `httpx`, `asyncpg`, `openai`, `clerk`. Enforced by AST rglob test. `pydantic` allowed. `engine/actor.py` holds shared integer settlement; `engine/turn.py` keeps `_target_price/_bounded_price`/supply signal and trace; `engine/rivals.py` owns scoring/headlines; `engine/prototype.py` owns session and `TURN_SPECS` + threat mapping. `cli.py` at top-level app is not checked but also pure stdlib+domain+engine.
+- Canonical state frozen with immutable tuples; `RivalState` frozen `ge=0` without headline; `RivalProfile` frozen prefs bps; `RivalTurnResult` frozen with full deltas and wealth `cash+qty+price` (price revaluation at `home_resolved`); rival wealth never floats.
+- Home supply remains signal `max(0, signal+farm_output-demand)` on `signal_next`, demand nodes in graph; River stable. Rivals **do not mutate** shared `GameState.market.supply` (isolation, verified by `test_player_market_isolation`); their production is private via `resolve_storage_settlement`. Shared constants/costs/clamping live in `actor.py` and are imported (not duplicated).
+- FiveTurnGame session-owned: `state:GameState` + `history:5` + `_rivals:{mira,daran}` + `_rival_history:5×(Mira,Daran)`; calls `resolve_turn` once per submit after rival choice, validates `rng_context`, enforces `turn==0`, determinism via choices+seed. `TURN_SPECS` 5 truthful signals, threat derived as `_next_world_known_for_turn(idx)==drought` only on idx 2 (Warning → Drought), never by parsing `signal`. Headlines derived from `RivalTurnResult.headline`, not stored in `RivalState`.
+- Wealth exact with revaluation: `quantity_value_effect = value(after, pre)-value(before, pre)`, `price_value_effect = value(after, resolved)-value(after, pre)`, `wealth_delta = cash+qty+price`; rival hold through 5000→6000 with 20→120 grain yields qty 500 + price 120 = 620, tested.
+- Determinism choices+seed via `rng_for(..., "rival", rival_id, 0)` only on exact integer tie; no `hash()` or global `random`.
 
 ### Normal verification
 
 ```bash
 uv sync --project backend
-make test              # = uv run --project backend pytest -v  (96 passed: 79 prior + 17 new)
+make test              # = uv run --project backend pytest -v  (109 passed: 96 prior + 13 new)
 make lint              # = ruff check backend  (All checks passed)
 make type              # = pyright  (0 errors)
-make format-check      # = ruff format --check backend  (24 already formatted)
+make format-check      # = ruff format --check backend  (27 already formatted)
 ```
 
 ### Last known green
 
 ```
 uv sync --project backend  → Resolved 15 packages, 0 errors
-pytest -v                  → 96 passed (8 core + 7 rounding + 11 determinism + 2 purity/sanity + 15 kernel + 7 invariants + 12 causal_trace + 4 explanation + 13 two_markets_route + 17 five_turn_prototype [exactly5, noninteractive, determinism same+diff, supply signal drained 110/70 demand in graph, three strategies diverge >10% farm 548 vs storage 1746 vs trade 1510, non-dominance hold vs storage/trade, drought rewards prep 130 vs -9, each turn chain demand→supply→price, turn0 enforced, demand in graph, summary true initial 5000→4545 not turn1 4545, summary regression, run requires 5, CLI parse, signals truthful, titles])
+pytest -v                  → 109 passed (8 core + 7 rounding + 11 determinism + 2 purity/sanity + 15 kernel + 7 invariants + 12 causal_trace + 4 explanation + 13 two_markets_route + 17 five_turn_prototype + 13 deterministic_rivals [profiles differ identical state 2+ diffs Mira storage, determinism, capital via shared primitives, no-money with revaluation, behavioral warning prep vs farm, fingerprint across contexts, headlines derived visible T2+, same-rules, market isolation, no float, structured threat, no headline in state, exact-tie rng])
 ruff check backend         → All checks passed
-ruff format --check backend→ 24 files already formatted
+ruff format --check backend→ 27 files already formatted
 pyright                    → 0 errors, 0 warnings
-demo                       → uv run --project backend python backend/app/engine/demo.py --world drought --command hold  Home availability 100+60-90→70 price 5000→5714 wealth +357 vs normal 100+100-90→110 price 5000→4545 wealth +354, trace supply node Regional availability 100+60-90→70 reason drought_reduced_availability (vs harvest_added_to_availability), supply lower under drought
-prototype hold 5           → uv run --project backend python backend/app/cli.py --seed demo-seed-001 --choices hold,hold,hold,hold,hold  prints INITIAL (5000/5200) /5× TURN (1 A Growing Settlement signal high demand, 2 Surplus abundant weak, 3 Warning dry, 4 Drought cuts output, 5 Aftermath) with 6 MONTHS LATER wealth/inventory/price WHY? drivers, ends STRATEGIC SUMMARY true initial 5000→4545 river 5200→6825 5 turns wealth 1100→1909 delta +809 (hold) vs farm 548 vs storage 1746 vs trade 1510 spreads >10%
-prototype verbose          → same --verbose adds FULL CAUSAL TRACE (world->farm_output->demand/home_demand->supply(100+100-90→110 availability_drained_by_demand/harvest_added_to_availability)->price_pressure(demand+supply)->target->price->shipment->cash/inventory->quantity->price revaluation->wealth) + DOMAIN EFFECTS
-cli parse                  → parse_choice("buy 20") -> buy_grain qty 20, parse_choices_arg("hold,buy 20,hold,ship 10,hold") len 5
+demo                       → normal 4545 vs drought 5714, trace supply 100+60-90→70 drought_reduced_availability
+prototype hold 5           → hold,hold,hold,hold,hold prints 5× 6 MONTHS LATER + MIRA/DARAN headlines each turn, ends STRATEGIC SUMMARY with T1..5 Rivals lines and final rivals Mira 0/255/5/450 Daran 100/200/32/200 (diff 3/5 Mira granary×3 vs Daran farm×2, warning T3 Mira granary vs Daran granary but prep boost verified via scores)
+prototype verbose          → adds RIVAL DETAILS per turn
+cli parse                  → parse_choice("buy 20") -> buy_grain qty 20
+actor primitives           → compute_farm_output/resolve_buy/resolve_storage_settlement/resolve_shipment share single source; turn.py and rivals.py both call same; costs 500/300/400/800 parity
 ```
 
-Cache provenance fixed in YOLO (`~/.cache/uv/sdists-v9/.git` removed, `uv cache prune`), no `UV_CACHE_DIR` workaround needed. `.git/refs` provenance cleared for branch creation; `.git/objects` provenance remains but does not block Git (refs are authoritative).
+Cache provenance fixed in YOLO (`~/.cache/uv/sdists-v9/.git` removed, `uv cache prune`), no `UV_CACHE_DIR` workaround needed. `.git/refs` provenance cleared for branch creation.
 
 ### Decisions relevant to future work
 
@@ -102,18 +106,19 @@ Cache provenance fixed in YOLO (`~/.cache/uv/sdists-v9/.git` removed, `uv cache 
 - Section 2: `pydantic` for validated integer types; JSON canonical encoding for RNG; capacities single-source
 - Section 3: `TURN_ORDER` explicit, drought reduces yield not price, buy clamped, integer price via basis points
 - Section 4: exact wealth decomposition at old vs new price, immutable tuples for causal DAG, allowed roots world/command, story drivers as causal paths ranked by exact wealth-bps, filtered zero stories, RNG ownership validated, concise/verbose CLI
-- Section 5: `market` stays Home alias + `river_market` + `route:RouteState`; `transport_cost_per_unit` in milliunits (800) comparable to price 5000; `TURN_ORDER` extended with `home_supply/river_supply/home_price/river_price/route_settlement`; river supply stable for divergence; `secure_route`/`ship_grain` with capacity/inventory/cash clamping; wealth with ship `purchase+harvest+ship+price+cash` exact; drivers include `trade_arbitrage` net with `arbitrage_margin` at resolved prices (reliability `delivered = effective * reliability_bps //10000`, default 10000, `delay_turns` constrained 0, `cash_after_trade`/`inventory_after_trade` nodes, `price_value_effect` parents `inventory_after_trade+price`); optional staleness deferred; regression: resolved Home price correctly flips arbitrage (5.00→6.00 vs 6.24 gives -6 not +4)
-- Section 6: Home supply is **availability signal drained by demand** `signal_next = max(0, signal + farm_output - demand)` (price on signal_next, surplus raises signal and depresses price, drought lowers signal and raises price, not a conserved physical stock); River signal stable; `FiveTurnGame` owns `GameState`+`history` outside canonical state, calls `resolve_turn` once per turn with validated `rng_context`, enforces exactly 5 submissions with `turn==0`, `TURN_SPECS` hardcoded 5 truthful signals (T1 high demand, T2 abundant weak surplus emergent, T3 warning, T4 drought, T5 aftermath); start state Home 100/90/5000 River 80/130/5200 storage 200 cash 1000 grain 20 farm 10 route 800/20/10000; CLI `backend/app/cli.py` thin (interactive + --choices non-interactive, shows turn/signal/player cash/grain/farm/storage HOME/RIVER pulse ROUTE choices, after-commit 6 MONTHS LATER wealth/inventory/price WHY? ≤3 drivers, ends STRATEGIC SUMMARY with true initial→final price trajectory); determinism is choices-based, no seed-divergence; three corrected policies + hold diverge with tradeoffs and drought rewards prep, demand in causal graph
+- Section 5: `market` stays Home alias + `river_market` + `route:RouteState`; `transport_cost_per_unit` in milliunits (800) comparable to price 5000; `TURN_ORDER` extended with home_supply/river_supply/home_price/river_price/route_settlement; river supply stable for divergence; `secure_route`/`ship_grain` with capacity/inventory/cash clamping; wealth with ship `purchase+harvest+ship+price+cash` exact; drivers include trade arbitrage at resolved prices; optional staleness deferred; regression: resolved Home price flips arbitrage
+- Section 6: Home supply signal `signal_next = max(0, signal+farm_output-demand)`; River stable; `FiveTurnGame` session-owned `state+history`, `TURN_SPECS` 5 truthful signals, start Home 100/90/5000 River 80/130/5200 storage200, determinism choices-based
+- Section 7: Session-owned rivals via `actor.py` shared primitives (no duplicated economy), two-phase timing (choose pre→player resolve→settle rivals buy@pre/ship@resolvedRiver/valuation@resolvedHome), integer/bps scoring `expected×pref×capital×risk×exposure` with threat boost only on `next_world_known==drought` (T3 warning, not signal parsing), `RivalProfile` (Mira 4500/15000/13000/14500 farm-averse, Daran 16000/7000 farm-hungry) vs `RivalState` (1200/25/5/250 vs 1400/15/12/150) proven via identical-state tests, `RivalTurnResult` history 5×(Mira,Daran) with `wealth=cash+qty+price` revaluation, headlines derived from outcome, isolation (player supply unchanged), deterministic exact-tie `rng_for`
 
 ### Intentionally missing (do not build early)
 
-Rivals Mira/Daran (Section 7), pressure arc (Section 8), balance harness (Section 9), etc. No FastAPI routes, DB/SQLAlchemy, React UI, content framework, LLMs.
+Pressure arc (Section 8), balance harness (Section 9), FastAPI/GameView/revision (Section 10), React UI (Section 11) etc. No DB/SQLAlchemy, LLMs, route congestion, contested supply, generic rival framework.
 
 ### Follow-up obligations
 
-Section 6 follow-ups resolved: supply semantics defined as availability signal drained by demand (bounded, price on signal, surplus truthful, no monotonic accumulation, not physical stock), demand in causal graph, signals truthful, strategies legal and distinct, turn0 enforced, summary true initial→final price, determinism via choices.
+Section 7 follow-ups resolved: shared primitives prevent divergence, two-phase timing respects buy/ship valuation, bps integer scoring with exact ties, structured threat not prose, profile vs state personality proven, full history with revaluation, behavioral not scripted headline tests, market isolation verified.
 
 ### Next milestone
 
-**Section 7 — Deterministic Rivals** — Mira (storage/trade/flexible early) and Daran (farmland scale, aggressive, vulnerable) via deterministic scoring `opportunity score = expected return × preference × capital × risk × exposure`, each turn at least one rival headline, legible behavior.
+**Section 8 — Pressure-Driven Event Arc** — replace hard-coded warning with small coherent pressure system (`normal→early dry→worsening→drought→aftermath`) keeping impact systemic via production/supply/price, not price hack, deterministic and inspectable.
 

@@ -1,15 +1,15 @@
-"""Five-turn headless prototype — Section 6.
+"""Five-turn headless prototype — Section 7 with deterministic rivals.
 
-Orchestrates exactly five deterministic turns with an authored world/signal arc.
-Pure engine: no FastAPI, no DB, no LLM, no rivals (Section 7).
+Orchestrates exactly five deterministic turns with an authored world/signal arc
+and session-owned rivals Mira/Daran (pure, no DB, no LLM, isolated supply).
 
 Supply semantics: MarketState.supply is a market-availability signal/index,
-drained by demand each turn (turn.py Section 6, not a conserved physical
-stock — farm_output also enters player inventory without conservation
-implied). Prototype start state is tuned so that surplus is truthfully
-weak and drought tightens, making signals truthful.
+drained by demand each turn (turn.py Section 6). Rivals do not mutate the
+shared availability signal in Section 7 (isolation).
 
 TURN_SPECS is the only world schedule (hardcoded, not a DSL).
+Structured threat `next_world_known` models the telegraphed warning
+(T3 → drought) without parsing prose.
 """
 
 from __future__ import annotations
@@ -25,6 +25,18 @@ from app.domain.types import (
     PlayerState,
     RouteState,
     WorldCondition,
+)
+from app.engine.rivals import (
+    DARAN_PROFILE,
+    DARAN_START_STATE,
+    MIRA_PROFILE,
+    MIRA_START_STATE,
+    ObservableContext,
+    RivalState,
+    RivalTurnResult,
+    SettlementContext,
+    apply_rival_command,
+    choose_rival_command,
 )
 from app.engine.turn import resolve_turn
 
@@ -124,8 +136,19 @@ def _wealth(state: GameState) -> int:
     return state.player.cash + (state.player.inventory.grain * state.market.current_price // 1000)
 
 
+def _next_world_known_for_turn(idx: int) -> WorldCondition | None:
+    """Structured threat known at turn idx (pre-turn).
+
+    Section 7: only T3 (idx=2, title Warning Signs, world normal) telegraphs
+    T4's drought. Do not parse signal prose; derive from authored TURN_SPECS.
+    """
+    if idx == 2:  # Warning Signs precedes Drought
+        return "drought"
+    return None
+
+
 class StrategicSummary(BaseModel):
-    """Concise end-of-run summary — both human and structured."""
+    """Concise end-of-run summary — both human and structured (now with rivals)."""
 
     model_config = ConfigDict(frozen=True)
 
@@ -138,6 +161,9 @@ class StrategicSummary(BaseModel):
     cash_low: int
     peak_inventory: int
     is_complete: bool
+    # Section 7 — optional to keep backward compat with tests that construct manually
+    final_rivals: tuple[RivalState, RivalState] | None = None
+    rival_history: tuple[tuple[RivalTurnResult, RivalTurnResult], ...] | None = None
 
     def format(self) -> str:
         lines: list[str] = []
@@ -170,12 +196,28 @@ class StrategicSummary(BaseModel):
             lines.append(
                 f"  T{i + 1} {title}: wealth {res.player_outcome.wealth_delta:+} — {drivers}"
             )
+        # Rival per-turn headlines (derived)
+        if self.rival_history is not None:
+            for i, pair in enumerate(self.rival_history):
+                mira, daran = pair
+                lines.append(f"  T{i + 1} Rivals: Mira: {mira.headline} | Daran: {daran.headline}")
+            if self.final_rivals is not None:
+                mr, dr = self.final_rivals
+                lines.append(
+                    f"  final rivals: Mira cash {mr.cash} grain {mr.inventory.grain} farm {mr.farm_capacity} storage {mr.storage_capacity} | Daran cash {dr.cash} grain {dr.inventory.grain} farm {dr.farm_capacity} storage {dr.storage_capacity}"
+                )
         lines.append("=" * 60)
         return "\n".join(lines)
 
 
 class FiveTurnGame:
-    """In-memory 5-turn game — owns GameState and history, calls resolve_turn."""
+    """In-memory 5-turn game — owns GameState, history, and session rivals.
+
+    Rivals are session-owned (not in GameState) — they do not mutate shared
+    availability signal in Section 7 (isolation). Timing is two-phase:
+    rivals choose from pre-turn observable info, player market resolves, then
+    rivals settle at pre-buy price + resolved River/Home prices.
+    """
 
     turn_limit: int = TURN_LIMIT
 
@@ -184,6 +226,8 @@ class FiveTurnGame:
         seed: str = "seed-001",
         version: str = "1.0",
         start_state: GameState | None = None,
+        mira_state: RivalState | None = None,
+        daran_state: RivalState | None = None,
     ) -> None:
         self._seed = seed
         self._version = version
@@ -201,6 +245,12 @@ class FiveTurnGame:
             self._version = self._initial_state.ruleset_version
         self._state: GameState = self._initial_state
         self._history: list[TurnResolution] = []
+        # Session-owned rivals — independent economic states
+        self._rivals: dict[str, RivalState] = {
+            "mira": mira_state if mira_state is not None else MIRA_START_STATE,
+            "daran": daran_state if daran_state is not None else DARAN_START_STATE,
+        }
+        self._rival_history: list[tuple[RivalTurnResult, RivalTurnResult]] = []
 
     @property
     def state(self) -> GameState:
@@ -209,6 +259,27 @@ class FiveTurnGame:
     @property
     def history(self) -> tuple[TurnResolution, ...]:
         return tuple(self._history)
+
+    @property
+    def rivals(self) -> tuple[RivalState, RivalState]:
+        return (self._rivals["mira"], self._rivals["daran"])
+
+    @property
+    def rival_history(
+        self,
+    ) -> tuple[tuple[RivalTurnResult, RivalTurnResult], ...]:
+        return tuple(self._rival_history)
+
+    @property
+    def rival_headlines_history(self) -> tuple[tuple[str, str], ...]:
+        """Derived headlines per turn for UI convenience."""
+        return tuple((m.headline, d.headline) for m, d in self._rival_history)
+
+    def current_rival_headlines(self) -> tuple[str, str] | None:
+        if not self._rival_history:
+            return None
+        m, d = self._rival_history[-1]
+        return (m.headline, d.headline)
 
     @property
     def is_complete(self) -> bool:
@@ -237,6 +308,24 @@ class FiveTurnGame:
     def available_commands(self) -> list[str]:
         return ["hold", "expand_farm", "build_granary", "buy_grain", "secure_route", "ship_grain"]
 
+    def _observable_for(self, idx: int) -> ObservableContext:
+        """Build pre-turn observable context for rival choice (structured, not prose)."""
+        spec = TURN_SPECS[idx]
+        return ObservableContext(
+            turn=idx,
+            world_now=spec.world,
+            next_world_known=_next_world_known_for_turn(idx),
+            home_price_pre=self._state.market.current_price,
+            river_price_pre=self._state.river_market.current_price,
+            transport_cost_per_unit=self._state.route.transport_cost_per_unit,
+            route_capacity=self._state.route.capacity,
+            reliability_bps=self._state.route.reliability_bps,
+            home_supply=self._state.market.supply,
+            home_demand=self._state.market.demand,
+            run_seed=self._seed,
+            ruleset_version=self._version,
+        )
+
     def submit(self, command: PlayerCommand) -> TurnResolution:
         if self.is_complete:
             raise ValueError("game complete — no more decisions allowed (exactly 5 turns)")
@@ -244,11 +333,35 @@ class FiveTurnGame:
         if idx >= len(TURN_SPECS):
             raise ValueError("no world spec for next turn")
         spec = TURN_SPECS[idx]
-        # RNG context must equal state's context (validated inside resolve_turn)
+
+        # 1. Rivals choose from pre-turn observable info (before player resolution)
+        obs = self._observable_for(idx)
+        mira_before = self._rivals["mira"]
+        daran_before = self._rivals["daran"]
+        mira_choice = choose_rival_command(MIRA_PROFILE, mira_before, obs)
+        daran_choice = choose_rival_command(DARAN_PROFILE, daran_before, obs)
+
+        # 2. Resolve player/world market turn (authoritative)
         ctx = self._state.to_turn_context()
         res = resolve_turn(self._state, command, spec.world, ctx)
         self._history.append(res)
         self._state = res.next_state
+
+        # 3. Rivals settle using correct timing: buy at pre, ship at resolved River, valuation at resolved Home
+        settlement = SettlementContext(
+            world_now=spec.world,
+            home_price_pre=obs.home_price_pre,
+            river_price_resolved=res.next_state.river_market.current_price,
+            home_price_resolved=res.next_state.market.current_price,
+            transport_cost_per_unit=obs.transport_cost_per_unit,
+            route_capacity=obs.route_capacity,
+            reliability_bps=obs.reliability_bps,
+        )
+        mira_result = apply_rival_command(MIRA_PROFILE, mira_before, mira_choice, settlement)
+        daran_result = apply_rival_command(DARAN_PROFILE, daran_before, daran_choice, settlement)
+        self._rivals["mira"] = mira_result.after
+        self._rivals["daran"] = daran_result.after
+        self._rival_history.append((mira_result, daran_result))
         return res
 
     def run(self, choices: list[PlayerCommand]) -> StrategicSummary:
@@ -265,7 +378,6 @@ class FiveTurnGame:
             + [h.next_state.player.cash for h in self._history]
             + [self._state.player.cash]
         )
-        # avoid double count final; use set
         cash_low = min(cash_vals) if cash_vals else self._state.player.cash
         inv_vals = [self._initial_state.player.inventory.grain] + [
             h.next_state.player.inventory.grain for h in self._history
@@ -274,8 +386,8 @@ class FiveTurnGame:
         final_wealth = _wealth(self._state)
         initial_wealth = _wealth(self._initial_state)
         wealth_delta_total = final_wealth - initial_wealth
-        # also check sum of wealth deltas equals total (allow for rounding? should be exact via wealth nodes)
-        # we keep computed total as ground truth
+        final_rivals = (self._rivals["mira"], self._rivals["daran"])
+        rival_hist = tuple(self._rival_history)
         return StrategicSummary(
             initial_state=self._initial_state,
             final_state=self._state,
@@ -286,4 +398,6 @@ class FiveTurnGame:
             cash_low=cash_low,
             peak_inventory=peak_inventory,
             is_complete=self.is_complete,
+            final_rivals=final_rivals,
+            rival_history=rival_hist,
         )

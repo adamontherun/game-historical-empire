@@ -1083,7 +1083,7 @@ Stop when the five-turn game is playable without a browser and feels like a sequ
 
 # SECTION 7 — Deterministic Rivals
 
-**Status:** NOT STARTED
+**Status:** COMPLETE
 
 ## Goal
 

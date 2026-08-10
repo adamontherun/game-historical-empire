@@ -57,48 +57,33 @@ from app.domain.types import (
     TurnContext,
     WorldCondition,
 )
+from app.engine.actor import (
+    BUILD_GRANARY_COST,
+    BUILD_GRANARY_DELTA,
+    DROUGHT_YIELD_REDUCTION_BPS,  # noqa: F401  re-export for backward compat
+    EXPAND_FARM_COST,
+    EXPAND_FARM_DELTA,
+    ROUTE_ESTABLISH_COST,
+    YIELD_PER_CAPACITY,  # noqa: F401
+    compute_farm_output,
+    resolve_buy,
+    resolve_shipment,
+    resolve_storage_settlement,
+)
+from app.engine.actor import (
+    affordable_quantity as _affordable_quantity,  # noqa: F401
+)
+from app.engine.actor import (
+    cost_for_quantity as _cost_for_quantity,  # noqa: F401
+)
+from app.engine.actor import (
+    value_for as _value,
+)
 from app.engine.rng import rng_for
 from app.engine.rounding import clamp_non_negative, div_round_half_up
 
-# Tuned constants — create real opportunity cost with starting cash ~1000.
-YIELD_PER_CAPACITY: int = 10  # grain per farm_capacity under normal
-DROUGHT_YIELD_REDUCTION_BPS: int = 4000  # 40% reduction
-EXPAND_FARM_COST: int = 500
-EXPAND_FARM_DELTA: int = 10
-BUILD_GRANARY_COST: int = 300
-BUILD_GRANARY_DELTA: int = 50
-ROUTE_ESTABLISH_COST: int = 400
-
 # Public for tests to assert order.
 TURN_ORDER: str = "command -> production -> home_supply -> river_supply -> home_price -> river_price -> settlement -> route_settlement -> valuation"
-
-
-def _cost_for_quantity(quantity: int, price_milli: int) -> int:
-    """Cost in Money for quantity at price_milli (milliunits per unit).
-
-    Floor division — deterministic and conservative.
-    Returns 0 if price_milli is 0 (free) or quantity 0.
-    """
-    if quantity <= 0 or price_milli <= 0:
-        return 0
-    return (quantity * price_milli) // 1000
-
-
-def _affordable_quantity(cash: int, price_milli: int, requested: int) -> int:
-    """Max quantity affordable at price_milli with cash, floored cost."""
-    if requested <= 0:
-        return 0
-    if price_milli <= 0:
-        return requested
-    max_affordable = ((cash + 1) * 1000 - 1) // price_milli
-    return max_affordable
-
-
-def _value(qty: int, price_milli: int) -> int:
-    """Inventory value in Money at price_milli."""
-    if qty <= 0 or price_milli <= 0:
-        return 0
-    return (qty * price_milli) // 1000
 
 
 def _target_price(
@@ -371,44 +356,13 @@ def resolve_turn(
     elif command.type == "buy_grain":
         requested = command.quantity if command.quantity is not None else 10
         requested = int(requested)
-        available_space = storage_capacity - inventory
-        if available_space < 0:
-            available_space = 0
-        affordable = _affordable_quantity(cash, before_price, requested)
-        actual = requested
-        if actual > affordable:
-            actual = affordable
-        if actual > available_space:
-            actual = available_space
-        cost = _cost_for_quantity(actual, before_price)
-        if actual < requested and actual == affordable and actual < available_space:
-            cmd_reason = "insufficient_cash"
-        elif actual < requested and actual == available_space:
-            if available_space < affordable:
-                cmd_reason = "insufficient_storage"
-            else:
-                cmd_reason = (
-                    "insufficient_cash" if affordable < requested else "insufficient_storage"
-                )
-            if requested > available_space:
-                if affordable < available_space:
-                    cmd_reason = "insufficient_cash"
-                else:
-                    cmd_reason = "insufficient_storage"
-        elif actual == requested and requested > 0:
-            cmd_reason = "buy_grain"
-        elif actual == 0 and requested > 0:
-            if affordable == 0 and available_space > 0:
-                cmd_reason = "insufficient_cash"
-            elif available_space == 0:
-                cmd_reason = "insufficient_storage"
-            else:
-                cmd_reason = "buy_grain_zero"
-        else:
-            cmd_reason = "buy_grain" if actual > 0 else "buy_grain_zero"
-
-        cash_after = cash - cost
-        inventory_after = inventory + actual
+        cash_after, inventory_after, actual, cost, cmd_reason = resolve_buy(
+            cash=cash,
+            price_milli=before_price,
+            storage_capacity=storage_capacity,
+            inventory=inventory,
+            requested=requested,
+        )
 
         nodes.append(
             CausalNode(
@@ -738,14 +692,8 @@ def resolve_turn(
         )
     )
 
-    # 2. Production — farm output depends on post-command farm_capacity + world
-    base_output = farm_capacity * YIELD_PER_CAPACITY
-    if world == "drought":
-        farm_output = base_output * (10_000 - DROUGHT_YIELD_REDUCTION_BPS) // 10_000
-        prod_reason = "drought_reduced_yield"
-    else:
-        farm_output = base_output
-        prod_reason = "normal_yield"
+    # 2. Production — farm output via shared primitive
+    farm_output, base_output, prod_reason = compute_farm_output(farm_capacity, world)
 
     nodes.append(
         CausalNode(
@@ -1022,20 +970,18 @@ def resolve_turn(
         )
     )
 
-    # 5. Settlement — inventory after harvest capped by storage
+    # 5. Settlement — inventory after harvest capped by storage (via shared primitive)
     inventory_before_settlement = inventory
-    inventory_after_harvest = inventory_before_settlement + farm_output
-    if inventory_after_harvest > storage_capacity:
-        excess = inventory_after_harvest - storage_capacity
-        inventory_final_pre_ship = storage_capacity
-        settle_reason = "capped_by_storage"
-        settle_delta = inventory_final_pre_ship - inventory_before_settlement
+    inventory_final_pre_ship, settle_delta, settle_reason = resolve_storage_settlement(
+        inventory_before=inventory_before_settlement,
+        farm_output=farm_output,
+        storage_capacity=storage_capacity,
+    )
+    # Reconstruct label details for trace (excess) while preserving shared math
+    if settle_reason == "capped_by_storage":
+        excess = inventory_before_settlement + farm_output - storage_capacity
         if command.type == "buy_grain":
-            inv_parents: tuple[str, ...] = (
-                "farm_output",
-                "storage_capacity",
-                "inventory_after_buy",
-            )
+            inv_parents = ("farm_output", "storage_capacity", "inventory_after_buy")
         else:
             inv_parents = ("farm_output", "storage_capacity")
         nodes.append(
@@ -1051,9 +997,7 @@ def resolve_turn(
             )
         )
     else:
-        inventory_final_pre_ship = inventory_after_harvest
-        settle_delta = farm_output
-        settle_reason = "harvest_to_inventory"
+        # harvest_to_inventory
         if command.type == "buy_grain":
             inv_parents = ("farm_output", "storage_capacity", "inventory_after_buy")
         else:
@@ -1197,58 +1141,29 @@ def resolve_turn(
                 )
             )
         else:
-            # Established: compute effective with clamping
+            # Established: shared shipment primitive (timing: revenue at resolved River price)
             assert requested is not None
-            # affordable by transport cost
-            if transport_cost_per_unit <= 0:
-                affordable = requested
-            else:
-                affordable = ((cash + 1) * 1000 - 1) // transport_cost_per_unit
-                if affordable < 0:
-                    affordable = 0
-            available_by_capacity = route_capacity
-            available_by_inventory = inventory_final_pre_ship
-            ship_effective = requested
-            if ship_effective > affordable:
-                ship_effective = affordable
-            if ship_effective > available_by_capacity:
-                ship_effective = available_by_capacity
-            if ship_effective > available_by_inventory:
-                ship_effective = available_by_inventory
-            if ship_effective < 0:
-                ship_effective = 0
-            # Determine limiting reason
-            if ship_effective < requested:
-                if (
-                    affordable < requested
-                    and affordable <= available_by_capacity
-                    and affordable <= available_by_inventory
-                ):
-                    ship_reason = "insufficient_cash_for_transport"
-                elif (
-                    available_by_capacity < requested
-                    and available_by_capacity <= available_by_inventory
-                    and available_by_capacity <= affordable
-                ):
-                    ship_reason = "limited_by_capacity"
-                elif available_by_inventory < requested:
-                    ship_reason = "insufficient_inventory"
-                else:
-                    ship_reason = "ship_limited"
-            else:
-                ship_reason = "ship_grain"
-            # Reliability applied consistently for all values; default 10000 is lossless
-            ship_delivered = ship_effective * route_reliability_bps // 10_000
-            ship_revenue = (ship_delivered * river_new_price) // 1000
-            ship_cost = (ship_effective * transport_cost_per_unit) // 1000
-            trade_cash = ship_revenue - ship_cost
-            # Update cash and inventory — capture before values for truthful trace
+            (
+                ship_effective,
+                ship_delivered,
+                ship_revenue,
+                ship_cost,
+                trade_cash,
+                inventory_final,
+                ship_reason,
+            ) = resolve_shipment(
+                requested=requested,
+                route_established=True,
+                route_capacity=route_capacity,
+                route_reliability_bps=route_reliability_bps,
+                transport_cost_per_unit=transport_cost_per_unit,
+                inventory_final_pre_ship=inventory_final_pre_ship,
+                cash=cash,
+                river_price=river_new_price,
+            )
+            # Update cash — capture before values for truthful trace
             cash_before_trade = cash
             cash_after_ship = cash + trade_cash
-            inventory_final = inventory_final_pre_ship - ship_effective
-            if inventory_final < 0:
-                inventory_final = 0
-            # Clamp cash non-negative (should not go negative due to affordable check)
             if cash_after_ship < 0:
                 cash_after_ship = 0
             cash = cash_after_ship
