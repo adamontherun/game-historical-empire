@@ -1,4 +1,4 @@
-"""One-turn grain market kernel — Sections 4–5.
+"""One-turn grain market kernel — Sections 4–6.
 
 Resolves a single turn with explicit order:
 
@@ -21,6 +21,16 @@ Story drivers are exact partitions of wealth_delta ranked by wealth-bps.
 Section 5 adds: Home Valley (existing market) + River Town (river_market)
 + River Route (route) with transport cost / capacity / reliability.
 Ship trade is settlement after harvest, valued at river price.
+
+Supply semantics (Section 6): MarketState.supply is the persistent
+regional stock at the start of the turn. Home Valley stock evolves as
+stock_next = max(0, stock + farm_output - demand), i.e. each turn's
+available grain (stock + harvest) is drained by regional consumption
+(up to demand) before the next turn. Price is set on stock_next
+(post-consumption stock) via _target_price with effective_supply guard,
+so surplus (farm_output > demand) raises stock and depresses price,
+shortage (drought) drains stock and raises price. River Town supply
+remains stable (exogenous) for Section 6.
 
 Spec: drought reduces production/yield, not directly price.
 """
@@ -729,21 +739,29 @@ def resolve_turn(
         )
     )
 
-    # 3. Home Supply — add farm_output to supply, clamped
+    # 3. Home Supply — stock drained by consumption (Section 6 semantics)
+    # MarketState.supply is stock at start; next stock = max(0, stock + farm_output - demand)
     supply_before_harvest = before_supply
-    next_supply = clamp_non_negative(supply_before_harvest + farm_output)
+    next_supply = clamp_non_negative(supply_before_harvest + farm_output - before_demand)
     supply_delta = next_supply - before_supply
+    # Reason reflects whether stock grew (surplus) or shrank (shortage)
+    if next_supply > before_supply:
+        supply_reason = "harvest_added_to_stock"
+    elif next_supply < before_supply:
+        supply_reason = "stock_drained_by_consumption"
+    else:
+        supply_reason = "stock_unchanged"
+    if world == "drought" and next_supply < before_supply:
+        supply_reason = "drought_reduced_stock"
     nodes.append(
         CausalNode(
             id="supply",
-            label=f"Regional supply {before_supply} → {next_supply}",
+            label=f"Regional stock {before_supply}+{farm_output}-{before_demand}→{next_supply}",
             kind="supply",
             before=before_supply,
             after=next_supply,
             delta=supply_delta,
-            reason_code="harvest_added_to_supply"
-            if world == "normal"
-            else "lower_output_reduced_supply",
+            reason_code=supply_reason,
             parent_ids=("farm_output",),
         )
     )
@@ -751,14 +769,12 @@ def resolve_turn(
     nodes.append(
         CausalNode(
             id="home_supply",
-            label=f"Home Valley supply {before_supply} → {next_supply}",
+            label=f"Home Valley stock {before_supply}+{farm_output}-{before_demand}→{next_supply}",
             kind="supply",
             before=before_supply,
             after=next_supply,
             delta=supply_delta,
-            reason_code="harvest_added_to_supply"
-            if world == "normal"
-            else "lower_output_reduced_supply",
+            reason_code=supply_reason,
             parent_ids=("farm_output",),
         )
     )

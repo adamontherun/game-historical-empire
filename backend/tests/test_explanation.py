@@ -173,7 +173,7 @@ def test_concise_le_three_full_trace_preserved() -> None:
 
 
 def test_normal_vs_drought_different_drivers() -> None:
-    """Same command, different world should produce different driver impacts (drought has larger farm/price effects)."""
+    """Same command, different world should produce different driver impacts."""
     state = _state(farm=10, supply=100, demand=120)
     cmd = PlayerCommand(type="hold")
     normal = resolve_turn(state, cmd, "normal", state.to_turn_context())
@@ -183,10 +183,14 @@ def test_normal_vs_drought_different_drivers() -> None:
     q_drought = next(n for n in drought.causal_trace.nodes if n.id == "quantity_value_effect").delta
     assert q_normal is not None and q_drought is not None
     assert q_drought < q_normal  # drought yields less quantity value
-    # Price effect larger under drought (more scarcity)
-    p_normal = next(n for n in normal.causal_trace.nodes if n.id == "price_value_effect").delta
-    p_drought = next(n for n in drought.causal_trace.nodes if n.id == "price_value_effect").delta
-    assert p_normal is not None and p_drought is not None
-    # Drought price higher, so price revaluation should be >= normal (if inventory positive)
-    # With same inventory, higher price under drought means larger price effect
-    assert p_drought >= p_normal
+    # Price should be higher (or equal) under drought scarcity — check market price node, not precomputed value effect
+    # (price_value_effect also depends on inventory size, which is smaller under drought)
+    price_normal = next(n for n in normal.causal_trace.nodes if n.id == "price").after
+    price_drought = next(n for n in drought.causal_trace.nodes if n.id == "price").after
+    assert price_normal is not None and price_drought is not None
+    assert price_drought >= price_normal
+    # Also verify supply stock is lower under drought due to smaller harvest drain
+    supply_normal = next(n for n in normal.causal_trace.nodes if n.id == "supply").after
+    supply_drought = next(n for n in drought.causal_trace.nodes if n.id == "supply").after
+    assert supply_normal is not None and supply_drought is not None
+    assert supply_drought <= supply_normal
