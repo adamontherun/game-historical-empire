@@ -108,7 +108,7 @@ def test_every_important_node_has_parent_including_valuation() -> None:
                     assert "farm_output" in node.parent_ids
                     assert "storage_capacity" in node.parent_ids
                 if node.id == "price_value_effect":
-                    assert "inventory" in node.parent_ids
+                    assert "inventory_after_trade" in node.parent_ids
                     assert "price" in node.parent_ids
                 if node.id == "wealth":
                     assert "quantity_value_effect" in node.parent_ids
@@ -208,7 +208,7 @@ def test_wealth_graph_parents() -> None:
     pur = next(n for n in res.causal_trace.nodes if n.id == "purchase_quantity_value")
     har = next(n for n in res.causal_trace.nodes if n.id == "harvest_quantity_value")
     assert set(q.parent_ids) == {"purchase_quantity_value", "harvest_quantity_value"}
-    assert set(p.parent_ids) == {"inventory", "price"}
+    assert set(p.parent_ids) == {"inventory_after_trade", "price"}
     assert set(w.parent_ids) == {"cash_effect", "quantity_value_effect", "price_value_effect"}
     assert "price" not in pur.parent_ids
     assert "price" not in har.parent_ids

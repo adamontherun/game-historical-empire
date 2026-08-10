@@ -132,7 +132,7 @@ class RouteState(BaseModel):
         default=20, description="Carrying capacity per turn in grain units (≥0)"
     )
     reliability_bps: BasisPoints = Field(
-        default=9000,
+        default=10000,
         description="Reliability 0..10_000 (10_000=100% delivers all)",
         strict=True,
         ge=0,
@@ -140,7 +140,10 @@ class RouteState(BaseModel):
     )
     established: bool = Field(default=False, description="Whether trade access has been secured")
     delay_turns: int = Field(
-        default=0, ge=0, description="Optional settlement delay in turns (0 = same-turn)"
+        default=0,
+        ge=0,
+        le=0,
+        description="Optional settlement delay in turns (must be 0 until delayed settlement exists)",
     )
     event_exposure: str = Field(
         default="river_risk", description="Event exposure tag for future pressure arc"

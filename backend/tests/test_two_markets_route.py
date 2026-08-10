@@ -36,7 +36,7 @@ def _base_state(
     river_price: int = 5200,
     route_capacity: int = 20,
     transport_cost: int = 800,
-    reliability: int = 9000,
+    reliability: int = 10000,
     established: bool = False,
     turn: int = 0,
     seed: str = "seed-001",
@@ -382,3 +382,115 @@ def test_wealth_decomposition_still_exact_with_route() -> None:
                 + eff["harvest_quantity_value"].delta
                 + eff["ship_quantity_value"].delta
             )
+
+
+def test_arbitrage_uses_resolved_home_price_not_before() -> None:
+    """Regression: old Home 5.00 new 6.00 river 6.24 transport 0.80 -> old says +0.44 profitable, resolved says -0.56 unprofitable."""
+    # Craft market conditions that make home price rise from 5000 to 6000 (new) while river goes to 6240
+    # home_supply 70 demand 130 etc gives 5000->6000 as shown in manual run
+    state = _base_state(
+        cash=5000,
+        grain=50,
+        farm=0,
+        storage=200,
+        home_supply=70,
+        home_demand=130,
+        home_price=5000,
+        river_supply=80,
+        river_demand=130,
+        river_price=5200,
+        transport_cost=800,
+        reliability=10000,
+        established=True,
+    )
+    res = resolve_turn(
+        state, PlayerCommand(type="ship_grain", quantity=10), "normal", state.to_turn_context()
+    )
+    assert res.next_state.market.current_price == 6000
+    assert res.next_state.river_market.current_price == 6240
+    # Old calc: river 62 - cost 8 - before_home 50 = 4 profitable (before_price 5000)
+    # New calc (arbitrage_margin): river 62 - cost 8 - new_home 60 = -6 unprofitable (new_price 6000)
+    old_margin = 62 - 8 - 50  # 4
+    new_margin = 62 - 8 - 60  # -6
+    assert old_margin == 4
+    assert new_margin == -6
+    trade = next(d for d in res.player_outcome.drivers if d.id == "trade_arbitrage")
+    # Engine must report unprofitable based on resolved price, even though wealth net is +4
+    assert trade.reason_code == "unprofitable_shipment"
+    # Label should mention arbitrage at resolved prices
+    assert "arbitrage" in trade.label.lower()
+    assert "-6" in trade.label
+
+
+def test_trade_causal_graph_truthful() -> None:
+    """Fix 2: cash_effect via cash_after_trade, price_value_effect via inventory_after_trade, shipment limits structural."""
+    state = _base_state(cash=5000, grain=50, storage=200, established=True, reliability=10000)
+    res = resolve_turn(
+        state, PlayerCommand(type="ship_grain", quantity=10), "normal", state.to_turn_context()
+    )
+    nodes = {n.id: n for n in res.causal_trace.nodes}
+    # cash_effect must parent cash_after_trade, not cash_after_command directly
+    assert nodes["cash_effect"].parent_ids == ("cash_after_trade",)
+    assert nodes["cash_after_trade"].parent_ids == (
+        "cash_after_command",
+        "trade_revenue",
+        "transport_cost",
+    )
+    # price_value_effect must parent inventory_after_trade
+    assert nodes["price_value_effect"].parent_ids == ("inventory_after_trade", "price")
+    assert nodes["inventory_after_trade"].parent_ids == ("inventory", "shipment")
+    # shipment must structurally depend on all limiters
+    assert "command" in nodes["shipment"].parent_ids
+    assert "route_established" in nodes["shipment"].parent_ids
+    assert "route_capacity" in nodes["shipment"].parent_ids
+    assert "inventory" in nodes["shipment"].parent_ids
+    assert "route_cost_per_unit" in nodes["shipment"].parent_ids
+    assert "cash_after_command" in nodes["shipment"].parent_ids
+    assert "route_reliability" in nodes["shipment"].parent_ids
+    # trade_revenue must parent route_reliability
+    assert "route_reliability" in nodes["trade_revenue"].parent_ids
+    assert "river_price" in nodes["trade_revenue"].parent_ids
+    assert "shipment" in nodes["trade_revenue"].parent_ids
+    # Also check blocked case has cash_after_trade zero correctly
+    blocked = _base_state(cash=1000, grain=20, established=False)
+    res_blocked = resolve_turn(
+        blocked, PlayerCommand(type="ship_grain", quantity=10), "normal", blocked.to_turn_context()
+    )
+    nodes_b = {n.id: n for n in res_blocked.causal_trace.nodes}
+    assert nodes_b["cash_after_trade"].delta == 0
+    assert nodes_b["inventory_after_trade"].delta == 0
+
+
+def test_reliability_and_delay_semantics() -> None:
+    """Fix 3: reliability consistent for all values, default lossless, delay constrained to 0."""
+    from pydantic import ValidationError
+
+    # Default lossless
+    assert RouteState().reliability_bps == 10000
+    assert RouteState().delay_turns == 0
+    # Delay >0 rejected
+    try:
+        RouteState(delay_turns=3)
+        raise AssertionError("delay 3 should be rejected")
+    except ValidationError:
+        pass
+    # Reliability affects delivered deterministically: 9000 -> 90% etc
+    for reliability, expected_rev in [(10000, 62), (9000, 56), (5000, 31), (0, 0)]:
+        s = _base_state(reliability=reliability, established=True, cash=5000, grain=50, storage=200)
+        # Use fixed market so river price 6240
+        s = s.model_copy(
+            update={
+                "river_market": MarketState(
+                    supply=80, demand=130, base_price=5200, current_price=5200
+                )
+            }
+        )
+        res = resolve_turn(
+            s, PlayerCommand(type="ship_grain", quantity=10), "normal", s.to_turn_context()
+        )
+        rev = next(n for n in res.causal_trace.nodes if n.id == "trade_revenue")
+        assert rev.delta == expected_rev, (
+            f"reliability {reliability} expected rev {expected_rev} got {rev.delta}"
+        )
+        # route_reliability must be parent of trade_revenue when it affects delivery
+        assert "route_reliability" in rev.parent_ids

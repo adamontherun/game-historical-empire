@@ -208,6 +208,7 @@ def resolve_turn(
     ship_cost: int = 0
     ship_reason: str = ""
     trade_cash: int = 0  # part of cash_effect from ship
+    arbitrage_margin: int = 0  # resolved-price arbitrage: river - transport - new_home
 
     nodes: list[CausalNode] = []
     effects: list[DomainEffect] = []
@@ -1064,6 +1065,7 @@ def resolve_turn(
             ship_cost = 0
             ship_reason = "no_route_access"
             trade_cash = 0
+            arbitrage_margin = 0
             ship_quantity_value_pre = 0
             # Emit shipment blocked node
             nodes.append(
@@ -1087,7 +1089,7 @@ def resolve_turn(
                     after=0,
                     delta=0,
                     reason_code=ship_reason,
-                    parent_ids=("shipment", "river_price"),
+                    parent_ids=("shipment", "river_price", "route_reliability"),
                 )
             )
             nodes.append(
@@ -1112,6 +1114,31 @@ def resolve_turn(
                     delta=0,
                     reason_code=ship_reason,
                     parent_ids=("shipment", "inventory"),
+                )
+            )
+            # Truthful cash/inventory after trade (no movement)
+            nodes.append(
+                CausalNode(
+                    id="cash_after_trade",
+                    label="Cash after trade 0 (blocked)",
+                    kind="cash",
+                    before=cash,
+                    after=cash,
+                    delta=0,
+                    reason_code=ship_reason,
+                    parent_ids=("cash_after_command", "trade_revenue", "transport_cost"),
+                )
+            )
+            nodes.append(
+                CausalNode(
+                    id="inventory_after_trade",
+                    label="Inventory after trade 0 (blocked)",
+                    kind="inventory",
+                    before=inventory_final_pre_ship,
+                    after=inventory_final_pre_ship,
+                    delta=0,
+                    reason_code=ship_reason,
+                    parent_ids=("inventory", "shipment"),
                 )
             )
             effects.append(
@@ -1164,18 +1191,13 @@ def resolve_turn(
                     ship_reason = "ship_limited"
             else:
                 ship_reason = "ship_grain"
-            # For Section 5, delivered == effective (no reliability loss). Keep reliability draw consumed earlier.
-            ship_delivered = ship_effective
-            # Optionally apply reliability reduction deterministically if we want: ship_delivered = ship_effective * route_reliability_bps // 10000
-            # But to keep profit test stable, we keep delivered == effective for default 9000+ unless reliability is explicitly low.
-            # If reliability < 10000, we could still apply reduction to demonstrate property, but then capacity test needs to account.
-            # To satisfy spec "reliability" without flakiness, we apply reduction only when reliability_bps < 9000 threshold.
-            if route_reliability_bps < 9000:
-                ship_delivered = ship_effective * route_reliability_bps // 10_000
+            # Reliability applied consistently for all values; default 10000 is lossless
+            ship_delivered = ship_effective * route_reliability_bps // 10_000
             ship_revenue = (ship_delivered * river_new_price) // 1000
             ship_cost = (ship_effective * transport_cost_per_unit) // 1000
             trade_cash = ship_revenue - ship_cost
-            # Update cash and inventory
+            # Update cash and inventory — capture before values for truthful trace
+            cash_before_trade = cash
             cash_after_ship = cash + trade_cash
             inventory_final = inventory_final_pre_ship - ship_effective
             if inventory_final < 0:
@@ -1188,7 +1210,15 @@ def resolve_turn(
             value_before_ship = _value(inventory_final_pre_ship, before_price)
             value_after_ship = _value(inventory_final, before_price)
             ship_quantity_value_pre = value_after_ship - value_before_ship
-            # Emit nodes
+            # Arbitrage margin using resolved prices (for driver decision, not wealth)
+            # river_sale_value - transport_cost - resolved_home_opportunity
+            arbitrage_margin = ship_revenue - ship_cost - (ship_effective * new_price // 1000)
+            # Store for driver reasoning (attach to trace via reason_code later)
+            # Keep for later use in story drivers via closure variable
+            # Use a local to pass to driver section: we store in a variable that survives
+            # We'll stash in a deterministic way: create a node that encodes the margin
+            # (no extra node needed, just keep variable arbitrage_margin for driver)
+            # Emit nodes with truthful parents
             nodes.append(
                 CausalNode(
                     id="shipment",
@@ -1198,7 +1228,15 @@ def resolve_turn(
                     after=inventory_final,
                     delta=-ship_effective,
                     reason_code=ship_reason,
-                    parent_ids=("command", "route_capacity", "inventory"),
+                    parent_ids=(
+                        "command",
+                        "route_established",
+                        "route_capacity",
+                        "inventory",
+                        "route_cost_per_unit",
+                        "cash_after_command",
+                        "route_reliability",
+                    ),
                 )
             )
             nodes.append(
@@ -1210,7 +1248,7 @@ def resolve_turn(
                     after=ship_revenue,
                     delta=ship_revenue,
                     reason_code="trade_revenue_at_river_price",
-                    parent_ids=("shipment", "river_price"),
+                    parent_ids=("shipment", "river_price", "route_reliability"),
                 )
             )
             nodes.append(
@@ -1235,6 +1273,32 @@ def resolve_turn(
                     delta=ship_quantity_value_pre,
                     reason_code="ship_quantity_value" if ship_effective > 0 else "no_ship",
                     parent_ids=("shipment", "inventory"),
+                )
+            )
+            # Cash after trade — truthful parentage for cash_effect
+            nodes.append(
+                CausalNode(
+                    id="cash_after_trade",
+                    label=f"Cash after trade {cash_before_trade} → {cash_after_ship} (revenue {ship_revenue} cost {ship_cost})",
+                    kind="cash",
+                    before=cash_before_trade,
+                    after=cash_after_ship,
+                    delta=trade_cash,
+                    reason_code="cash_after_trade",
+                    parent_ids=("cash_after_command", "trade_revenue", "transport_cost"),
+                )
+            )
+            # Inventory after trade — truthful parent for price revaluation
+            nodes.append(
+                CausalNode(
+                    id="inventory_after_trade",
+                    label=f"Inventory after trade {inventory_final_pre_ship} → {inventory_final}",
+                    kind="inventory",
+                    before=inventory_final_pre_ship,
+                    after=inventory_final,
+                    delta=-ship_effective,
+                    reason_code=ship_reason,
+                    parent_ids=("inventory", "shipment"),
                 )
             )
             effects.append(
@@ -1296,6 +1360,7 @@ def resolve_turn(
         ship_cost = 0
         ship_reason = "no_shipment"
         trade_cash = 0
+        arbitrage_margin = 0
         ship_quantity_value_pre = 0
         nodes.append(
             CausalNode(
@@ -1318,7 +1383,7 @@ def resolve_turn(
                 after=0,
                 delta=0,
                 reason_code=ship_reason,
-                parent_ids=("shipment", "river_price"),
+                parent_ids=("shipment", "river_price", "route_reliability"),
             )
         )
         nodes.append(
@@ -1343,6 +1408,30 @@ def resolve_turn(
                 delta=0,
                 reason_code=ship_reason,
                 parent_ids=("shipment", "inventory"),
+            )
+        )
+        nodes.append(
+            CausalNode(
+                id="cash_after_trade",
+                label="Cash after trade 0 (no shipment)",
+                kind="cash",
+                before=cash,
+                after=cash,
+                delta=0,
+                reason_code=ship_reason,
+                parent_ids=("cash_after_command", "trade_revenue", "transport_cost"),
+            )
+        )
+        nodes.append(
+            CausalNode(
+                id="inventory_after_trade",
+                label="Inventory after trade 0 (no shipment)",
+                kind="inventory",
+                before=inventory_final_pre_ship,
+                after=inventory_final,
+                delta=0,
+                reason_code=ship_reason,
+                parent_ids=("inventory", "shipment"),
             )
         )
         effects.append(
@@ -1474,7 +1563,7 @@ def resolve_turn(
             after=value_after,
             delta=price_value_effect,
             reason_code="price_revalued_stored_grain",
-            parent_ids=("inventory", "price"),
+            parent_ids=("inventory_after_trade", "price"),
         )
     )
     nodes.append(
@@ -1486,7 +1575,7 @@ def resolve_turn(
             after=cash,
             delta=cash_effect,
             reason_code=cmd_reason,
-            parent_ids=("cash_after_command",),
+            parent_ids=("cash_after_trade",),
         )
     )
     nodes.append(
@@ -1670,19 +1759,28 @@ def resolve_turn(
             )
         )
 
-    # Candidate ship trade — net wealth impact of shipping (quantity loss at home price + cash revenue-cost)
+    # Candidate ship trade — net wealth impact + arbitrage margin at resolved prices
     if is_ship_command and ship_effective > 0:
         net_trade = ship_quantity_value + trade_cash
-        # Only add if net !=0 or we want to show profitable vs not
+        # arbitrage_margin uses resolved home price for opportunity cost
+        # wealth keeps ship_quantity_value at before_price, but decision uses arbitrage_margin
+        # arbitrage_margin already computed; fallback to net_trade calc if not set (should be set)
+        try:
+            margin = arbitrage_margin
+        except NameError:
+            margin = ship_revenue - ship_cost - (ship_effective * new_price // 1000)
+        # Only add if wealth net !=0 (keeps wealth-bps ranking intact); decision based on margin
         if net_trade != 0:
-            # Label depending on profitability
-            if net_trade > 0:
-                label = f"Shipped {ship_effective} grain to River Town for profit {net_trade:+} (revenue {ship_revenue} - cost {ship_cost} + quantity {ship_quantity_value:+})"
+            if margin > 0:
+                label = f"Shipped {ship_effective} grain to River Town for profit {net_trade:+} (revenue {ship_revenue} - cost {ship_cost} + quantity {ship_quantity_value:+}, arbitrage {margin:+} at resolved prices)"
                 reason = "profitable_arbitrage"
+            elif margin < 0:
+                label = f"Shipped {ship_effective} grain to River Town (net {net_trade:+}, revenue {ship_revenue} - cost {ship_cost} + quantity {ship_quantity_value:+}, arbitrage {margin:+} at resolved prices)"
+                reason = "unprofitable_shipment"
             else:
-                label = f"Shipped {ship_effective} grain to River Town (net {net_trade:+}, revenue {ship_revenue} - cost {ship_cost} + quantity {ship_quantity_value:+})"
-                reason = "unprofitable_shipment" if net_trade < 0 else "trade_arbitrage"
-            # causal path includes river price divergence
+                label = f"Shipped {ship_effective} grain to River Town break-even (revenue {ship_revenue} = cost + resolved home value)"
+                reason = "break_even_trade"
+            # causal path includes river price divergence and home price opportunity
             causal_ids = (
                 "command",
                 "shipment",
@@ -1690,6 +1788,8 @@ def resolve_turn(
                 "ship_quantity_value",
                 "trade_revenue",
                 "transport_cost",
+                "inventory_after_trade",
+                "price",
             )
             candidates.append(
                 OutcomeDriver(
@@ -1702,7 +1802,6 @@ def resolve_turn(
                     causal_node_ids=causal_ids,
                 )
             )
-        # Also handle case where net_trade ==0 but capacity limited — still show?
         elif ship_effective > 0 and net_trade == 0:
             label = f"Shipped {ship_effective} grain to River Town break-even (revenue {ship_revenue} = cost + quantity loss)"
             reason = "break_even_trade"
@@ -1718,9 +1817,7 @@ def resolve_turn(
                     causal_node_ids=causal_ids,
                 )
             )
-            # This will be filtered later (impact 0) but we keep logic; filtering happens below
-            # Actually we should not add zero-impact drivers; they will be filtered
-            candidates.pop()  # remove the zero we just added
+            candidates.pop()  # filtered zero
 
     # Candidate 2: purchase quantity value — only if purchase actually added value
     if purchase_quantity_value != 0:
