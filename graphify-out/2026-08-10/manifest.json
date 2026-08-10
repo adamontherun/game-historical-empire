@@ -35,18 +35,18 @@
     "semantic_hash": "1b031b9d77a75b18f3473b807902c35f"
   },
   "backend/app/engine/rounding.py": {
-    "mtime": 1786384179.1280117,
+    "mtime": 1786384675.6916058,
     "ast_hash": "79fb1a94c42d32e68ee6a881643adb44",
     "semantic_hash": "79fb1a94c42d32e68ee6a881643adb44"
   },
   "backend/app/engine/turn.py": {
-    "mtime": 1786383969.7012632,
+    "mtime": 1786384933.5073247,
     "ast_hash": "c0a489cd8174273eedbd20f883df835a",
     "semantic_hash": ""
   },
   "backend/pyproject.toml": {
-    "mtime": 1786383449.9561815,
-    "ast_hash": "45d9c9be86a60b0e57d6735209f78897",
+    "mtime": 1786384659.4911306,
+    "ast_hash": "abaf81eae19d0175145041426849e3ba",
     "semantic_hash": ""
   },
   "backend/tests/__init__.py": {
@@ -90,7 +90,7 @@
     "semantic_hash": "99faf0cea1d3d8ae649448899f2e1dea"
   },
   "backend/tests/test_sanity.py": {
-    "mtime": 1786384177.5296197,
+    "mtime": 1786384896.549599,
     "ast_hash": "81e2f4b128e3532ff831a358f6d1f6c4",
     "semantic_hash": "81e2f4b128e3532ff831a358f6d1f6c4"
   },
@@ -215,13 +215,13 @@
     "semantic_hash": ""
   },
   "DECISIONS.md": {
-    "mtime": 1786384050.0822477,
-    "ast_hash": "54c9eb57620346e95376ff33fc99db5e",
+    "mtime": 1786384721.6126614,
+    "ast_hash": "934480d48ff63465fd19b485f4ed713c",
     "semantic_hash": ""
   },
   "STATE.md": {
-    "mtime": 1786384032.98792,
-    "ast_hash": "7604b2d1df1ea249fc0143b07311b175",
+    "mtime": 1786384825.2507954,
+    "ast_hash": "dc6879c718af4125f5383884a534ad30",
     "semantic_hash": ""
   },
   "backend/AGENTS.md": {
@@ -280,7 +280,7 @@
     "semantic_hash": ""
   },
   "backend/app/engine/actor.py": {
-    "mtime": 1786383974.5978744,
+    "mtime": 1786384767.63477,
     "ast_hash": "9f21859c87b706f9026af14ca91e6b3e",
     "semantic_hash": ""
   },
@@ -315,8 +315,8 @@
     "semantic_hash": ""
   },
   "backend/app/domain/pressure.py": {
-    "mtime": 1786383555.6455247,
-    "ast_hash": "73a65b4c69637e9e6b2258a60d455752",
+    "mtime": 1786384960.3950024,
+    "ast_hash": "6cedb20e139e70991611e42449734d8f",
     "semantic_hash": ""
   },
   "backend/app/engine/pressure.py": {
@@ -345,7 +345,7 @@
     "semantic_hash": ""
   },
   "backend/app/engine/harness.py": {
-    "mtime": 1786383978.6301484,
+    "mtime": 1786384933.194072,
     "ast_hash": "8c35acc0cf6b58974a335360ff29f942",
     "semantic_hash": ""
   },
@@ -395,8 +395,8 @@
     "semantic_hash": ""
   },
   "backend/app/api/mappers.py": {
-    "mtime": 1786384015.1278527,
-    "ast_hash": "971021bbdf8ce90cd2b49999f3c94692",
+    "mtime": 1786384691.2516391,
+    "ast_hash": "6f9c7d29c8077569178a4f06432715c4",
     "semantic_hash": ""
   },
   "backend/app/api/router.py": {
@@ -410,8 +410,8 @@
     "semantic_hash": ""
   },
   "backend/app/api/service.py": {
-    "mtime": 1786384278.3260856,
-    "ast_hash": "05de65dcccc8af462cc452d715c1b0e3",
+    "mtime": 1786384764.4463453,
+    "ast_hash": "933b0faada86ee4eac0ba879ce3d1f5c",
     "semantic_hash": ""
   },
   "backend/app/api/sessions.py": {
@@ -425,8 +425,8 @@
     "semantic_hash": ""
   },
   "backend/tests/test_api.py": {
-    "mtime": 1786383952.5597003,
-    "ast_hash": "2f84d32f3ff4ac6fa715d7d305c37ab4",
+    "mtime": 1786384735.845616,
+    "ast_hash": "8a8c0afd887f9b5bb6e32ba7107d4c44",
     "semantic_hash": ""
   },
   "docs/plans/2026-08-10-section-10-implementation-review-round-3.md": {
@@ -447,6 +447,11 @@
   "docs/plans/2026-08-10-audit-sections-1-10-review-round-2.md": {
     "mtime": 1786384426.8829014,
     "ast_hash": "0484f386b652711c5be3b6eebdbdda02",
+    "semantic_hash": ""
+  },
+  "backend/pyrightconfig.json": {
+    "mtime": 1786384661.7976246,
+    "ast_hash": "2aa8f6d8e5c18d229ac44562fb5b84c8",
     "semantic_hash": ""
   }
 }

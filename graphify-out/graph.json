@@ -659,7 +659,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "backend_app_domain_init",
-      "community": 90,
+      "community": 85,
       "community_name": "domain/__init__.py",
       "norm_label": "domain/__init__.py"
     },
@@ -670,7 +670,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "backend_app_domain_init_rationale_1",
-      "community": 90,
+      "community": 85,
       "community_name": "domain/__init__.py",
       "norm_label": "domain package \u2014 re-exports canonical types."
     },
@@ -769,7 +769,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "backend_app_domain_trace",
-      "community": 90,
+      "community": 85,
       "community_name": "domain/__init__.py",
       "norm_label": "trace.py"
     },
@@ -780,7 +780,7 @@
       "source_location": "L40",
       "_origin": "ast",
       "id": "backend_app_domain_trace_causalnode",
-      "community": 90,
+      "community": 85,
       "community_name": "domain/__init__.py",
       "norm_label": "causalnode"
     },
@@ -835,7 +835,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "computed_field",
-      "community": 85,
+      "community": 73,
       "community_name": ".edges",
       "norm_label": "computed_field"
     },
@@ -846,7 +846,7 @@
       "source_location": "L81",
       "_origin": "ast",
       "id": "backend_app_domain_trace_causaltrace_edges",
-      "community": 85,
+      "community": 73,
       "community_name": ".edges",
       "norm_label": ".edges()"
     },
@@ -857,7 +857,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "causaledge",
-      "community": 85,
+      "community": 73,
       "community_name": ".edges",
       "norm_label": "causaledge"
     },
@@ -912,7 +912,7 @@
       "source_location": "L227",
       "_origin": "ast",
       "id": "backend_app_domain_trace_playeroutcome",
-      "community": 90,
+      "community": 85,
       "community_name": "domain/__init__.py",
       "norm_label": "playeroutcome"
     },
@@ -923,7 +923,7 @@
       "source_location": "L245",
       "_origin": "ast",
       "id": "backend_app_domain_trace_playeroutcome_top_drivers",
-      "community": 85,
+      "community": 73,
       "community_name": ".edges",
       "norm_label": ".top_drivers()"
     },
@@ -934,7 +934,7 @@
       "source_location": "L250",
       "_origin": "ast",
       "id": "backend_app_domain_trace_turnresolution",
-      "community": 90,
+      "community": 85,
       "community_name": "domain/__init__.py",
       "norm_label": "turnresolution"
     },
@@ -945,7 +945,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "backend_app_domain_trace_rationale_1",
-      "community": 90,
+      "community": 85,
       "community_name": "domain/__init__.py",
       "norm_label": "causal trace, domain effects, and player outcome for sections 4\u20135. structural..."
     },
@@ -956,7 +956,7 @@
       "source_location": "L41",
       "_origin": "ast",
       "id": "backend_app_domain_trace_rationale_41",
-      "community": 90,
+      "community": 85,
       "community_name": "domain/__init__.py",
       "norm_label": "one step in the causal chain with explicit parent links."
     },
@@ -978,7 +978,7 @@
       "source_location": "L82",
       "_origin": "ast",
       "id": "backend_app_domain_trace_rationale_82",
-      "community": 85,
+      "community": 73,
       "community_name": ".edges",
       "norm_label": "derived edges as (parent, child) tuples from parent_ids."
     },
@@ -1011,7 +1011,7 @@
       "source_location": "L228",
       "_origin": "ast",
       "id": "backend_app_domain_trace_rationale_228",
-      "community": 90,
+      "community": 85,
       "community_name": "domain/__init__.py",
       "norm_label": "concise player outcome for the turn reveal."
     },
@@ -1022,7 +1022,7 @@
       "source_location": "L246",
       "_origin": "ast",
       "id": "backend_app_domain_trace_rationale_246",
-      "community": 85,
+      "community": 73,
       "community_name": ".edges",
       "norm_label": "string view of driver labels (derived from drivers)."
     },
@@ -1033,7 +1033,7 @@
       "source_location": "L251",
       "_origin": "ast",
       "id": "backend_app_domain_trace_rationale_251",
-      "community": 90,
+      "community": 85,
       "community_name": "domain/__init__.py",
       "norm_label": "full result of resolving one turn."
     },
@@ -1110,7 +1110,7 @@
       "source_location": "L108",
       "_origin": "ast",
       "id": "backend_app_domain_types_turncontext",
-      "community": 90,
+      "community": 85,
       "community_name": "domain/__init__.py",
       "norm_label": "turncontext"
     },
@@ -1132,7 +1132,7 @@
       "source_location": "L157",
       "_origin": "ast",
       "id": "backend_app_domain_types_playercommand",
-      "community": 73,
+      "community": 2,
       "community_name": "PlayerCommand",
       "norm_label": "playercommand"
     },
@@ -1154,7 +1154,7 @@
       "source_location": "L201",
       "_origin": "ast",
       "id": "backend_app_domain_types_gamestate_to_turn_context",
-      "community": 90,
+      "community": 85,
       "community_name": "domain/__init__.py",
       "norm_label": ".to_turn_context()"
     },
@@ -1220,7 +1220,7 @@
       "source_location": "L109",
       "_origin": "ast",
       "id": "backend_app_domain_types_rationale_109",
-      "community": 90,
+      "community": 85,
       "community_name": "domain/__init__.py",
       "norm_label": "lightweight turn identity for rng derivation."
     },
@@ -1242,7 +1242,7 @@
       "source_location": "L158",
       "_origin": "ast",
       "id": "backend_app_domain_types_rationale_158",
-      "community": 73,
+      "community": 2,
       "community_name": "PlayerCommand",
       "norm_label": "player turn command \u2014 one major action per turn (sections 3\u20135, sell_grain added..."
     },
@@ -1264,7 +1264,7 @@
       "source_location": "L202",
       "_origin": "ast",
       "id": "backend_app_domain_types_rationale_202",
-      "community": 90,
+      "community": 85,
       "community_name": "domain/__init__.py",
       "norm_label": "derive turncontext for rng calls."
     },
@@ -1297,7 +1297,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "backend_app_engine_actor",
-      "community": 91,
+      "community": 90,
       "community_name": "turn.py",
       "norm_label": "actor.py"
     },
@@ -1319,7 +1319,7 @@
       "source_location": "L36",
       "_origin": "ast",
       "id": "backend_app_engine_actor_affordable_quantity",
-      "community": 91,
+      "community": 90,
       "community_name": "turn.py",
       "norm_label": "affordable_quantity()"
     },
@@ -1352,7 +1352,7 @@
       "source_location": "L69",
       "_origin": "ast",
       "id": "backend_app_engine_actor_resolve_buy",
-      "community": 91,
+      "community": 90,
       "community_name": "turn.py",
       "norm_label": "resolve_buy()"
     },
@@ -1374,7 +1374,7 @@
       "source_location": "L164",
       "_origin": "ast",
       "id": "backend_app_engine_actor_resolve_storage_settlement",
-      "community": 91,
+      "community": 90,
       "community_name": "turn.py",
       "norm_label": "resolve_storage_settlement()"
     },
@@ -1385,7 +1385,7 @@
       "source_location": "L187",
       "_origin": "ast",
       "id": "backend_app_engine_actor_resolve_shipment",
-      "community": 91,
+      "community": 90,
       "community_name": "turn.py",
       "norm_label": "resolve_shipment()"
     },
@@ -1396,7 +1396,7 @@
       "source_location": "L260",
       "_origin": "ast",
       "id": "backend_app_engine_actor_resolve_expand_farm",
-      "community": 91,
+      "community": 90,
       "community_name": "turn.py",
       "norm_label": "resolve_expand_farm()"
     },
@@ -1407,7 +1407,7 @@
       "source_location": "L279",
       "_origin": "ast",
       "id": "backend_app_engine_actor_resolve_build_granary",
-      "community": 91,
+      "community": 90,
       "community_name": "turn.py",
       "norm_label": "resolve_build_granary()"
     },
@@ -1418,7 +1418,7 @@
       "source_location": "L298",
       "_origin": "ast",
       "id": "backend_app_engine_actor_resolve_secure_route",
-      "community": 91,
+      "community": 90,
       "community_name": "turn.py",
       "norm_label": "resolve_secure_route()"
     },
@@ -1440,7 +1440,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "backend_app_engine_actor_rationale_1",
-      "community": 91,
+      "community": 90,
       "community_name": "turn.py",
       "norm_label": "shared actor-level economic primitives \u2014 section 7 extraction. single source of..."
     },
@@ -1462,7 +1462,7 @@
       "source_location": "L37",
       "_origin": "ast",
       "id": "backend_app_engine_actor_rationale_37",
-      "community": 91,
+      "community": 90,
       "community_name": "turn.py",
       "norm_label": "max quantity affordable at price_milli with cash, floored cost."
     },
@@ -1495,7 +1495,7 @@
       "source_location": "L77",
       "_origin": "ast",
       "id": "backend_app_engine_actor_rationale_77",
-      "community": 91,
+      "community": 90,
       "community_name": "turn.py",
       "norm_label": "resolve a buy_grain command using shared clamping. args: cash: cash before buy..."
     },
@@ -1517,7 +1517,7 @@
       "source_location": "L170",
       "_origin": "ast",
       "id": "backend_app_engine_actor_rationale_170",
-      "community": 91,
+      "community": 90,
       "community_name": "turn.py",
       "norm_label": "settle harvest into inventory with storage cap. returns..."
     },
@@ -1528,7 +1528,7 @@
       "source_location": "L199",
       "_origin": "ast",
       "id": "backend_app_engine_actor_rationale_199",
-      "community": 91,
+      "community": 90,
       "community_name": "turn.py",
       "norm_label": "resolve ship_grain settlement with shared clamping. uses pre-turn..."
     },
@@ -1539,7 +1539,7 @@
       "source_location": "L265",
       "_origin": "ast",
       "id": "backend_app_engine_actor_rationale_265",
-      "community": 91,
+      "community": 90,
       "community_name": "turn.py",
       "norm_label": "shared expand_farm affordability/mutation. returns (cash_after, farm_after,..."
     },
@@ -1550,7 +1550,7 @@
       "source_location": "L284",
       "_origin": "ast",
       "id": "backend_app_engine_actor_rationale_284",
-      "community": 91,
+      "community": 90,
       "community_name": "turn.py",
       "norm_label": "shared build_granary affordability/mutation. returns (cash_after,..."
     },
@@ -1561,7 +1561,7 @@
       "source_location": "L303",
       "_origin": "ast",
       "id": "backend_app_engine_actor_rationale_303",
-      "community": 91,
+      "community": 90,
       "community_name": "turn.py",
       "norm_label": "shared secure_route affordability/mutation. returns (cash_after, route_after,..."
     },
@@ -1869,7 +1869,7 @@
       "source_location": "L90",
       "_origin": "ast",
       "id": "backend_app_engine_pressure_pressure_for_world",
-      "community": 73,
+      "community": 2,
       "community_name": "PlayerCommand",
       "norm_label": "pressure_for_world()"
     },
@@ -1935,7 +1935,7 @@
       "source_location": "L91",
       "_origin": "ast",
       "id": "backend_app_engine_pressure_rationale_91",
-      "community": 73,
+      "community": 2,
       "community_name": "PlayerCommand",
       "norm_label": "return canonical test pressure for a worldcondition (g1 helper)."
     },
@@ -2947,7 +2947,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "backend_app_engine_turn",
-      "community": 91,
+      "community": 90,
       "community_name": "turn.py",
       "norm_label": "turn.py"
     },
@@ -2958,7 +2958,7 @@
       "source_location": "L74",
       "_origin": "ast",
       "id": "backend_app_engine_turn_regional_output_after_world",
-      "community": 73,
+      "community": 2,
       "community_name": "PlayerCommand",
       "norm_label": "_regional_output_after_world()"
     },
@@ -2969,7 +2969,7 @@
       "source_location": "L86",
       "_origin": "ast",
       "id": "backend_app_engine_turn_target_price",
-      "community": 100,
+      "community": 93,
       "community_name": "test_invariants.py",
       "norm_label": "_target_price()"
     },
@@ -2980,7 +2980,7 @@
       "source_location": "L103",
       "_origin": "ast",
       "id": "backend_app_engine_turn_bounded_price",
-      "community": 100,
+      "community": 93,
       "community_name": "test_invariants.py",
       "norm_label": "_bounded_price()"
     },
@@ -2991,7 +2991,7 @@
       "source_location": "L121",
       "_origin": "ast",
       "id": "backend_app_engine_turn_resolve_turn",
-      "community": 73,
+      "community": 2,
       "community_name": "PlayerCommand",
       "norm_label": "resolve_turn()"
     },
@@ -3002,7 +3002,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "backend_app_engine_turn_rationale_1",
-      "community": 91,
+      "community": 90,
       "community_name": "turn.py",
       "norm_label": "one-turn grain market kernel \u2014 sections 4\u20136, regional_output section 9...."
     },
@@ -3013,7 +3013,7 @@
       "source_location": "L75",
       "_origin": "ast",
       "id": "backend_app_engine_turn_rationale_75",
-      "community": 73,
+      "community": 2,
       "community_name": "PlayerCommand",
       "norm_label": "non-player regional output after world effect \u2014 reuses same drought primitive."
     },
@@ -3024,7 +3024,7 @@
       "source_location": "L92",
       "_origin": "ast",
       "id": "backend_app_engine_turn_rationale_92",
-      "community": 100,
+      "community": 93,
       "community_name": "test_invariants.py",
       "norm_label": "integer-safe target price from supply/demand."
     },
@@ -3035,7 +3035,7 @@
       "source_location": "L108",
       "_origin": "ast",
       "id": "backend_app_engine_turn_rationale_108",
-      "community": 100,
+      "community": 93,
       "community_name": "test_invariants.py",
       "norm_label": "bound movement toward target_price within max_movement_bps of current."
     },
@@ -3046,7 +3046,7 @@
       "source_location": "L127",
       "_origin": "ast",
       "id": "backend_app_engine_turn_rationale_127",
-      "community": 73,
+      "community": 2,
       "community_name": "PlayerCommand",
       "norm_label": "resolve one deterministic turn. order is explicit: pressure_stage -> world ->..."
     },
@@ -3621,7 +3621,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "backend_tests_test_causal_trace",
-      "community": 73,
+      "community": 2,
       "community_name": "PlayerCommand",
       "norm_label": "test_causal_trace.py"
     },
@@ -3632,7 +3632,7 @@
       "source_location": "L21",
       "_origin": "ast",
       "id": "backend_tests_test_causal_trace_base_state",
-      "community": 73,
+      "community": 2,
       "community_name": "PlayerCommand",
       "norm_label": "_base_state()"
     },
@@ -3643,7 +3643,7 @@
       "source_location": "L50",
       "_origin": "ast",
       "id": "backend_tests_test_causal_trace_test_every_important_node_has_parent_including_valuation",
-      "community": 73,
+      "community": 2,
       "community_name": "PlayerCommand",
       "norm_label": "test_every_important_node_has_parent_including_valuation()"
     },
@@ -3654,7 +3654,7 @@
       "source_location": "L134",
       "_origin": "ast",
       "id": "backend_tests_test_causal_trace_test_trace_immutable_tuples",
-      "community": 73,
+      "community": 2,
       "community_name": "PlayerCommand",
       "norm_label": "test_trace_immutable_tuples()"
     },
@@ -3665,7 +3665,7 @@
       "source_location": "L162",
       "_origin": "ast",
       "id": "backend_tests_test_causal_trace_test_wealth_decomposition_exact",
-      "community": 73,
+      "community": 2,
       "community_name": "PlayerCommand",
       "norm_label": "test_wealth_decomposition_exact()"
     },
@@ -3676,7 +3676,7 @@
       "source_location": "L208",
       "_origin": "ast",
       "id": "backend_tests_test_causal_trace_test_wealth_graph_parents",
-      "community": 73,
+      "community": 2,
       "community_name": "PlayerCommand",
       "norm_label": "test_wealth_graph_parents()"
     },
@@ -3687,7 +3687,7 @@
       "source_location": "L230",
       "_origin": "ast",
       "id": "backend_tests_test_causal_trace_test_drivers_derived_from_trace_not_snapshot",
-      "community": 73,
+      "community": 2,
       "community_name": "PlayerCommand",
       "norm_label": "test_drivers_derived_from_trace_not_snapshot()"
     },
@@ -3698,7 +3698,7 @@
       "source_location": "L257",
       "_origin": "ast",
       "id": "backend_tests_test_causal_trace_test_driver_ranking_deterministic_exact_wealth_bps",
-      "community": 73,
+      "community": 2,
       "community_name": "PlayerCommand",
       "norm_label": "test_driver_ranking_deterministic_exact_wealth_bps()"
     },
@@ -3709,7 +3709,7 @@
       "source_location": "L290",
       "_origin": "ast",
       "id": "backend_tests_test_causal_trace_test_story_drivers_are_paths_and_filtered",
-      "community": 73,
+      "community": 2,
       "community_name": "PlayerCommand",
       "norm_label": "test_story_drivers_are_paths_and_filtered()"
     },
@@ -3731,7 +3731,7 @@
       "source_location": "L490",
       "_origin": "ast",
       "id": "backend_tests_test_causal_trace_test_rng_context_mismatch_raises",
-      "community": 73,
+      "community": 2,
       "community_name": "PlayerCommand",
       "norm_label": "test_rng_context_mismatch_raises()"
     },
@@ -3742,7 +3742,7 @@
       "source_location": "L501",
       "_origin": "ast",
       "id": "backend_tests_test_causal_trace_test_storage_capped_zero_quantity_effect",
-      "community": 73,
+      "community": 2,
       "community_name": "PlayerCommand",
       "norm_label": "test_storage_capped_zero_quantity_effect()"
     },
@@ -3753,7 +3753,7 @@
       "source_location": "L536",
       "_origin": "ast",
       "id": "backend_tests_test_causal_trace_test_buy_quantity_split_no_false_harvest_story",
-      "community": 73,
+      "community": 2,
       "community_name": "PlayerCommand",
       "norm_label": "test_buy_quantity_split_no_false_harvest_story()"
     },
@@ -3764,7 +3764,7 @@
       "source_location": "L564",
       "_origin": "ast",
       "id": "backend_tests_test_causal_trace_test_turn_order_includes_valuation",
-      "community": 73,
+      "community": 2,
       "community_name": "PlayerCommand",
       "norm_label": "test_turn_order_includes_valuation()"
     },
@@ -3775,7 +3775,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "backend_tests_test_causal_trace_rationale_1",
-      "community": 73,
+      "community": 2,
       "community_name": "PlayerCommand",
       "norm_label": "section 4 \u2014 causal trace hardening, exact wealth decomposition, and story..."
     },
@@ -3786,7 +3786,7 @@
       "source_location": "L51",
       "_origin": "ast",
       "id": "backend_tests_test_causal_trace_rationale_51",
-      "community": 73,
+      "community": 2,
       "community_name": "PlayerCommand",
       "norm_label": "ac #1: every important mutated node has parents, including valuation subgraph."
     },
@@ -3797,7 +3797,7 @@
       "source_location": "L163",
       "_origin": "ast",
       "id": "backend_tests_test_causal_trace_rationale_163",
-      "community": 73,
+      "community": 2,
       "community_name": "PlayerCommand",
       "norm_label": "wealth delta must equal cash + purchase + harvest + price effects exactly."
     },
@@ -3808,7 +3808,7 @@
       "source_location": "L231",
       "_origin": "ast",
       "id": "backend_tests_test_causal_trace_rationale_231",
-      "community": 73,
+      "community": 2,
       "community_name": "PlayerCommand",
       "norm_label": "drivers must reference trace nodes, not snapshot diff."
     },
@@ -3819,7 +3819,7 @@
       "source_location": "L291",
       "_origin": "ast",
       "id": "backend_tests_test_causal_trace_rationale_291",
-      "community": 73,
+      "community": 2,
       "community_name": "PlayerCommand",
       "norm_label": "drivers must be causal paths, not single nodes, and zero-impact stories..."
     },
@@ -3830,7 +3830,7 @@
       "source_location": "L502",
       "_origin": "ast",
       "id": "backend_tests_test_causal_trace_rationale_502",
-      "community": 73,
+      "community": 2,
       "community_name": "PlayerCommand",
       "norm_label": "if storage is full, quantity value effect should be zero and driver discarded."
     },
@@ -3841,7 +3841,7 @@
       "source_location": "L537",
       "_origin": "ast",
       "id": "backend_tests_test_causal_trace_rationale_537",
-      "community": 73,
+      "community": 2,
       "community_name": "PlayerCommand",
       "norm_label": "farm 0 buy must not produce a harvest story \u2014 quantity is entirely purchase."
     },
@@ -4248,7 +4248,7 @@
       "source_location": "L464",
       "_origin": "ast",
       "id": "backend_tests_test_deterministic_rivals_test_player_market_isolation",
-      "community": 73,
+      "community": 2,
       "community_name": "PlayerCommand",
       "norm_label": "test_player_market_isolation()"
     },
@@ -4391,7 +4391,7 @@
       "source_location": "L465",
       "_origin": "ast",
       "id": "backend_tests_test_deterministic_rivals_rationale_465",
-      "community": 73,
+      "community": 2,
       "community_name": "PlayerCommand",
       "norm_label": "rivals must not mutate shared market availability \u2014 player supply same as..."
     },
@@ -4556,7 +4556,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "backend_tests_test_explanation",
-      "community": 73,
+      "community": 2,
       "community_name": "PlayerCommand",
       "norm_label": "test_explanation.py"
     },
@@ -4567,7 +4567,7 @@
       "source_location": "L10",
       "_origin": "ast",
       "id": "backend_tests_test_explanation_state",
-      "community": 73,
+      "community": 2,
       "community_name": "PlayerCommand",
       "norm_label": "_state()"
     },
@@ -4578,7 +4578,7 @@
       "source_location": "L37",
       "_origin": "ast",
       "id": "backend_tests_test_explanation_test_drought_to_wealth_structural_chain_exact",
-      "community": 73,
+      "community": 2,
       "community_name": "PlayerCommand",
       "norm_label": "test_drought_to_wealth_structural_chain_exact()"
     },
@@ -4589,7 +4589,7 @@
       "source_location": "L130",
       "_origin": "ast",
       "id": "backend_tests_test_explanation_test_story_drivers_cover_wealth_chain",
-      "community": 73,
+      "community": 2,
       "community_name": "PlayerCommand",
       "norm_label": "test_story_drivers_cover_wealth_chain()"
     },
@@ -4600,7 +4600,7 @@
       "source_location": "L153",
       "_origin": "ast",
       "id": "backend_tests_test_explanation_test_concise_le_three_full_trace_preserved",
-      "community": 73,
+      "community": 2,
       "community_name": "PlayerCommand",
       "norm_label": "test_concise_le_three_full_trace_preserved()"
     },
@@ -4611,7 +4611,7 @@
       "source_location": "L178",
       "_origin": "ast",
       "id": "backend_tests_test_explanation_test_normal_vs_drought_different_drivers",
-      "community": 73,
+      "community": 2,
       "community_name": "PlayerCommand",
       "norm_label": "test_normal_vs_drought_different_drivers()"
     },
@@ -4622,7 +4622,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "backend_tests_test_explanation_rationale_1",
-      "community": 73,
+      "community": 2,
       "community_name": "PlayerCommand",
       "norm_label": "section 4 \u2014 multi-step drought to wealth chain tests."
     },
@@ -4633,7 +4633,7 @@
       "source_location": "L38",
       "_origin": "ast",
       "id": "backend_tests_test_explanation_rationale_38",
-      "community": 73,
+      "community": 2,
       "community_name": "PlayerCommand",
       "norm_label": "drought chain must be structurally present via parent_ids and exact wealth math."
     },
@@ -4644,7 +4644,7 @@
       "source_location": "L179",
       "_origin": "ast",
       "id": "backend_tests_test_explanation_rationale_179",
-      "community": 73,
+      "community": 2,
       "community_name": "PlayerCommand",
       "norm_label": "same command, different world should produce different driver impacts."
     },
@@ -4952,7 +4952,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "backend_tests_test_invariants",
-      "community": 100,
+      "community": 93,
       "community_name": "test_invariants.py",
       "norm_label": "test_invariants.py"
     },
@@ -4974,7 +4974,7 @@
       "source_location": "L26",
       "_origin": "ast",
       "id": "backend_tests_test_invariants_test_target_price_monotonic_in_supply",
-      "community": 100,
+      "community": 93,
       "community_name": "test_invariants.py",
       "norm_label": "test_target_price_monotonic_in_supply()"
     },
@@ -4985,7 +4985,7 @@
       "source_location": "L45",
       "_origin": "ast",
       "id": "backend_tests_test_invariants_test_bounded_price_monotonic_with_supply",
-      "community": 100,
+      "community": 93,
       "community_name": "test_invariants.py",
       "norm_label": "test_bounded_price_monotonic_with_supply()"
     },
@@ -4996,7 +4996,7 @@
       "source_location": "L74",
       "_origin": "ast",
       "id": "backend_tests_test_invariants_test_demand_unchanged_cannot_reduce_target_when_supply_falls",
-      "community": 100,
+      "community": 93,
       "community_name": "test_invariants.py",
       "norm_label": "test_demand_unchanged_cannot_reduce_target_when_supply_falls()"
     },
@@ -5007,7 +5007,7 @@
       "source_location": "L86",
       "_origin": "ast",
       "id": "backend_tests_test_invariants_test_resolve_turn_monotonic_via_engine",
-      "community": 100,
+      "community": 93,
       "community_name": "test_invariants.py",
       "norm_label": "test_resolve_turn_monotonic_via_engine()"
     },
@@ -5029,7 +5029,7 @@
       "source_location": "L135",
       "_origin": "ast",
       "id": "backend_tests_test_invariants_test_price_stays_positive_extreme",
-      "community": 100,
+      "community": 93,
       "community_name": "test_invariants.py",
       "norm_label": "test_price_stays_positive_extreme()"
     },
@@ -5040,7 +5040,7 @@
       "source_location": "L144",
       "_origin": "ast",
       "id": "backend_tests_test_invariants_test_responsiveness_zero_gives_base_price",
-      "community": 100,
+      "community": 93,
       "community_name": "test_invariants.py",
       "norm_label": "test_responsiveness_zero_gives_base_price()"
     },
@@ -5051,7 +5051,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "backend_tests_test_invariants_rationale_1",
-      "community": 100,
+      "community": 93,
       "community_name": "test_invariants.py",
       "norm_label": "invariant and property tests for section 3 \u2014 ac #2, #4."
     },
@@ -5403,7 +5403,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "backend_tests_test_turn_kernel",
-      "community": 73,
+      "community": 2,
       "community_name": "PlayerCommand",
       "norm_label": "test_turn_kernel.py"
     },
@@ -5414,7 +5414,7 @@
       "source_location": "L10",
       "_origin": "ast",
       "id": "backend_tests_test_turn_kernel_base_state",
-      "community": 73,
+      "community": 2,
       "community_name": "PlayerCommand",
       "norm_label": "_base_state()"
     },
@@ -5425,7 +5425,7 @@
       "source_location": "L39",
       "_origin": "ast",
       "id": "backend_tests_test_turn_kernel_test_determinism_same_inputs_same_result",
-      "community": 73,
+      "community": 2,
       "community_name": "PlayerCommand",
       "norm_label": "test_determinism_same_inputs_same_result()"
     },
@@ -5436,7 +5436,7 @@
       "source_location": "L54",
       "_origin": "ast",
       "id": "backend_tests_test_turn_kernel_test_determinism_seed_matters_only_via_context",
-      "community": 73,
+      "community": 2,
       "community_name": "PlayerCommand",
       "norm_label": "test_determinism_seed_matters_only_via_context()"
     },
@@ -5447,7 +5447,7 @@
       "source_location": "L71",
       "_origin": "ast",
       "id": "backend_tests_test_turn_kernel_test_turn_increments_and_no_negatives",
-      "community": 73,
+      "community": 2,
       "community_name": "PlayerCommand",
       "norm_label": "test_turn_increments_and_no_negatives()"
     },
@@ -5458,7 +5458,7 @@
       "source_location": "L93",
       "_origin": "ast",
       "id": "backend_tests_test_turn_kernel_test_drought_reduces_farm_output_and_supply_not_direct_price",
-      "community": 73,
+      "community": 2,
       "community_name": "PlayerCommand",
       "norm_label": "test_drought_reduces_farm_output_and_supply_not_direct_price()"
     },
@@ -5469,7 +5469,7 @@
       "source_location": "L136",
       "_origin": "ast",
       "id": "backend_tests_test_turn_kernel_test_drought_price_not_direct_mutation_grep",
-      "community": 73,
+      "community": 2,
       "community_name": "PlayerCommand",
       "norm_label": "test_drought_price_not_direct_mutation_grep()"
     },
@@ -5480,7 +5480,7 @@
       "source_location": "L149",
       "_origin": "ast",
       "id": "backend_tests_test_turn_kernel_test_farm_output_parents_are_world_and_farm_capacity_not_command",
-      "community": 73,
+      "community": 2,
       "community_name": "PlayerCommand",
       "norm_label": "test_farm_output_parents_are_world_and_farm_capacity_not_command()"
     },
@@ -5491,7 +5491,7 @@
       "source_location": "L180",
       "_origin": "ast",
       "id": "backend_tests_test_turn_kernel_test_buy_beyond_cash_is_clamped",
-      "community": 73,
+      "community": 2,
       "community_name": "PlayerCommand",
       "norm_label": "test_buy_beyond_cash_is_clamped()"
     },
@@ -5502,7 +5502,7 @@
       "source_location": "L202",
       "_origin": "ast",
       "id": "backend_tests_test_turn_kernel_test_buy_beyond_storage_is_clamped",
-      "community": 73,
+      "community": 2,
       "community_name": "PlayerCommand",
       "norm_label": "test_buy_beyond_storage_is_clamped()"
     },
@@ -5513,7 +5513,7 @@
       "source_location": "L220",
       "_origin": "ast",
       "id": "backend_tests_test_turn_kernel_test_every_major_change_has_trace_entry",
-      "community": 73,
+      "community": 2,
       "community_name": "PlayerCommand",
       "norm_label": "test_every_major_change_has_trace_entry()"
     },
@@ -5524,7 +5524,7 @@
       "source_location": "L239",
       "_origin": "ast",
       "id": "backend_tests_test_turn_kernel_test_hold_does_not_change_capacities",
-      "community": 73,
+      "community": 2,
       "community_name": "PlayerCommand",
       "norm_label": "test_hold_does_not_change_capacities()"
     },
@@ -5535,7 +5535,7 @@
       "source_location": "L249",
       "_origin": "ast",
       "id": "backend_tests_test_turn_kernel_test_expand_farm_consumes_cash_and_increases_capacity",
-      "community": 73,
+      "community": 2,
       "community_name": "PlayerCommand",
       "norm_label": "test_expand_farm_consumes_cash_and_increases_capacity()"
     },
@@ -5546,7 +5546,7 @@
       "source_location": "L265",
       "_origin": "ast",
       "id": "backend_tests_test_turn_kernel_test_build_granary_increases_storage",
-      "community": 73,
+      "community": 2,
       "community_name": "PlayerCommand",
       "norm_label": "test_build_granary_increases_storage()"
     },
@@ -5557,7 +5557,7 @@
       "source_location": "L273",
       "_origin": "ast",
       "id": "backend_tests_test_turn_kernel_test_price_bounded_movement",
-      "community": 73,
+      "community": 2,
       "community_name": "PlayerCommand",
       "norm_label": "test_price_bounded_movement()"
     },
@@ -5568,7 +5568,7 @@
       "source_location": "L287",
       "_origin": "ast",
       "id": "backend_tests_test_turn_kernel_test_turn_order_constant",
-      "community": 73,
+      "community": 2,
       "community_name": "PlayerCommand",
       "norm_label": "test_turn_order_constant()"
     },
@@ -5579,7 +5579,7 @@
       "source_location": "L294",
       "_origin": "ast",
       "id": "backend_tests_test_turn_kernel_test_player_outcome_drivers_deterministic_and_bounded",
-      "community": 73,
+      "community": 2,
       "community_name": "PlayerCommand",
       "norm_label": "test_player_outcome_drivers_deterministic_and_bounded()"
     },
@@ -5590,7 +5590,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "backend_tests_test_turn_kernel_rationale_1",
-      "community": 73,
+      "community": 2,
       "community_name": "PlayerCommand",
       "norm_label": "section 3 kernel tests \u2014 ac #1,3,4,5,6."
     },
@@ -5601,7 +5601,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "backend_tests_test_two_markets_route",
-      "community": 73,
+      "community": 2,
       "community_name": "PlayerCommand",
       "norm_label": "test_two_markets_route.py"
     },
@@ -5612,7 +5612,7 @@
       "source_location": "L25",
       "_origin": "ast",
       "id": "backend_tests_test_two_markets_route_base_state",
-      "community": 73,
+      "community": 2,
       "community_name": "PlayerCommand",
       "norm_label": "_base_state()"
     },
@@ -5623,7 +5623,7 @@
       "source_location": "L74",
       "_origin": "ast",
       "id": "backend_tests_test_two_markets_route_test_two_markets_can_have_different_prices",
-      "community": 73,
+      "community": 2,
       "community_name": "PlayerCommand",
       "norm_label": "test_two_markets_can_have_different_prices()"
     },
@@ -5634,7 +5634,7 @@
       "source_location": "L99",
       "_origin": "ast",
       "id": "backend_tests_test_two_markets_route_test_transport_cost_can_make_apparent_price_difference_unprofitable",
-      "community": 73,
+      "community": 2,
       "community_name": "PlayerCommand",
       "norm_label": "test_transport_cost_can_make_apparent_price_difference_unprofitable()"
     },
@@ -5645,7 +5645,7 @@
       "source_location": "L149",
       "_origin": "ast",
       "id": "backend_tests_test_two_markets_route_test_route_capacity_constrains_trade_volume",
-      "community": 73,
+      "community": 2,
       "community_name": "PlayerCommand",
       "norm_label": "test_route_capacity_constrains_trade_volume()"
     },
@@ -5656,7 +5656,7 @@
       "source_location": "L174",
       "_origin": "ast",
       "id": "backend_tests_test_two_markets_route_test_profitable_arbitrage_emerges_from_market_conditions_not_script",
-      "community": 73,
+      "community": 2,
       "community_name": "PlayerCommand",
       "norm_label": "test_profitable_arbitrage_emerges_from_market_conditions_not_script()"
     },
@@ -5667,7 +5667,7 @@
       "source_location": "L252",
       "_origin": "ast",
       "id": "backend_tests_test_two_markets_route_test_player_can_remain_entirely_in_home_valley",
-      "community": 73,
+      "community": 2,
       "community_name": "PlayerCommand",
       "norm_label": "test_player_can_remain_entirely_in_home_valley()"
     },
@@ -5678,7 +5678,7 @@
       "source_location": "L284",
       "_origin": "ast",
       "id": "backend_tests_test_two_markets_route_test_all_results_remain_deterministic",
-      "community": 73,
+      "community": 2,
       "community_name": "PlayerCommand",
       "norm_label": "test_all_results_remain_deterministic()"
     },
@@ -5689,7 +5689,7 @@
       "source_location": "L320",
       "_origin": "ast",
       "id": "backend_tests_test_two_markets_route_test_secure_route_creates_trade_access",
-      "community": 73,
+      "community": 2,
       "community_name": "PlayerCommand",
       "norm_label": "test_secure_route_creates_trade_access()"
     },
@@ -5700,7 +5700,7 @@
       "source_location": "L349",
       "_origin": "ast",
       "id": "backend_tests_test_two_markets_route_test_ship_requires_route_access",
-      "community": 73,
+      "community": 2,
       "community_name": "PlayerCommand",
       "norm_label": "test_ship_requires_route_access()"
     },
@@ -5711,7 +5711,7 @@
       "source_location": "L367",
       "_origin": "ast",
       "id": "backend_tests_test_two_markets_route_test_turn_order_string",
-      "community": 73,
+      "community": 2,
       "community_name": "PlayerCommand",
       "norm_label": "test_turn_order_string()"
     },
@@ -5722,7 +5722,7 @@
       "source_location": "L377",
       "_origin": "ast",
       "id": "backend_tests_test_two_markets_route_test_wealth_decomposition_still_exact_with_route",
-      "community": 73,
+      "community": 2,
       "community_name": "PlayerCommand",
       "norm_label": "test_wealth_decomposition_still_exact_with_route()"
     },
@@ -5733,7 +5733,7 @@
       "source_location": "L403",
       "_origin": "ast",
       "id": "backend_tests_test_two_markets_route_test_arbitrage_uses_resolved_home_price_not_before",
-      "community": 73,
+      "community": 2,
       "community_name": "PlayerCommand",
       "norm_label": "test_arbitrage_uses_resolved_home_price_not_before()"
     },
@@ -5744,7 +5744,7 @@
       "source_location": "L444",
       "_origin": "ast",
       "id": "backend_tests_test_two_markets_route_test_trade_causal_graph_truthful",
-      "community": 73,
+      "community": 2,
       "community_name": "PlayerCommand",
       "norm_label": "test_trade_causal_graph_truthful()"
     },
@@ -5755,7 +5755,7 @@
       "source_location": "L489",
       "_origin": "ast",
       "id": "backend_tests_test_two_markets_route_test_reliability_and_delay_semantics",
-      "community": 73,
+      "community": 2,
       "community_name": "PlayerCommand",
       "norm_label": "test_reliability_and_delay_semantics()"
     },
@@ -5766,7 +5766,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "backend_tests_test_two_markets_route_rationale_1",
-      "community": 73,
+      "community": 2,
       "community_name": "PlayerCommand",
       "norm_label": "section 5 \u2014 two markets and one trade route acceptance tests. ac 1: home valley..."
     },
@@ -5777,7 +5777,7 @@
       "source_location": "L75",
       "_origin": "ast",
       "id": "backend_tests_test_two_markets_route_rationale_75",
-      "community": 73,
+      "community": 2,
       "community_name": "PlayerCommand",
       "norm_label": "ac1: home and river can have different prices from same underlying grain."
     },
@@ -5788,7 +5788,7 @@
       "source_location": "L100",
       "_origin": "ast",
       "id": "backend_tests_test_two_markets_route_rationale_100",
-      "community": 73,
+      "community": 2,
       "community_name": "PlayerCommand",
       "norm_label": "ac2: transport cost can erase apparent arbitrage profit."
     },
@@ -5799,7 +5799,7 @@
       "source_location": "L150",
       "_origin": "ast",
       "id": "backend_tests_test_two_markets_route_rationale_150",
-      "community": 73,
+      "community": 2,
       "community_name": "PlayerCommand",
       "norm_label": "ac3: route capacity limits shipped quantity."
     },
@@ -5810,7 +5810,7 @@
       "source_location": "L175",
       "_origin": "ast",
       "id": "backend_tests_test_two_markets_route_rationale_175",
-      "community": 73,
+      "community": 2,
       "community_name": "PlayerCommand",
       "norm_label": "ac4: profitability depends on market supply/demand divergence, not scripted..."
     },
@@ -5821,7 +5821,7 @@
       "source_location": "L253",
       "_origin": "ast",
       "id": "backend_tests_test_two_markets_route_rationale_253",
-      "community": 73,
+      "community": 2,
       "community_name": "PlayerCommand",
       "norm_label": "ac5: player can complete turn staying in home valley (no trade)."
     },
@@ -5832,7 +5832,7 @@
       "source_location": "L285",
       "_origin": "ast",
       "id": "backend_tests_test_two_markets_route_rationale_285",
-      "community": 73,
+      "community": 2,
       "community_name": "PlayerCommand",
       "norm_label": "ac6: same state+command+world+seed => identical result, including river and..."
     },
@@ -5843,7 +5843,7 @@
       "source_location": "L321",
       "_origin": "ast",
       "id": "backend_tests_test_two_markets_route_rationale_321",
-      "community": 73,
+      "community": 2,
       "community_name": "PlayerCommand",
       "norm_label": "command that creates trade access must be deterministic and cost cash."
     },
@@ -5854,7 +5854,7 @@
       "source_location": "L350",
       "_origin": "ast",
       "id": "backend_tests_test_two_markets_route_rationale_350",
-      "community": 73,
+      "community": 2,
       "community_name": "PlayerCommand",
       "norm_label": "ship without established route should be blocked and not move grain."
     },
@@ -5865,7 +5865,7 @@
       "source_location": "L368",
       "_origin": "ast",
       "id": "backend_tests_test_two_markets_route_rationale_368",
-      "community": 73,
+      "community": 2,
       "community_name": "PlayerCommand",
       "norm_label": "turn_order must include river and route phases and valuation."
     },
@@ -5876,7 +5876,7 @@
       "source_location": "L378",
       "_origin": "ast",
       "id": "backend_tests_test_two_markets_route_rationale_378",
-      "community": 73,
+      "community": 2,
       "community_name": "PlayerCommand",
       "norm_label": "wealth delta must remain exact with route: cash + purchase+harvest+ship + price."
     },
@@ -5887,7 +5887,7 @@
       "source_location": "L404",
       "_origin": "ast",
       "id": "backend_tests_test_two_markets_route_rationale_404",
-      "community": 73,
+      "community": 2,
       "community_name": "PlayerCommand",
       "norm_label": "regression: old home 5.00 new 6.00 river 6.24 transport 0.80 -> old says +0.44..."
     },
@@ -5898,7 +5898,7 @@
       "source_location": "L445",
       "_origin": "ast",
       "id": "backend_tests_test_two_markets_route_rationale_445",
-      "community": 73,
+      "community": 2,
       "community_name": "PlayerCommand",
       "norm_label": "fix 2: cash_effect via cash_after_trade, price_value_effect via..."
     },
@@ -5909,7 +5909,7 @@
       "source_location": "L490",
       "_origin": "ast",
       "id": "backend_tests_test_two_markets_route_rationale_490",
-      "community": 73,
+      "community": 2,
       "community_name": "PlayerCommand",
       "norm_label": "fix 3: reliability consistent for all values, default lossless, delay..."
     },
@@ -7537,7 +7537,7 @@
       "source_location": "L80",
       "_origin": "ast",
       "id": "build_spec_part_i_product_north_star",
-      "community": 2,
+      "community": 91,
       "community_name": "Part I \u2014 Product North Star",
       "norm_label": "part i \u2014 product north star"
     },
@@ -7548,7 +7548,7 @@
       "source_location": "L82",
       "_origin": "ast",
       "id": "build_spec_1_product_thesis",
-      "community": 2,
+      "community": 91,
       "community_name": "Part I \u2014 Product North Star",
       "norm_label": "1. product thesis"
     },
@@ -7559,7 +7559,7 @@
       "source_location": "L146",
       "_origin": "ast",
       "id": "build_spec_2_signature_design_rule",
-      "community": 2,
+      "community": 91,
       "community_name": "Part I \u2014 Product North Star",
       "norm_label": "2. signature design rule"
     },
@@ -7570,7 +7570,7 @@
       "source_location": "L184",
       "_origin": "ast",
       "id": "build_spec_3_the_long_term_hook",
-      "community": 2,
+      "community": 91,
       "community_name": "Part I \u2014 Product North Star",
       "norm_label": "3. the long-term hook"
     },
@@ -40861,5 +40861,5 @@
     }
   ],
   "hyperedges": [],
-  "built_at_commit": "6a191aea209d0d2e85836e5fe1dcd8e862c7138c"
+  "built_at_commit": "efd16fd32a7e2773e078fbc023c76d54f495ff5e"
 }
