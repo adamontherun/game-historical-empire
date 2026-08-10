@@ -90,13 +90,15 @@
   "88": "Section 9 — review round 4 (consolidated, final) — SUPERSEDES rounds 2 and 3",
   "89": "Orchestration Guide — how BUILD_SPEC sections get built",
   "90": "test_causal_trace.py",
-  "91": "turn.py",
+  "91": "test_invariants.py",
   "92": "rivals.py",
   "93": "apply_rival_command",
   "94": "Part VIII — Agent Guardrails",
   "95": "api/__init__.py",
-  "96": "PressureState",
+  "96": "GameState",
   "97": "RivalProfile",
   "98": "test_engine_purity.py",
-  "99": "Section 10 implementation — review round 3"
+  "99": "Section 10 implementation — review round 3",
+  "100": "test_explanation.py",
+  "101": "default_start_state"
 }
