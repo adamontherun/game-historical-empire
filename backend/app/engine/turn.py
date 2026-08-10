@@ -1235,7 +1235,6 @@ def resolve_turn(
                         "inventory",
                         "route_cost_per_unit",
                         "cash_after_command",
-                        "route_reliability",
                     ),
                 )
             )

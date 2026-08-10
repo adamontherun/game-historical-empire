@@ -439,14 +439,14 @@ def test_trade_causal_graph_truthful() -> None:
     # price_value_effect must parent inventory_after_trade
     assert nodes["price_value_effect"].parent_ids == ("inventory_after_trade", "price")
     assert nodes["inventory_after_trade"].parent_ids == ("inventory", "shipment")
-    # shipment must structurally depend on all limiters
+    # shipment must structurally depend on all limiters (reliability affects delivery, not quantity shipped)
     assert "command" in nodes["shipment"].parent_ids
     assert "route_established" in nodes["shipment"].parent_ids
     assert "route_capacity" in nodes["shipment"].parent_ids
     assert "inventory" in nodes["shipment"].parent_ids
     assert "route_cost_per_unit" in nodes["shipment"].parent_ids
     assert "cash_after_command" in nodes["shipment"].parent_ids
-    assert "route_reliability" in nodes["shipment"].parent_ids
+    assert "route_reliability" not in nodes["shipment"].parent_ids
     # trade_revenue must parent route_reliability
     assert "route_reliability" in nodes["trade_revenue"].parent_ids
     assert "river_price" in nodes["trade_revenue"].parent_ids
