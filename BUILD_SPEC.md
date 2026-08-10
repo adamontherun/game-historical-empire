@@ -1453,7 +1453,7 @@ Stop when the five-turn game is comfortably playable and understandable in the b
 
 # SECTION 12 — First Human Playtest and Refinement Gate
 
-**Status:** BLOCKED — AWAITING HUMAN PLAYTEST
+**Status:** SKIPPED — product owner opted to play directly instead of running facilitated sessions (2026-08-10). Not a gate on Section 14.
 
 ## Goal
 
@@ -1545,7 +1545,7 @@ Do not advance by adding features to hide a weak decision loop.
 
 # SECTION 13 — City & Craft Transition Epilogue
 
-**Status:** NOT STARTED
+**Status:** COMPLETE (mechanism) — AC1 statistical demonstration deferred to post-playtest tuning
 
 ## Goal
 

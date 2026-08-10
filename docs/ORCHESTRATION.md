@@ -246,9 +246,12 @@ commit the regenerated `graphify-out/` artifacts.
 
 ## 8. Known upcoming blockers
 
-- **Section 12 — First Human Playtest.** Requires real humans playing and reporting
-  expectations vs. outcomes. Cannot be completed autonomously. Build up to it, prepare the
-  playtest script and instrumentation, hand it over, and continue to Section 13+ rather
-  than stalling.
 - **Section 19 — Authentication.** Requires a deliberate 13+ vs. reviewed child-privacy
   decision before public release. Implement and document; the product owner ratifies.
+
+**Section 12 is no longer a blocker.** The product owner skipped the formal facilitated
+playtest (2026-08-10) in favour of playing it themselves. Do not treat it as a gate, do not
+schedule sessions, and do not hold Section 14 for it — Section 14's "only after the five-turn
+loop and regime-shift hook test well" is satisfied by the owner's own pass. Owner feedback
+from direct play is the signal; take it as you would playtest observations and apply the
+`BUILD_SPEC §12` classification if it is substantial.
