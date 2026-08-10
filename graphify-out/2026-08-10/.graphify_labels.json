@@ -91,7 +91,7 @@
   "89": "Orchestration Guide — how BUILD_SPEC sections get built",
   "90": "2. SHOULD-FIX",
   "91": "App.tsx",
-  "92": "test_two_markets_route.py",
+  "92": "StrategicSummary",
   "93": "default_start_state",
   "94": "@eslint/js",
   "95": "api/__init__.py",
@@ -103,6 +103,7 @@
   "101": "compilerOptions",
   "102": "Audit — Sections 1–10, Consolidated Review Round 2",
   "103": "typescript",
+  "104": "_regional_output_after_world",
   "105": "devDependencies",
   "106": "scripts",
   "107": "compilerOptions",
@@ -113,7 +114,7 @@
   "112": "test_no_float_in_rival_scoring",
   "113": "@playwright/test",
   "114": "prettier",
-  "115": "@testing-library/jest-dom",
+  "115": "test_rival_state_has_no_headline",
   "116": "@testing-library/user-event",
   "117": "@types/node",
   "118": "@types/react-dom",
@@ -125,5 +126,5 @@
   "126": "setup.ts",
   "127": "vite.config.ts",
   "128": "vitest.config.ts",
-  "129": "test_rival_state_has_no_headline"
+  "130": "@testing-library/jest-dom"
 }

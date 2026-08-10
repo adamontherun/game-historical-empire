@@ -1453,7 +1453,7 @@ Stop when the five-turn game is comfortably playable and understandable in the b
 
 # SECTION 12 — First Human Playtest and Refinement Gate
 
-**Status:** NOT STARTED
+**Status:** BLOCKED — AWAITING HUMAN PLAYTEST
 
 ## Goal
 

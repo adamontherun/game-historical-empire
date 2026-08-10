@@ -2,9 +2,9 @@
 
 > Handoff snapshot for Muse / human. Concise and current, not a history log.
 
-## Section 11 — COMPLETE (2026-08-10) — Mobile-First React Playable
+## Section 12 — BLOCKED — AWAITING HUMAN PLAYTEST (2026-08-10) — Run-record instrumentation
 
-**Vertical slice:** Vite + React + TypeScript + TanStack Query single-column playable (390×844 excellent, desktop 480px centred) with phase-selected `data-pressure` theming, verb cards with verbatim quantities + exact `id` submit, `hold` cost 0 via `cost !== null`, staged outcome reveal (7 beats, `latest_outcome.*` + top-level `rival_headlines` + `signal` hand-off, `0→delta` anim, `Home price` label, `Current route spread` quote, drivers `impact_money` only), empire tableau 3 independent rows (no arrows), market cards `price / grain` + Availability + Demand (R2), StartScreen `Begin` + `Age of Grain · Chapter I` + `seed · rules` footer, `format.ts` as only `/1000`/`/10000` site, `committingRef` + `isPending` double-submit guard, fifth reveal before completion (B2), `displayPressure` phase-selected (B3), `expected_revision: game.revision` (B4), all 8 AC plus 4 screenshots + console-error guard verified via Playwright.
+**Instrumentation only (ORCHESTRATION.md §8):** Section 12 cannot be completed autonomously — requires real humans playing and reporting expectations vs. outcomes. This commit closes the one replayability gap named in the prompt: the ordered committed `choice_id`s were recorded nowhere. Frontend now accumulates exact server-provided ids in `App.tsx` local state (`committedIds: string[]`) and shows a pasteable run record on the completion screen (`seed`, `ruleset_version`, ordered ids) plus a "Copy run record" button with `navigator.clipboard` + textarea/execCommand fallback that never throws or logs a console error (AC7). No backend changes, no persistence, no analytics, no network calls — everything is local component state discarded on reload. Decision surface / outcome reveal / tableau untouched. `docs/playtest/` facilitator script is owned by the product owner. Section 12 stays BLOCKED until real observations arrive and the three highest-impact fixes are made.
 
 ### What exists
 
@@ -53,7 +53,7 @@ frontend/
   playwright.config.ts         # two projects mobile 390×844 + desktop 1280×800, webServer backend+frontend
   src/
     main.tsx
-    App.tsx                    # phase machine start→decision→reveal→completion (B2), displayPressure phase-selected (B3), committingRef guard (B8), revision: game.revision (B4)
+    App.tsx                    # phase machine start→decision→reveal→completion (B2), displayPressure phase-selected (B3), committingRef guard (B8), revision: game.revision (B4), committedIds: string[] Section 12 instrumentation (exact id, order, local state, reset on Begin/PlayAgain)
     api/
       client.ts                # createGame/getGame/commitChoice (expected_revision)
       types.ts                 # GameView shapes
@@ -61,6 +61,7 @@ frontend/
     lib/
       format.ts                # money/pricePerUnit/percent — ONLY /1000 & /10000 site (K2)
       tableau.ts               # 3 independent rows (R1): estate farm≥15, storage≥180, trade route
+      runRecord.ts             # Section 12: formatRunRecord(seed, rules, choiceIds) → "seed=… rules=… choices=…"
     components/
       StartScreen.tsx          # R8 Begin + R9 Age of Grain · Chapter I
       HeaderBar.tsx            # turn pips Turn n of 5, cash format.money
@@ -72,7 +73,7 @@ frontend/
       RivalsStrip.tsx          # B5: rival_headlines resolved context, empty state turn 0
       DecisionBlock.tsx        # B1: group by kind, qty verbatim, exact id submit
       OutcomeReveal.tsx        # B2/B5/B7/R6/R7: 7 beats data-reveal-beat/state, drivers impact_money, Home price, from 0
-      CompletionSummary.tsx    # R10: hero wealth, total change, estate, run record, rivals, seed·rules
+      CompletionSummary.tsx    # R10: hero wealth, total change, estate, run record, rivals, seed·rules + Section 12 run-record-replay block + Copy run record (clipboard with fallback, no console error)
       FooterDebug.tsx          # R12: seed · rules
     styles/
       tokens.css               # --market-home/--market-river identity + --page-ground atmosphere + [data-pressure] + font stacks R11 + tabular-nums
@@ -83,18 +84,20 @@ frontend/
       decisionBlock.test.tsx   # 5 tests inc. verbatim {7,999} (B1), hold cost 0 (B6), 9→6 cards
       commit.test.tsx          # 1 test synthetic turn 2 rev 7 → 7 (B4) — vestigial removed J3
       outcomeReveal.test.tsx   # B7 magnitude
+      runRecord.test.tsx       # Section 12: 4 tests — formatRunRecord verbatim+order, reconstruction fails, copy fallback no throw/no console.error, replay block contains seed/rules/ids
   e2e/
-    critical.spec.ts           # 4 tests: full 5-turn mobile (expand→granary S2, 4 viewport 390×844 J1 mobile-only, B2/B3/B5/B6/B7/B9), desktop smoke, AC2 no table, AC4 rivals; B8 sync double-click, no waitForTimeout, console+pageerror
+    critical.spec.ts           # 4 tests: full 5-turn mobile (expand→granary S2, 4 viewport 390×844 J1 mobile-only, B2/B3/B5/B6/B7/B9), desktop smoke, AC2 no table, AC4 rivals; B8 sync double-click, no waitForTimeout, console+pageerror + Section 12 run-record-replay asserts seed/rules + 5 ids in order + Copy button
     screenshots/
       first-decision.png        # 390×844 viewport J1 scrolled top — J2 0% (static bar, was 82%)
       drought-warning.png       # turn 2 worsening_dry — viewport J1 1073×2321@2.75x
       drought-reveal.png        # after turn 3: header aftermath vs reveal drought B3 — viewport J1
       final-summary.png         # turn 5 R10 — viewport J1
-  dist/                        # vite build output (rebuilt, 7.50kB css)
+  dist/                        # vite build output
 Makefile                       # test/lint/type/format-check + front-type/front-lint/front-test/front-e2e + check-all
 docs/plans/2026-08-10-section-11-mobile-react-playable.md  # plan revised for B1–B9 + R1–R12 + S1–S2
 docs/plans/2026-08-10-section-11-design-direction.md      # partially superseded banner (review wins)
 docs/plans/2026-08-10-section-11-review-round-1.md        # consolidated review (9 blocking, 12 rulings)
+docs/plans/2026-08-10-section-12-playtest-gate.md        # Section 12 instrumentation plan — committedIds + run-record + copy fallback + tests
 ```
 
 ### Boundaries
@@ -107,33 +110,34 @@ docs/plans/2026-08-10-section-11-review-round-1.md        # consolidated review 
 - Drivers top-3 with residual NOT represented (B7) — no stacked bar, `impact_bps` is magnitude, colour from `impact_money`. `price_delta` is Home price (R6), delta animates `0→delta` (R7), `command_quantity` is requested (R5).
 - Pure engine boundary: `engine`+`domain` no `fastapi`/`alembic`/`app.api`; `tableau()` pure with 3 independent rows (R1) thresholds `farm≥15`/`storage≥180`/`route` (B9 exact before/after + negative hold flat).
 - `Makefile` now has `front-type/front-lint/front-test/front-e2e` plus `make check-all` per S1 — `ORCHESTRATION.md` §4 verification is `make test && make lint && make type && make format-check` plus frontend via `check-all`.
+- Section 12 instrumentation: ordered `choice_id`s accumulated in `App.tsx` local state (`committedIds`) from the exact `selectedId` sent to the server (never reconstructed), reset on Begin/PlayAgain, discarded on reload. Run record `seed=… rules=… choices=…` rendered in `CompletionSummary` (`data-testid="run-record-replay"`) with `Copy run record` (`data-testid="copy-run-record"`) using `navigator.clipboard` with textarea/execCommand fallback; handler swallows errors, logs no console error (AC7). No backend changes, no persistence, no telemetry, no network calls.
 
 ### Normal verification
 
 ```bash
-make test              # 150 passed, 1 warning in 2.01s
+make test              # 150 passed, 1 warning in 2.06s
 make lint              # All checks passed!
 make type              # 0 errors, 0 warnings, 0 informations — 38 files analyzed
 make format-check      # 39 files already formatted
 make front-type        # tsc --noEmit — 0 errors
 make front-lint        # eslint . --ext .ts,.tsx — 0 problems (no-restricted-syntax, no waitForTimeout)
-make front-test        # vitest run — 5 passed (5), 25 passed (25) — J3 vestigial removed (was 26)
+make front-test        # vitest run — 6 passed (6), 29 passed (29) — 4 new in runRecord.test.tsx
 make check-all         # backend + frontend gates green — check-all: backend + frontend gates green
 # e2e (via npx playwright test)
-# — 8 passed (4 mobile 390×844 + 4 desktop 1280×800, 43.5s) — full 5-turn mobile (expand→granary, 4 viewport screenshots J1 1073×2321@2.75x, scrolled top, desktop no longer overwrites), drought-warning turn2 worsening_dry, drought-reveal B3 header aftermath vs reveal drought, final-summary R10; J2 0% occlusion at scroll 0 (static bar, verb 8px, tap target fully visible, was 82%/98%), J4 route single calm river line with sign-coloured spread only, B1 verbatim, B6 sell no Cost, B8 sync double-click requestCount 1, no waitForTimeout, console+pageerror zero
+# — 8 passed (4 mobile 390×844 + 4 desktop 1280×800, 45.0s) — full 5-turn mobile (expand→granary, 4 viewport screenshots, run-record-replay asserts seed/rules + 5 ids in order + Copy button click no console error), drought-warning turn2 worsening_dry, drought-reveal B3 header aftermath vs reveal drought, final-summary R10; J2 0% occlusion, B8 sync double-click requestCount 1, no waitForTimeout, console+pageerror zero
 ```
 
 ### Last known green
 
 ```
-pytest 150 passed in 2.01s (1 warning: StarletteDeprecationWarning)
+pytest 150 passed in 2.06s (1 warning: StarletteDeprecationWarning)
 ruff check All checks passed!
 pyright 0 errors, 0 warnings, 0 informations — 38 files analyzed
 ruff format --check 39 files already formatted
 tsc --noEmit — 0 errors (frontend)
 eslint — 0 problems (no-restricted-syntax for /1000 and /10000 outside format.ts, no waitForTimeout)
-vitest — 5 passed (5), 25 passed (25) — J3 vestigial removed, B4 revision 7 vs turn 2 + B7 impact_money mutation-proven
-playwright — 8 passed (4 mobile 390×844 + 4 desktop 1280×800) — 43.5s — screenshots: first-decision.png 1073×2321 viewport J1 0% occlusion (static bar), drought-warning.png turn2 worsening_dry viewport, drought-reveal.png header aftermath vs reveal drought B3 viewport, final-summary.png turn5 R10 viewport; J4 route single line river colour sign-only
+vitest — 6 passed (6), 29 passed (29) — 4 new Section 12 runRecord tests
+playwright — 8 passed (4 mobile 390×844 + 4 desktop 1280×800) — 45.0s — full 5-turn + run-record-replay seed/rules + ordered ids + Copy run record click, no console errors
 check-all: backend + frontend gates green
 ```
 
@@ -149,8 +153,8 @@ check-all: backend + frontend gates green
 
 ### Intentionally missing
 
-History endpoint, SQLAlchemy/Alembic/Postgres, auth, LLM, `render.yaml` cloud deploy. Section 12 human playtest remains autonomous-blocked.
+History endpoint, SQLAlchemy/Alembic/Postgres, auth, LLM, `render.yaml` cloud deploy. Section 12 human playtest remains BLOCKED — awaiting real observations (ORCHESTRATION.md §8).
 
 ### Next milestone
 
-Section 12 First Human Playtest and Refinement Gate — requires real humans; prepare playtest script + instrumentation and proceed to Section 13+ rather than stall per `ORCHESTRATION.md` §8.
+Section 12 remains BLOCKED — AWAITING HUMAN PLAYTEST. Facilitator script is owned by product owner (`docs/playtest/`). When written observations arrive, classify each per §12 and fix only the three highest-impact problems. No new goods/turns/rivals/DB/auth/LLM. After handover, proceed to Section 13 City & Craft Transition Epilogue.
