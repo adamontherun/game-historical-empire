@@ -1,5 +1,21 @@
 # Section 11 — Design Direction (Claude, design authority)
 
+> ⚠️ **PARTIALLY SUPERSEDED by `2026-08-10-section-11-review-round-1.md`.** Independent review
+> found five errors in this document. Where the two disagree, **the review wins**:
+>
+> | here | corrected |
+> |---|---|
+> | §0.4 "8 choices across 5 verbs" | 8 across **6** verbs; simultaneous max 9 across 6 |
+> | §1.2 root `data-pressure` from top-level `pressure_stage` | must be **phase-selected** — the reveal reads `latest_outcome.pressure_stage`, else the drought reveal paints in aftermath colours (review B3) |
+> | §3 "cost or proceeds" | `ChoiceView.cost` is `null` for sell/ship and `0` for hold — label is authoritative (review B6) |
+> | §5 drivers "top-3 + residual" | residual is **not** represented; `sum(impact_money) ≠ wealth_delta` in 2 of 5 measured turns (review B7) |
+> | §5 deltas "count from the previous value" | these are deltas — animate from **0** (review R7) |
+> | §3 rationale "DECISIONS 017 is the more recent and more specific authority" | wrong per `BUILD_SPEC §0.2` — the active numbered section **outranks** `DECISIONS.md`; reframed in review §4 |
+>
+> Also missing here and added by the review: `revision ≠ turn` (B4), the fifth commit returns
+> both an outcome and a completion summary (B2), and rulings R1–R12 on the under-specified
+> visual items.
+
 > Input to the Section 11 plan, not the plan itself. Authority: `docs/ORCHESTRATION.md` §5
 > — "Claude owns game-design judgment" and "when UI sections arrive (11, 20), actively drive
 > visual design and consistency."
