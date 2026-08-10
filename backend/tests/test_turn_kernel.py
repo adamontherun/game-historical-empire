@@ -287,7 +287,7 @@ def test_price_bounded_movement() -> None:
 def test_turn_order_constant() -> None:
     assert (
         TURN_ORDER
-        == "pressure_stage -> world -> command -> production -> home_supply -> river_supply -> home_price -> river_price -> settlement -> route_settlement -> valuation"
+        == "pressure_stage -> world -> command -> production -> regional_output -> home_supply -> river_supply -> home_price -> river_price -> settlement -> route_settlement -> valuation"
     )
 
 

@@ -123,7 +123,50 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument(
         "--verbose", action="store_true", help="show full causal trace and domain effects"
     )
+    parser.add_argument(
+        "--balance",
+        action="store_true",
+        help="run balance harness (hundreds of games, reports dominance)",
+    )
+    parser.add_argument(
+        "--seeds", type=int, default=200, help="number of seeds for --balance (default 200)"
+    )
+    parser.add_argument("--seed-prefix", default="harness", help="seed prefix for --balance")
+    parser.add_argument("--json-out", default=None, help="write balance JSON to path")
+    parser.add_argument("--balance-version", default="1.0", help="ruleset version for --balance")
     args = parser.parse_args(argv)
+
+    # Balance harness path
+    if args.balance:
+        from app.engine.harness import BatchConfig, format_markdown, run_batch, to_json
+
+        config = BatchConfig(
+            seed_prefix=args.seed_prefix, n_seeds=args.seeds, version=args.balance_version
+        )
+        result = run_batch(config)
+        print(format_markdown(result))
+        if args.json_out:
+            Path(args.json_out).write_text(to_json(result))
+            print(f"\nJSON written to {args.json_out}", file=sys.stderr)
+        # Exit 2 on any gate breach (reported, not hard assert — see plan Rev2)
+        if not (
+            result.dominant_gate_pass
+            and result.dead_gate_pass
+            and result.price_gate_pass
+            and result.negativity_gate_pass
+        ):
+            reasons: list[str] = []
+            if not result.dominant_gate_pass:
+                reasons.append(f"dominant {result.dominant_reason}")
+            if not result.dead_gate_pass:
+                reasons.append(f"dead {result.dead_reason}")
+            if not result.price_gate_pass:
+                reasons.append("price out of bounds")
+            if not result.negativity_gate_pass:
+                reasons.append("negative state")
+            print(f"FAIL: {'; '.join(reasons)}", file=sys.stderr)
+            return 2
+        return 0
 
     game = FiveTurnGame(seed=args.seed, version=args.version)
 

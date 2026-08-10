@@ -2,9 +2,9 @@
 
 > Handoff snapshot for Muse / human. Concise and current, not a history log.
 
-## Section 8 — COMPLETE (2026-08-10)
+## Section 9 — COMPLETE (2026-08-10)
 
-**Pressure-driven event arc (Rev 4 — turn-derived pressure, mechanism-isolated warning, G1–G6 fixes):** Small coherent `normal→early_dry→worsening_dry→drought→aftermath` arc via **`backend/app/domain/pressure.py` + `backend/app/engine/pressure.py`** — `PressureStage` literal + frozen `PressureState{pressure_id, stage, activation_turn, world, signal, title, causal_source_id}` (exactly 7 fields, no `world_modifiers`), validator `mode="before"` populates `causal_source_id` + `mode="after"` enforces biconditional `stage=="drought" <=> world=="drought"` (F2) and `causal_source_id == f"pressure:{id}:{stage}"` single source (F3/G6), `PRESSURE_ARC` hard-coded 5 entries (activation_turn==index) with truthful rainfall prose (T2 `"Grain remains abundant, but the rains have begun to fail."` / T3 `"The dry spell persists. Farmers warn the next harvest is at risk."`, title keeps `Surplus`), reused via `pressure_for_turn(idx)` + `next_world_known_for_turn(idx)` (only `worsening_dry→drought`, not prose parsing), plus reusable `PRESSURE_NORMAL`/`PRESSURE_DROUGHT`/`pressure_for_world` constants for headless callers (G1). `TURN_SPECS` now **derived** `tuple(TurnSpec(world=p.world, signal=p.signal, title=p.title) for p in PRESSURE_ARC)` (single source), `FiveTurnGame` **session-authored** pressure (not canonical `GameState`): `submit` reads `pressure_for_turn(idx)` → `resolve_turn(state, command, pressure: PressureState, ctx)` (world derived internally), `current_pressure: PressureState|None` (`None` when `is_complete`, else `pressure_for_turn(len(history))`; `pressure_for_turn(5)` raises), `current_signal/title` mirror pressure; **systemic** impact preserved: `resolve_turn` emits leading `pressure_stage` node (`kind="pressure"`, `delta=None`, `label` stage-derived like `"Early dry conditions"` not title `"Surplus"` (G5), `reason_code=pressure.causal_source_id` directly, not recomputed) parent of `world` (`pressure_stage→world→farm_output→home_supply→home_price→…→wealth`), no direct pressure→price edge, reuse `actor.compute_farm_output` (40%), no new RNG/loader/weighted sampler. **Mechanism-isolated AC1/AC3 instrument (F1):** both histories share T1 `hold` (timing-isolated) and avoid `expand_farm` in either arm (market-isolated) — `prep=[hold, build_granary, buy_grain:20, hold, hold]` vs `unprep=[hold, hold, hold, hold, hold]` on `seed-8-useful`: T4 `supply 100==100`, `price 4750==4750`, `farm_output 60==60` (identical shock, proven by equality pre-condition), yet `price_value_effect 130 vs 104` (delta 26), `inventory 250 vs 200`, `wealth 130 vs 104` — fully affordable (no `insufficient_*`), threshold-free. No legacy string shim — `resolve_turn` requires `PressureState`, G1 migrated ~72 call sites via `PRESSURE_NORMAL`/`PRESSURE_DROUGHT`/`pressure_for_world` (no `type: ignore` for union). `trace.py` validator not loosened — fallback `delta is None` already admits `pressure` kind (R3). TURN_ORDER now `pressure_stage -> world -> command -> production -> home_supply -> river_supply -> home_price -> river_price -> settlement -> route_settlement -> valuation`. CLI now displays pressure stage per turn (`TURN … [stage]` and `World: … Pressure: …`) and `StrategicSummary.format()` appends `T2 Surplus [early_dry]` etc. (G2).
+**Headless Strategy and Balance Harness — regional_output economy + harness (Rev 2):** Fixed universally dominant "hold" pathology by adding non-player regional production. **`backend/app/domain/types.py` now `MarketState{..., regional_output: Quantity=0}`** (Home only, River stays 0). **`backend/app/engine/turn.py` supply `signal_next = max(0, signal + regional_after + farm_output - demand)`** where `regional_after` reuses **same `DROUGHT_YIELD_REDUCTION_BPS=4000` via `_regional_output_after_world`** (no second formula). **`backend/app/engine/prototype.py` retuned `default_start_state` to `regional_output 360 + farm 10*10=100 =460, player 21.7% (15–25%), supply 280 demand 400 (surplus ~60, roughly stable), responsiveness 4000 (was 5000), storage 400 (was 200, cap was binding)** — demand stable, price within [2000,9000], production not dead. Trace now `pressure_stage -> world -> regional_output (parent world) -> home_supply (parents regional_output,farm_output,home_demand) -> home_price` alongside `farm_output -> home_supply`; drought felt even with `farm_capacity=0` via regional (price 6000 both hit cap but supply 96 vs 240, regional 216 vs 360). `TURN_ORDER` extended to `pressure_stage -> world -> command -> production -> regional_output -> home_supply -> ... -> valuation`. **New `backend/app/engine/harness.py`** pure sync — 5 policies (`production_heavy` expand once, `storage_heavy` granary+buy20×2, `trade_heavy` route+buy10+ship, `cash_preserving` hold×5, `random_legal` uniform affordable via `rng_for`), `BatchConfig{n_seeds,seed_prefix,version}`, `run_batch` deterministic, `format_markdown`/`to_json` stable, gates: dominant `max_median/second <1.60`, dead `median≥0.70*overall` (no win_rate floor — deterministic win_rate is 0/1 by construction, seed variation from `random_legal` only), price `[2000,9000]`, negativity no <0, largest swing ≤2500, determinism double-run equality. **CLI `backend/app/cli.py --balance --seeds 200 --seed-prefix harness --json-out`** prints markdown table, writes stable JSON, exit 2 on breach (reported first, now blocking since economy passes). No bare-string `resolve_turn` — harness delegates via `FiveTurnGame` (no `world: str` overload). Balance table (200 seeds ×5 =1000 games, final tuned constants): `production 2073` `storage 2752` `trade 2624` `cash 3008` `random 2117` — `max_median 3008/second 2752 ratio 1.09 PASS`, `dead PASS` (prod 2073 ≥0.70*2624=1836), `price 3657-5381 PASS`, `negativity PASS`. Existing tests updated legitimately (TURN_ORDER + regional_output, supply 110→340/70→156, rival diffs 3→5 with new market) — no deleted/loosened invariants.
 
 ### What exists
 
@@ -13,35 +13,37 @@ backend/
   app/
     __init__.py
     domain/
-      __init__.py            # re-exports domain + pressure (PressureStage/PressureState)
-      types.py               # Money/... + GameState(Home+river+route)+RouteState+PlayerCommand(6 verbs) frozen ge=0
-      trace.py               # CausalNode(tuple parents)/CausalTrace/OutcomeDriver/PlayerOutcome/TurnResolution frozen (validator unchanged — pressure admitted via delta None fallback)
-      pressure.py            # NEW Section 8: PressureStage Literal + PressureState frozen 7 fields, validator stage<=>world + causal_source_id single source, turn-derived not canonical
+      __init__.py            # re-exports domain + pressure
+      types.py               # Money/... + MarketState{..., regional_output=0}+RouteState+PlayerCommand frozen (regional_output added Section 9)
+      trace.py               # CausalNode/CausalTrace/OutcomeDriver frozen (validator unchanged — pressure+regional_output via delta None / production)
+      pressure.py            # PressureStage + PressureState 7 fields, biconditional + causal_source_id single source
     engine/
-      __init__.py            # re-exports RNG+rounding+resolve_turn/TURN_ORDER + PRESSURE_ARC/pressure_for_turn/next_world_known/world_for_turn
+      __init__.py            # re-exports RNG+rounding+resolve_turn/TURN_ORDER+PRESSURE_ARC + harness BatchConfig/run_batch
       rng.py                 # derive_seed/make_rng/rng_for — JSON canonical -> blake2b
       rounding.py            # mul_basis_points/div_round_half_up/clamp_non_negative
-      actor.py               # Shared primitives: YIELD_PER_CAPACITY/DROUGHT_BPS/COSTS + compute_farm_output/resolve_buy/resolve_storage_settlement/resolve_shipment/resolve_expand_farm/resolve_build_granary/resolve_secure_route/value_for/cost_for_quantity
-      turn.py                # resolve_turn(state, command, pressure:PressureState, rng_context) — pressure_stage root (reason_code=causal_source_id, label stage-derived not title (G5)) → world→production→…→valuation; world derived; no shim (G1)
-      pressure.py            # NEW Section 8: PRESSURE_ARC 5 hard-coded (normal→early_dry→worsening_dry→drought→aftermath, truthful rainfall prose, T2 title Surplus), PRESSURE_NORMAL/DROUGHT constants + pressure_for_world helper (G1), pressure_for_turn/next_world_known/world_for_turn, activation_turn==index validated at import, no RNG/loader
-      rivals.py              # Deterministic rivals: RivalProfile(farm-averse/hungry prefs bps)/RivalState/RivalTurnResult/ObservableContext/SettlementContext + integer/bps scoring (threat boost only on worsening_dry→drought via next_world_known_for_turn from pressure), apply_rival_command via actor primitives
-      prototype.py           # FiveTurnGame(state, history, rival_history, turn_limit=5, PRESSURE_ARC single source, TURN_SPECS derived, default_start_state Home 100/90/5000 River 80/130/5200 route 800/20/10000 storage200, turn==0 enforced, current_pressure None when complete, pressure_for_turn/next_world_known_for_turn, two-phase submit(choose pre→resolve player pressure→settle rivals), run->summary, StrategicSummary+_wealth)
-      cli.py                 # Thin CLI: interactive + --choices non-interactive, per-turn display turn/signal/player HOME/RIVER ROUTE + pressure stage [stage] per turn (G2) + strategic summary T2 ... [early_dry], after-commit 6 MONTHS LATER wealth/inventory/price WHY? drivers + MIRA/DARAN headlines (derived), --verbose adds rival details, ends STRATEGIC SUMMARY with rival lines
-      demo.py                # Single-turn demo (demand 90) — builds PressureState for world param (pressure_stage with stage-derived label G5)
+      actor.py               # Shared primitives: YIELD_PER_CAPACITY/DROUGHT_BPS/COSTS + compute_farm_output/resolve_* (single source)
+      turn.py                # resolve_turn(state, command, pressure:PressureState, ctx) — pressure_stage->world->farm_output+regional_output->home_supply->home_price...; world derived; _regional_output_after_world reuses DROUGHT_BPS; TURN_ORDER includes regional_output; no shim
+      pressure.py            # PRESSURE_ARC 5 hard-coded (normal→early_dry→worsening_dry→drought→aftermath) + PRESSURE_NORMAL/DROUGHT + pressure_for_world/pressure_for_turn/next_world_known
+      rivals.py              # Deterministic rivals via actor primitives, integer/bps scoring, structured threat
+      prototype.py           # FiveTurnGame(state,history,rival_history, turn_limit=5, PRESSURE_ARC single source, TURN_SPECS derived, default_start_state Home 280/400/5000/4000 regional360 River 80/130/5200 storage400, turn==0, current_pressure, two-phase submit)
+      harness.py             # NEW Section 9: BatchConfig/SeedResult/PolicyAggregate/BatchResult, 5 policies, run_batch deterministic, format_markdown/to_json, gates median-ratio/dead/price/negativity
+      cli.py                 # CLI: interactive + --choices non-interactive + --balance harness (markdown+JSON, exit 2 on breach)
+      demo.py                # Single-turn demo via PressureState
   tests/
     test_sanity.py
     test_engine_purity.py
     test_core_types.py
     test_determinism.py
     test_rounding.py
-    test_turn_kernel.py         # TURN_ORDER updated to pressure_stage->world->...
+    test_turn_kernel.py         # TURN_ORDER includes regional_output
     test_invariants.py
-    test_causal_trace.py        # world now child of pressure_stage; TURN_ORDER updated; world parent_ids == ("pressure_stage",)
+    test_causal_trace.py        # TURN_ORDER includes regional_output
     test_explanation.py
     test_two_markets_route.py
-    test_five_turn_prototype.py # TURN_SPECS derived, titles/signals preserved (abundant/Surplus)
+    test_five_turn_prototype.py # supply 340/156 with regional, parents include regional_output
     test_deterministic_rivals.py
-    test_pressure_arc.py        # NEW Section 8 AC1-5: arc 5 order + signals, 7-field exact, stage/world biconditional (F2) + causal_source_id single source (F3), warning-isolated+mechanism-isolated AC1+AC3 (hold+granary+buy vs hold*5 on seed-8-useful: supply 100==100 price 4750==4750 farm 60==60 yet price_value 130 vs 104 inv 250 vs 200), drought systemic chain pressure→world→farm→supply→price (no direct edge), determinism/inspectability (current_pressure None when complete, pressure_for_turn raises), structural smallness (no json/weighted/sampler, 5 only), threat only on worsening
+    test_pressure_arc.py        # warning-isolated still equality, now with regional supply equality
+    test_balance_harness.py     # NEW Section 9: 8 tests — harness 200 games <5s, median-ratio dominant/dead, negativity, price bounds, swing, determinism double-run, no bare-string, regional truthful (farm 0 drought via regional)
   pyproject.toml             # uv project: pytest + ruff + pyright strict + pydantic>=2.7
   uv.lock
   .venv/
@@ -49,8 +51,8 @@ Makefile
 .gitignore
 .python-version              # 3.12 (root only)
 AGENTS.md / backend/AGENTS.md / frontend/AGENTS.md
-DECISIONS.md (001-012)
-BUILD_SPEC.md Status: Sections 1-8 COMPLETE
+DECISIONS.md (001-013)
+BUILD_SPEC.md Status: Sections 1-9 COMPLETE
 docs/plans/
   2026-08-09-section-1-walking-skeleton.md
   2026-08-09-section-2-core-types.md
@@ -58,48 +60,51 @@ docs/plans/
   2026-08-09-section-4-causal-explanation.md
   2026-08-09-section-5-two-markets-route.md
   2026-08-09-section-6-five-turn-prototype.md  # Rev2
-  2026-08-09-section-7-deterministic-rivals.md  # Rev2 shared primitives, two-phase timing, bps integer, structured threat
-  2026-08-10-section-8-pressure-driven-event-arc.md  # Rev4 mechanism-isolated (F1), biconditional (F2), single source causal_source_id (F3), pressure.py location (F4), closeout (F5)
+  2026-08-09-section-7-deterministic-rivals.md  # Rev2
+  2026-08-10-section-8-pressure-driven-event-arc.md  # Rev4
+  2026-08-10-section-9-balance-harness.md  # Rev2 (regional_output fix, median-ratio gates, reported-first)
+  2026-08-10-section-8-review-round-1.md
+  2026-08-10-section-8-review-round-2.md
+  2026-08-10-section-8-review-round-3.md
+  2026-08-10-section-9-review-round-1.md
 frontend/                    # placeholder for Section 11
 docs/
-graphify-out/                # graph.json 965 nodes/1668 edges, GRAPH_REPORT updated via graphify update .
+graphify-out/                # graph.json 1180 nodes/2100 edges, GRAPH_REPORT via graphify update .
 ```
 
 ### Boundaries
 
-- `backend/app/engine` and `backend/app/domain` are pure: no `fastapi`, `sqlalchemy`, `httpx`, `asyncpg`, `openai`, `clerk`. Enforced by AST rglob test. `pydantic` allowed. `domain/pressure.py` holds PressureStage/PressureState (frozen, validator stage<=>world + causal_source_id); `engine/pressure.py` holds hard-coded PRESSURE_ARC (5, truthful prose, activation_turn==index) + pressure_for_turn/next_world_known/world_for_turn (no RNG/loader); `engine/turn.py` keeps `_target_price/_bounded_price`/supply signal + trace + pressure_stage root (reason_code=pressure.causal_source_id, parent of world); `engine/rivals.py` owns scoring/headlines via `next_world_known_for_turn` from pressure stage; `engine/prototype.py` owns session and PRESSURE_ARC-derived TURN_SPECS + current_pressure (None when complete).
-- Canonical state frozen with immutable tuples; `PressureState` frozen 7 fields, `activation_turn 0..4`, validator `stage=="drought" <=> world=="drought"` (early_dry+drought and worsening_dry+drought and drought+normal all raise); `causal_source_id` default `f"pressure:{id}:{stage}"` and explicit mismatch raises; no `world_modifiers`; pressure is **turn-derived/session-authored** (R1/F2) — not in `GameState`, deterministically `pressure_for_turn(state.turn)`, so `GameState` remains canonical without duplication.
-- Home supply remains signal `max(0, signal+farm_output-demand)` on `signal_next`, demand nodes in graph; River stable. `TURN_ORDER` now `pressure_stage -> world -> command -> production -> home_supply -> river_supply -> home_price -> river_price -> settlement -> route_settlement -> valuation` (updated in turn.py and tests). Rivals **do not mutate** shared `GameState.market.supply` (isolation); their production is private via `resolve_storage_settlement`. Shared constants/costs/clamping live in `actor.py`.
-- FiveTurnGame session-owned: `state:GameState` + `history:5` + `_rivals:{mira,daran}` + `_rival_history:5×(Mira,Daran)`; calls `resolve_turn` once per submit with `pressure_for_turn(idx)`, validates `rng_context`, enforces `turn==0`, determinism via choices+seed. `PRESSURE_ARC` 5 truthful signals (T2 `"Grain remains abundant, but the rains have begun to fail."` keeps `abundant` substring + title `Surplus`; T3 worsening, T4 drought, T5 aftermath), `current_pressure` mirrors `current_spec` (`None` when complete, else `pressure_for_turn(len(history))`), threat derived as `next_world_known_for_turn(idx)==drought` only on `worsening_dry` (idx 2), never by parsing `signal`. Causal trace pressure chain `pressure_stage (reason_code=causal_source_id, kind=pressure, delta None, parent_ids ()) -> world (parent pressure_stage) -> farm_output (drought_reduced_yield, parent world) -> supply -> price (no direct pressure→price edge) -> … -> wealth`; `trace.py` validator not modified — pressure admitted via delta None fallback (R3).
-- Wealth exact with revaluation: `quantity_value_effect = value(after, pre)-value(before, pre)`, `price_value_effect = value(after, resolved)-value(after, pre)`, `wealth_delta = cash+qty+price`; mechanism-isolated AC1/AC3 proves same market shock (T4 supply 100==100 price 4750==4750 farm 60==60) yet different exposure (price_value 130 vs 104, inv 250 vs 200, wealth 130 vs 104 on seed-8-useful, threshold-free, affordable).
-- Determinism choices+seed via `rng_for` and `pressure_for_turn(idx)` (no global random, no `hash()`); no `world_modifiers`/JSON loader/weighted sampler/DSL.
+- `backend/app/engine` and `backend/app/domain` are pure: no `fastapi`, `sqlalchemy`, `httpx`, `asyncpg`, `openai`, `clerk`. Enforced by AST rglob test. `pydantic` allowed. `domain/types.py` MarketState now `supply/demand/regional_output/base_price/current_price/responsiveness/max_movement_bps`; `engine/pressure.py` hard-coded PRESSURE_ARC + helpers; `engine/turn.py` keeps `_target_price/_bounded_price` + `regional_output` node + `home_supply` parents `(regional_output,farm_output,home_demand)` and `TURN_ORDER` with `regional_output`; `engine/rivals.py` scoring via `next_world_known`; `engine/prototype.py` session-owned and `default_start_state` now `supply 280/demand 400/regional 360/responsiveness 4000/storage 400` (was 100/90/5000/200) — player 21.7% share, demand ~stable (+60), price 3657-5381 within [2000,9000]; `engine/harness.py` pure batch runner via `FiveTurnGame` (no bare string).
+- Canonical state frozen; `MarketState.regional_output` ge=0 default 0; supply `signal_next = max(0, signal + regional_after + farm_output - demand)` with `regional_after` via same `DROUGHT_YIELD_REDUCTION_BPS` (single formula); demand nodes in graph; River stable exogenous. `TURN_ORDER` now `pressure_stage -> world -> command -> production -> regional_output -> home_supply -> river_supply -> home_price -> river_price -> settlement -> route_settlement -> valuation`.
+- FiveTurnGame session-owned: `state:GameState` + `history:5` + `_rivals` + `_rival_history:5×(Mira,Daran)`; `pressure_for_turn` + `current_pressure` None when complete; two-phase submit; determinism via choices+seed. `PRESSURE_ARC` 5 truthful signals, `StrategicSummary` + rival headlines.
+- Wealth exact with revaluation; causal chain `pressure_stage->world->regional_output/farm_output->home_supply->home_price->...->wealth` (pressure never directly parents price); `trace.py` validator unchanged (regional_output kind production, delta handling via existing).
+- Harness honest: deterministic policies are seed-invariant on fixed arc, seed variation from `random_legal` only via `rng_for`; median-ratio gates (1.60 dominant, 0.70 dead) generous; 200 seeds ×5 =1000 games <5s; exit 2 on breach reported, now blocking since tuned passes (2073/2624/2752/3008 ratio 1.09).
+- Determinism choices+seed via `rng_for` (no global random, no `hash()`); no `world_modifiers`/JSON loader/weighted sampler.
 
 ### Normal verification
 
 ```bash
 uv sync --project backend
-make test              # = uv run --project backend pytest -v  (122 passed: 112 prior +10 new pressure tests)
+make test              # = uv run --project backend pytest -v  (130 passed: 122 prior +8 new balance tests)
 make lint              # = ruff check backend  (All checks passed)
 make type              # = pyright  (0 errors, 0 warnings)
-make format-check      # = ruff format --check backend  (30 files already formatted)
+make format-check      # = ruff format --check backend  (32 files already formatted)
 ```
 
 ### Last known green
 
 ```
 uv sync --project backend  → Resolved 15 packages, 0 errors
-pytest -v                  → 122 passed (8 core +7 rounding +11 determinism +2 purity/sanity +15 kernel +7 invariants +13 causal_trace (world child of pressure_stage, TURN_ORDER pressure_stage->world->... ) +4 explanation+13 two_markets_route+17 five_turn_prototype+16 deterministic_rivals +10 pressure_arc [arc 5 order + signals observational, 7-field exact, stage/world biconditional (early_dry+drought/worsening+drought/drought+normal raise) + causal_source_id single source, warning-isolated+mechanism-isolated AC1+AC3 (hold+granary+buy vs hold*5 on seed-8-useful: supply 100==100 price 4750==4750 farm 60==60 yet price_value 130 vs 104 inv 250 vs 200 wealth 130 vs 104 affordable threshold-free), drought systemic pressure→world→farm→supply→price no direct edge + reason_code==causal_source_id, determinism/inspectability current_pressure None when complete + pressure_for_turn raises, structural smallness no json/weighted/sampler, threat only on worsening])
+pytest -v                  → 130 passed (8 core +7 rounding +11 determinism +2 purity/sanity +15 kernel +7 invariants +13 causal_trace (TURN_ORDER with regional_output) +4 explanation+13 two_markets_route+17 five_turn_prototype (supply 340/156 with regional, parents regional+farm) +16 deterministic_rivals (5 diffs with new market) +10 pressure_arc +8 balance_harness [harness 200 games <5s, median_ratio 1.09 PASS dominant <1.60, dead PASS median≥0.70*overall (2073≥1836), negativity PASS, price 3657-5381 PASS [2000,9000], swing ≤2500 PASS, determinism double-run identical + sensitivity, no bare string, regional truthful farm0 drought supply 96<240 and regional 216<360])
 ruff check backend         → All checks passed
-ruff format --check backend→ 30 files already formatted
+ruff format --check backend→ 32 files already formatted
 pyright                    → 0 errors, 0 warnings, 0 informations
-demo                       → via PressureState (stage-derived label G5: normal→"Normal conditions", early_dry→"Early dry conditions", etc.), both normals/droughts via northern_drought arc or test constants, trace pressure_stage root
-prototype hold 5           → hold×5 prints 5× 6 MONTHS LATER + MIRA/DARAN headlines each turn, ends STRATEGIC SUMMARY with 5/5 diffs `T2 Surplus [early_dry]` etc. (G2) + pressure_stage root in each trace (pressure_stage:pressure:northern_drought:normal / early_dry / worsening_dry / drought / aftermath, e.g. T2 Early dry conditions [reason pressure:northern_drought:early_dry])
-cli parse                  → parse_choice("buy 20") -> buy_grain qty 20; backend/app/cli.py --choices "hold,build_granary,buy_grain,hold,hold" vs "hold,hold,hold,hold,hold" shows mechanism-isolated warning usefulness
-actor primitives           → compute_farm_output/resolve_buy/... single source; turn.py and rivals.py both call same; costs 500/300/400/800 parity
-graphify update .          → 965 nodes, 1668 edges, 73 communities; graph.json/graph.html/GRAPH_REPORT updated
+demo                       → via PressureState, trace now includes regional_output parented by world, home_supply parented by regional+farm
+prototype hold 5           → hold×5 wealth ~3008 with new economy (supply 280→340→... price 4739-5381), MIRA/DARAN 5 diffs
+cli balance                → --balance --seeds 200 -> 1000 games <2s: production 2073 storage 2752 trade 2624 cash 3008 random 2117 ratio 1.09 PASS, price 3657-5381 PASS
+harness determinism        → same config double-run identical JSON, prefix change varies random_legal
+graphify update .          → 1180 nodes, 2100 edges, 73 communities; graph.json/graph.html/GRAPH_REPORT updated
 ```
-
-Cache provenance fixed in YOLO (`~/.cache/uv/sdists-v9/.git` removed, `uv cache prune`), no `UV_CACHE_DIR` workaround needed.
 
 ### Decisions relevant to future work
 
@@ -109,21 +114,22 @@ Cache provenance fixed in YOLO (`~/.cache/uv/sdists-v9/.git` removed, `uv cache 
 - Coverage tracked not gating until Sections 3-4; heavy unit on engine/domain
 - `backend/pyproject.toml` location; root `Makefile` wrappers; `backend/uv.lock` tracked
 - Section 2: `pydantic` for validated integer types; JSON canonical encoding for RNG; capacities single-source
-- Section 3: `TURN_ORDER` explicit (now pressure_stage->world->command->production->home_supply->river_supply->home_price->river_price->settlement->route_settlement->valuation), drought reduces yield not price, buy clamped, integer price via basis points
-- Section 4: exact wealth decomposition at old vs new price, immutable tuples for causal DAG, allowed roots now pressure_stage+command (world child of pressure_stage), story drivers as causal paths ranked by exact wealth-bps, filtered zero stories, RNG ownership validated, concise/verbose CLI
-- Section 5: `market` stays Home alias + `river_market` + `route:RouteState`; `transport_cost_per_unit` in milliunits (800) comparable to price 5000; `TURN_ORDER` extended with home_supply/river_supply/home_price/river_price/route_settlement; river supply stable for divergence; `secure_route`/`ship_grain` with capacity/inventory/cash clamping; wealth with ship `purchase+harvest+ship+price+cash` exact; drivers include trade arbitrage at resolved prices; optional staleness deferred; regression: resolved Home price flips arbitrage
-- Section 6: Home supply signal `signal_next = max(0, signal+farm_output-demand)`; River stable; `FiveTurnGame` session-owned `state+history`, `TURN_SPECS` 5 truthful signals, start Home 100/90/5000 River 80/130/5200 storage200, determinism choices-based
-- Section 7: Session-owned rivals via `actor.py` shared primitives (no duplicated economy), two-phase timing (choose pre→player resolve→settle rivals buy@pre/ship@resolvedRiver/valuation@resolvedHome), integer/bps scoring `expected×pref×capital×risk×exposure` with threat boost only on `next_world_known==drought` (T3 warning, not signal parsing; now via pressure stage), `RivalProfile` (Mira 4500/15000/13000/14500 farm-averse, Daran 16000/7000 farm-hungry) vs `RivalState` (1200/25/5/250 vs 1400/15/12/150) proven via identical-state tests, `RivalTurnResult` history 5×(Mira,Daran) with `wealth=cash+qty+price` revaluation, headlines derived from outcome, isolation (player supply unchanged), deterministic exact-tie `rng_for`
-- Section 8: Turn-derived pressure via `domain/pressure.py` + `engine/pressure.py` (PRESSURE_ARC 5, truthful rainfall prose, T2 title Surplus kept, activation_turn==index, no world_modifiers/loader/DSL), `PressureState` frozen 7 fields with validator `stage=="drought" <=> world=="drought"` + `causal_source_id` single source, `resolve_turn` pressure_stage root (reason_code=causal_source_id, delta None, parent of world; no direct pressure→price edge, systemic via farm_output→supply→price), `FiveTurnGame` pressure-derived TURN_SPECS + `current_pressure` None when complete, `trace.py` validator unchanged (pressure admitted via delta None fallback), mechanism+warning-isolated AC1/AC3 (hold+granary+buy vs hold*5 on seed-8-useful proves identical T4 market 100==100/4750==4750/60==60 yet different exposure 130 vs 104/250 vs 200), structural smallness (5 only, no json/weighted/sampler), determinism/inspectability via pressure_for_turn
+- Section 3: `TURN_ORDER` explicit (now with regional_output), drought reduces yield not price, buy clamped, integer price via basis points
+- Section 4: exact wealth decomposition at old vs new price, immutable tuples for causal DAG, allowed roots now pressure_stage+command (regional_output also root child of world), story drivers ranked by wealth-bps, RNG ownership validated, concise/verbose CLI
+- Section 5: `market` stays Home alias + `river_market` + `route:RouteState`; transport_cost 800 comparable; river stable; `secure_route`/`ship_grain` with clamping; wealth with ship exact; drivers include trade arbitrage at resolved prices
+- Section 6: Home supply signal `signal_next = max(0, signal+regional_after+farm_output-demand)` with regional_output; River stable; `FiveTurnGame` session-owned, TURN_SPECS derived, start Home 280/400/5000/4000 regional360 storage400, determinism choices-based
+- Section 7: Session-owned rivals via `actor.py` shared primitives, two-phase timing, integer/bps scoring with structured threat, `RivalProfile` vs `RivalState`, `RivalTurnResult` history, isolation, deterministic tie-break
+- Section 8: Turn-derived pressure via `domain/pressure.py` + `engine/pressure.py` (PRESSURE_ARC 5, truthful prose), `PressureState` 7 fields biconditional + causal_source_id single source, `resolve_turn` pressure_stage root, `FiveTurnGame` pressure-derived, `trace.py` unchanged, warning-isolated
+- Section 9: Regional non-player output via `MarketState.regional_output` + `_regional_output_after_world` reusing `DROUGHT_YIELD_REDUCTION_BPS` (single formula), supply `signal+regional_after+farm-demand`, `regional_output` causal node (parent world) -> `home_supply` (parents regional+farm), `TURN_ORDER` with regional_output, `default_start_state` retuned `supply 280/demand 400/regional 360/responsiveness 4000/storage 400` (was 100/90/5000/200) — player 21.7% share, roughly stable (+60), price 3657-5381, harness `engine/harness.py` 5 policies, `BatchConfig/run_batch` deterministic, `cli --balance` markdown+JSON exit 2 reported (now blocking since passes: 2073/2752/2624/3008 ratio1.09), no bare string, honest seed-invariant note, 8 new tests
 
 ### Intentionally missing (do not build early)
 
-Balance harness (Section 9 — multi-seed sweeps, win rates), FastAPI/GameView/revision (Section 10), React UI (Section 11) etc. No DB/SQLAlchemy, LLMs, route congestion, contested supply, generic rival framework, content loader/world_modifiers/content_version (Section 15).
+FastAPI/GameView/revision (Section 10), React UI (Section 11) etc. No DB/SQLAlchemy, LLMs, route congestion, contested supply, generic rival framework, content loader/world_modifiers/content_version (Section 15). Balance harness is the Section 9 deliverable — no further tuning beyond median-ratio gates.
 
 ### Follow-up obligations
 
-Section 8 follow-ups resolved: turn-derived pressure (R1/F2) not canonical GameState, biconditional validator, single-source causal_source_id (F3), domain/pressure.py location (F4), mechanism-isolated warning instrument (F1) with equality pre-condition (supply/price/farm_output identical) + threshold-free exposure difference, structural smallness, closeout per F5. graphify 965 nodes.
+Section 9 complete: regional_output economy (single field + single drought primitive + retuned constants 280/400/360/4000/400) fixes dominant hold and makes drought truthful via regional even with farm 0; harness proves no dominant/dead (ratio 1.09) and price within bounds. graphify 1180 nodes. Next is Section 10 FastAPI.
 
 ### Next milestone
 
-**Section 9 — Headless Strategy and Balance Harness** — scripted harness over many seeds (production-heavy/storage-heavy/trade-heavy/cash-preserving/random), no universally dominant strategy, price bounds, deterministic batch.
+**Section 10 — Minimal FastAPI Boundary** — in-memory `POST /api/v1/games`, `GET /api/v1/games/{id}`, `POST /api/v1/games/{id}/choices/{choice_id}` with `GameView` and `expected_revision` staleness, engine stays pure.

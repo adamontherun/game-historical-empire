@@ -1,8 +1,8 @@
-"""One-turn grain market kernel — Sections 4–6.
+"""One-turn grain market kernel — Sections 4–6, regional_output Section 9.
 
 Resolves a single turn with explicit order:
 
-    Command -> Production -> HomeSupply -> RiverSupply -> HomePrice -> RiverPrice -> Settlement -> RouteSettlement -> Valuation
+    Command -> Production -> RegionalOutput -> HomeSupply -> RiverSupply -> HomePrice -> RiverPrice -> Settlement -> RouteSettlement -> Valuation
 
 All canonical state is integer; rounding via helpers; deterministic RNG
 substream is consumed but core price remains deterministic to preserve
@@ -22,18 +22,14 @@ Section 5 adds: Home Valley (existing market) + River Town (river_market)
 + River Route (route) with transport cost / capacity / reliability.
 Ship trade is settlement after harvest, valued at river price.
 
-Supply semantics (Section 6): MarketState.supply is a regional
-market-availability signal/index at the start of the turn, not a literal
-conserved physical stock. Home Valley signal evolves as
-signal_next = max(0, signal + farm_output - demand), i.e. each turn's
-availability index is adjusted by harvest and drained by regional
-consumption (demand). Price is set on signal_next via _target_price
-with effective_supply guard, so surplus (farm_output > demand) raises the
-signal and depresses price, shortage (drought) lowers the signal and
-raises price. The same farm_output also enters player inventory; for this
-prototype no conservation is implied between the regional signal and
-player inventory (ownership/flow accounting is deferred to Section 14).
-River Town signal remains stable (exogenous) for Section 6.
+Supply semantics (Section 6, revised Section 9): MarketState.supply is a regional
+market-availability signal/index at the start of the turn. Home Valley signal evolves as
+signal_next = max(0, signal + regional_output_after_world + farm_output - demand),
+where regional_output_after_world reuses the same drought reduction (DROUGHT_YIELD_REDUCTION_BPS)
+as the player's farm via actor. Price is set on signal_next via _target_price
+with effective_supply guard. The same farm_output also enters player inventory;
+for this prototype no conservation is implied between the regional signal and
+player inventory (ownership deferred to Section 14). River Town signal remains stable (exogenous).
 
 Spec: drought reduces production/yield, not directly price.
 """
@@ -68,6 +64,8 @@ from app.engine.actor import (
     resolve_shipment,
     resolve_storage_settlement,
 )
+
+# Regional output reuses the same drought reduction as compute_farm_output
 from app.engine.actor import (
     affordable_quantity as _affordable_quantity,  # noqa: F401
 )
@@ -80,8 +78,17 @@ from app.engine.actor import (
 from app.engine.rng import rng_for
 from app.engine.rounding import clamp_non_negative, div_round_half_up
 
+
+def _regional_output_after_world(base: int, world: str) -> tuple[int, str]:
+    """Non-player regional output after world effect — reuses same drought primitive."""
+    if world == "drought":
+        after = base * (10_000 - DROUGHT_YIELD_REDUCTION_BPS) // 10_000
+        return after, "drought_reduced_yield"
+    return base, "normal_yield"
+
+
 # Public for tests to assert order.
-TURN_ORDER: str = "pressure_stage -> world -> command -> production -> home_supply -> river_supply -> home_price -> river_price -> settlement -> route_settlement -> valuation"
+TURN_ORDER: str = "pressure_stage -> world -> command -> production -> regional_output -> home_supply -> river_supply -> home_price -> river_price -> settlement -> route_settlement -> valuation"
 
 
 def _target_price(
@@ -127,7 +134,7 @@ def resolve_turn(
 ) -> TurnResolution:
     """Resolve one deterministic turn.
 
-    Order is explicit: pressure_stage -> world -> command -> production -> home_supply -> river_supply -> home_price -> river_price -> settlement -> route_settlement -> valuation.
+    Order is explicit: pressure_stage -> world -> command -> production -> regional_output -> home_supply -> river_supply -> home_price -> river_price -> settlement -> route_settlement -> valuation.
 
     Args:
         state: Canonical before state (includes home market, river market, route).
@@ -722,10 +729,37 @@ def resolve_turn(
         )
     )
 
-    # 3. Home Supply — availability signal drained by demand (Section 6 semantics)
-    # MarketState.supply is an availability signal/index at start; next signal = max(0, signal + farm_output - demand)
+    # 2b. Regional output — non-player, same drought reduction
+    regional_base = state.market.regional_output
+    regional_after, regional_reason = _regional_output_after_world(regional_base, world)
+    nodes.append(
+        CausalNode(
+            id="regional_output",
+            label=f"Regional output {regional_after} (base {regional_base})",
+            kind="production",
+            before=regional_base if world == "drought" else None,
+            after=regional_after,
+            delta=regional_after - regional_base if world == "drought" else regional_after,
+            reason_code=regional_reason,
+            parent_ids=("world",),
+        )
+    )
+    effects.append(
+        DomainEffect(
+            metric="regional_output",
+            before=regional_base if world == "drought" else 0,
+            after=regional_after,
+            delta=regional_after - regional_base if world == "drought" else regional_after,
+            reason_code=regional_reason,
+        )
+    )
+
+    # 3. Home Supply — availability signal drained by demand (Section 9: includes regional)
+    # signal_next = max(0, signal + regional_after + farm_output - demand)
     supply_before_harvest = before_supply
-    next_supply = clamp_non_negative(supply_before_harvest + farm_output - before_demand)
+    next_supply = clamp_non_negative(
+        supply_before_harvest + regional_after + farm_output - before_demand
+    )
     supply_delta = next_supply - before_supply
     # Reason reflects whether signal grew (surplus) or shrank (shortage)
     if next_supply > before_supply:
@@ -739,26 +773,26 @@ def resolve_turn(
     nodes.append(
         CausalNode(
             id="supply",
-            label=f"Regional availability {before_supply}+{farm_output}-{before_demand}→{next_supply}",
+            label=f"Regional availability {before_supply}+{regional_after}+{farm_output}-{before_demand}→{next_supply}",
             kind="supply",
             before=before_supply,
             after=next_supply,
             delta=supply_delta,
             reason_code=supply_reason,
-            parent_ids=("farm_output", "demand"),
+            parent_ids=("regional_output", "farm_output", "demand"),
         )
     )
     # Also emit alias home_supply for clarity
     nodes.append(
         CausalNode(
             id="home_supply",
-            label=f"Home Valley availability {before_supply}+{farm_output}-{before_demand}→{next_supply}",
+            label=f"Home Valley availability {before_supply}+{regional_after}+{farm_output}-{before_demand}→{next_supply}",
             kind="supply",
             before=before_supply,
             after=next_supply,
             delta=supply_delta,
             reason_code=supply_reason,
-            parent_ids=("farm_output", "home_demand"),
+            parent_ids=("regional_output", "farm_output", "home_demand"),
         )
     )
     effects.append(
@@ -1635,6 +1669,7 @@ def resolve_turn(
         current_price=new_price,
         responsiveness=responsiveness,
         max_movement_bps=max_movement_bps,
+        regional_output=regional_base,
     )
     next_river_market = MarketState(
         supply=river_supply_next,

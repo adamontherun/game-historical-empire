@@ -91,18 +91,18 @@ def test_determinism_same_seed_same_choices_same_final_state() -> None:
 
 def test_supply_semantics_is_signal_drained_by_demand() -> None:
     """Gate for KDR #5: supply is an availability signal drained by demand each turn."""
-    # Use a controlled state: supply 100, demand 90, farm 10 => 100 harvest normal
+    # Updated: Section 9 regional_output economy — supply includes regional
+    # default_start_state: supply 280, demand 400, regional 360, farm 10 => 100 harvest normal
+    # For normal: signal_next = 280 + 360 + 100 -400 =340
+    # For drought: 280+216+60-400=156
     state = default_start_state(seed="supply-semantics", version="1.0")
-    # Use the default start state's market: supply 100 demand 90
-    # For normal: signal_next = 100 + 100 -90 =110
-    # For drought: 100+60-90=70
     normal = resolve_turn(state, _hold(), PRESSURE_NORMAL, state.to_turn_context())
     drought = resolve_turn(state, _hold(), PRESSURE_DROUGHT, state.to_turn_context())
-    assert normal.next_state.market.supply == 110, (
-        f"expected 110 got {normal.next_state.market.supply}"
+    assert normal.next_state.market.supply == 340, (
+        f"expected 340 got {normal.next_state.market.supply}"
     )
-    assert drought.next_state.market.supply == 70, (
-        f"expected 70 got {drought.next_state.market.supply}"
+    assert drought.next_state.market.supply == 156, (
+        f"expected 156 got {drought.next_state.market.supply}"
     )
     # Supply lower under drought
     assert drought.next_state.market.supply < normal.next_state.market.supply
@@ -110,8 +110,9 @@ def test_supply_semantics_is_signal_drained_by_demand() -> None:
     assert drought.next_state.market.current_price >= normal.next_state.market.current_price
     # Verify trace supply node exists and has correct reason
     supply_node = next(n for n in normal.causal_trace.nodes if n.id == "supply")
-    assert supply_node.after == 110
+    assert supply_node.after == 340
     assert "farm_output" in supply_node.parent_ids
+    assert "regional_output" in supply_node.parent_ids
 
 
 def test_three_strategies_diverge() -> None:

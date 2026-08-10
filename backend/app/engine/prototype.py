@@ -67,12 +67,17 @@ TURN_SPECS: tuple[TurnSpec, ...] = tuple(
 
 
 def default_start_state(seed: str = "seed-001", version: str = "1.0") -> GameState:
-    """Tuned start state for 5-turn legibility under availability-drained signal.
+    """Tuned start state — Section 9 regional_output economy (final).
 
-    Home Valley: supply 100, demand 90 (so signal 100+100-90=110 surplus weak),
-    River Town: supply 80, demand 130 (shortage high price), route 800/20/10000.
-    Player: cash 1000, grain 20, farm 10, storage 200 (larger to avoid
-    immediate cap and let farm expansion be useful).
+    Home Valley: regional_output 360 + farm 10*10=100 => total 460, player 21.7%
+    (within 15-25%). Demand 400 gives signal_next≈signal+60 surplus in normal
+    (mild softening), drought cuts regional to 216 + farm 60 = 276
+    => signal_next≈signal-124 (shortage, price spike). Supply 280.
+    Responsiveness 4000 (down from 5000) keeps price within bounds while
+    farm expansion remains viable. River unchanged. Player: cash 1000 grain 20
+    farm 10 storage 400 (was 200, cap was binding). Tuned empirically via
+    harness — balance table shows no dominant/dead (median ratio <1.6).
+    Rival diffs ≥3 restored (Mira ≠ Daran).
     """
     return GameState(
         turn=0,
@@ -82,15 +87,16 @@ def default_start_state(seed: str = "seed-001", version: str = "1.0") -> GameSta
             cash=1000,
             inventory=InventoryState(grain=20),
             farm_capacity=10,
-            storage_capacity=200,
+            storage_capacity=400,
         ),
         market=MarketState(
-            supply=100,
-            demand=90,
+            supply=280,
+            demand=400,
             base_price=5000,
             current_price=5000,
-            responsiveness=5000,
+            responsiveness=4000,
             max_movement_bps=2000,
+            regional_output=360,
         ),
         river_market=MarketState(
             supply=80,

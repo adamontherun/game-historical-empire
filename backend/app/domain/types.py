@@ -76,6 +76,10 @@ class MarketState(BaseModel):
 
     supply: Quantity = Field(description="Regional grain supply")
     demand: Quantity = Field(description="Regional grain demand")
+    regional_output: Quantity = Field(
+        default=0,
+        description="Non-player regional grain output per turn (Home only; River stays exogenous)",
+    )
     base_price: PriceMilliunits = Field(  # type: ignore[call-overload]
         description="Base price milliunits (>0)",
         strict=True,
